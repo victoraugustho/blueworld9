@@ -1,0 +1,44 @@
+# Dependências
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build
+.next
+out
+dist
+build
+
+# Desenvolvimento
+.git
+.gitignore
+README.md
+.DS_Store
+*.local
+
+# Testes
+coverage
+.nyc_output
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Env
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+
+# Misc
+.vercel

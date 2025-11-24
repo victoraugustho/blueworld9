@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  blueworld9:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blueworld9-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_N8N_WEBHOOK_URL=${NEXT_PUBLIC_N8N_WEBHOOK_URL}
+    networks:
+      - blueworld9-network
+
+networks:
+  blueworld9-network:
+    driver: bridge

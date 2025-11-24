@@ -92,7 +92,9 @@ export function GlassmorphismNav() {
             <button className="relative px-6 py-2 rounded-full font-semibold text-white 
                 bg-gradient-to-r from-orange-500 to-rose-400
                 hover:from-emerald-400 hover:via-cyan-400 hover:to-blue-500
-                transition-all duration-800 hover:scale-[1.03] hover:border-2">
+                transition-all duration-800 hover:scale-[1.03] hover:border-2"
+                onClick={() => window.location.href = "/portal"}
+                >
               <span className="relative z-10">Acessar Portal</span>
             </button>
           </div>
@@ -131,11 +133,14 @@ export function GlassmorphismNav() {
             </div>
             <div className="pt-4 border-t border-white/20 mt-4">
             <button className="relative px-6 py-2 rounded-full font-semibold text-white 
-                bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-600
-                hover:from-emerald-400 hover:via-cyan-400 hover:to-blue-500
-                transition-all duration-800 hover:scale-[1.03] md:text-yellow">
+              bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-600
+              hover:from-emerald-400 hover:via-cyan-400 hover:to-blue-500
+              transition-all duration-800 hover:scale-[1.03] md:text-yellow"
+              onClick={() => window.location.href = "/portal"}
+            >
               <span className="relative z-10">Acessar Portal</span>
             </button>
+
             <button className="relative px-6 py-2 ml-4 rounded-full font-semibold text-white border hover:bg-white hover:text-blue-500
               transition-all duration-800 hover:scale-[1.03]">
             <span className="relative z-10">Contato</span>

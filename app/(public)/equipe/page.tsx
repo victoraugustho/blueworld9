@@ -42,6 +42,17 @@ export default function EquipePage() {
       },
     },
     {
+      name: "Alexandra Castro",
+      role: "Coordenadora Pedagógica Nacional",
+      formacao:"Graduada em Pedagogia",
+      bio: "Como a líder da excelência educacional, sua atuação lidera a coordenação pedagógica nacional da Blue World 9 Soluções Educacionais. Sua missão foca em potencializar o corpo docente e em garantir o alto padrão de qualidade e consistência dos programas, transformando o processo de aprendizado em cada unidade parceira no país.",
+      image: "/webp/alexandra.webp",
+      color: "from-green-500 to-emerald-600",
+      social: {
+        email: "rafael.oliveira@blueworld9.com",
+      },
+    },
+    {
       name: "Daniella Alquimim",
       role: "Coordenadora Pedagógica Internacional",
       formacao:"Graduada em Letras (Português/Inglês) e Pedagogia, com especializações em Espanhol e Educação Ambiental.",

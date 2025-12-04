@@ -23,9 +23,9 @@ export function AboutHomeSection() {
     },
     {
       icon: Users,
-      title: "Aprendizado Acessível",
+      title: "Experiência Prática Simplificada",
       description:
-        "Material educacional acessível que requer apenas um computador ou notebook, democratizando o acesso à educação de qualidade em tecnologia e inovação.",
+        "A abordagem STEAM só se completa com a ação. Por isso, a metodologia inclui recursos tangíveis e tecnológicos que possibilitam o aprendizado prático. É a combinação perfeita entre a exploração digital e a construção concreta, preparando nossos alunos para o futuro de forma integral.",
       gradient: "from-cyan-400/20 to-cyan-600/30",
       borderColor: "border-cyan-600/50",
       hoverBorder: "hover:border-cyan-500",
@@ -51,7 +51,7 @@ export function AboutHomeSection() {
       icon: Zap,
       title: "Educação 5.0",
       description:
-        "Combinamos metodologias ativas, robótica, IA e educação socioemocional para preparar jovens para os desafios do futuro.",
+        "Aplicamos a abordagem STEAM/Maker em conjunto com Metodologias Ativas, Inteligência Artificial (IA) e Educação Socioemocional, preparando nossos alunos para os desafios complexos do futuro.",
       gradient: "from-cyan-400/20 to-cyan-600/30",
       borderColor: "border-cyan-600/50",
       hoverBorder: "hover:border-cyan-500",
@@ -88,8 +88,7 @@ export function AboutHomeSection() {
             </span>
           </h2>
           <p className="text-xl text-slate-300 max-w-3xl mx-auto">
-            Combinamos as melhores práticas educacionais com inovação tecnológica para preparar estudantes para os
-            desafios do século XXI.
+            Integramos as melhores práticas com a vanguarda da inovação tecnológica, garantindo que cada estudante esteja totalmente preparado para os desafios do século XXI.
           </p>
         </div>
 
@@ -154,8 +153,7 @@ export function AboutHomeSection() {
           <div data-aos="fade-left" className="space-y-6">
             <h3 className="font-heading text-3xl font-bold text-cyan-500">Metodologia Inovadora que Transforma</h3>
             <p className="text-lg text-slate-300 leading-relaxed">
-              Nossa abordagem combina tecnologia de ponta com práticas pedagógicas comprovadas, criando experiências de
-              aprendizado memoráveis e impactantes que preparam os alunos para os desafios do futuro.
+              Combinamos tecnologia de ponta com práticas pedagógicas comprovadas para criar experiências de aprendizado memoráveis e impactantes que preparam nossos alunos para os desafios do futuro.
             </p>
             <div className="w-full flex flex-wrap gap-3">
               <span className="px-4 py-2 bg-yellow-400/20 border border-yellow-400/50 rounded-full text-yellow-300 text-sm">

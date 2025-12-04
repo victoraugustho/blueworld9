@@ -46,8 +46,7 @@ export function Footer() {
                 />
               </div>
               <p className="text-white/70 leading-relaxed max-w-md">
-                Transformando a educação através da tecnologia, inovação e metodologias humanizadas. Preparando alunos
-                para os desafios do futuro com STEAM, robótica e educação 5.0.
+                Transformamos a Educação com Tecnologia, Inovação e Metodologias Humanizadas. Preparamos nossos alunos para os desafios do futuro, integrando o STEAM, a Robótica e os pilares da Educação 5.0.
               </p>
               <div className="flex gap-3">
                 <a

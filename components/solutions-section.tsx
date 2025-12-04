@@ -20,7 +20,7 @@ export function SolutionsSection() {
     {
       icon: Users,
       title: "Capacitação de Professores",
-      description: "Formação docente contínua com metodologias ativas, STEAM e educação socioemocional integrada.",
+      description: "Oferecemos uma Formação Docente Contínua e focada em resultados. Nosso programa integra Metodologias Ativas, a abordagem STEAM e a Educação Socioemocional, capacitando seus professores a revolucionar a experiência de aprendizado em sala de aula.",
       gradient: "from-purple-500/10 to-pink-500/10",
       borderColor: "border-purple-400/50",
       hoverBorder: "hover:border-purple-300",
@@ -31,7 +31,7 @@ export function SolutionsSection() {
       icon: Lightbulb,
       title: "Projetos Maker",
       description:
-        "Ambientes de criação onde alunos desenvolvem soluções reais através da prototipagem e experimentação.",
+        "Ambientes de Criação e Inovação onde nossos alunos desenvolvem soluções reais por meio da prototipagem e experimentação, formando as bases dos inovadores do futuro.",
       gradient: "from-purple-500/10 to-pink-500/10",
       borderColor: "border-purple-400/50",
       hoverBorder: "hover:border-purple-300",
@@ -61,9 +61,9 @@ export function SolutionsSection() {
     },
     {
       icon: Zap,
-      title: "Tecnologia Educacional",
+      title: "Tecnologia Educacional Estratégica",
       description:
-        "Integração de IA, robótica e ferramentas digitais que tornam o aprendizado prático e significativo.",
+        "Aplicamos uma integração intencional de Inteligência Artificial (IA), robótica e ferramentas digitais avançadas para tornar o aprendizado não apenas prático, mas profundamente significativo e relevante para o futuro de nossos alunos.",
       gradient: "from-purple-500/10 to-pink-500/10",
       borderColor: "border-purple-400/50",
       hoverBorder: "hover:border-purple-300",

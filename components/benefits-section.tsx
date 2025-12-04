@@ -138,21 +138,20 @@ export function BenefitsSection() {
           <div data-aos="fade-left" className="space-y-6">
             <h3 className="font-heading text-3xl font-bold text-pink-400">Impacto Real na Vida dos Alunos</h3>
             <p className="text-lg text-slate-300 leading-relaxed">
-              Nossos programas vão além do conhecimento técnico, desenvolvendo habilidades socioemocionais e
-              competências essenciais para o sucesso profissional e pessoal no século XXI.
+              Nossos programas vão além do conhecimento técnico, focando no desenvolvimento de habilidades socioemocionais e competências essenciais para o sucesso acadêmico, profissional e pessoal no século XXI.
             </p>
             <div className="space-y-3">
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-green-400 mt-1 flex-shrink-0" />
-                <span className="text-slate-300">Desenvolvimento integral: cognitivo, social e emocional</span>
+                <span className="text-slate-300">Desenvolvimento Integral: equilíbrio entre o desenvolvimento cognitivo, social e emocional.</span>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-green-400 mt-1 flex-shrink-0" />
-                <span className="text-slate-300">Preparação para carreiras do futuro em tecnologia</span>
+                <span className="text-slate-300">Competências para o Futuro: aprimoramento do pensamento crítico, criatividade e resolução de problemas.</span>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-green-400 mt-1 flex-shrink-0" />
-                <span className="text-slate-300">Aumento significativo do engajamento e motivação</span>
+                <span className="text-slate-300">Engajamento Máximo: aumento significativo da motivação e da participação dos alunos.</span>
               </div>
             </div>
           </div>

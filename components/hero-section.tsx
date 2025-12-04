@@ -200,8 +200,7 @@ export function HeroSection() {
             </h1>
 
             <p className="text-lg md:text-xl text-white/90 max-w-xl">
-              Metodologias ativas, robótica, IA e educação socioemocional para formar jovens preparados
-              para os desafios da Educação 5.0.
+              Metodologias Ativas, Robótica, Tecnologia Maker, a abordagem STEAM, Inteligência Artificial (IA) e Educação Socioemocional são fundamentais para preparar os alunos para os desafios da Educação 5.0.
             </p>
 
             {/* BUTTONS */}

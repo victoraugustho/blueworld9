@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Menu,
   X,
+  Users,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -17,19 +18,16 @@ export function PortalSidebar({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const menu = [
+  const teacherMenu = [
     { href: "/portal/dashboard", label: "Início", icon: Home },
     { href: "/portal/dashboard/aulas", label: "Aulas", icon: BookOpen },
     { href: "/portal/dashboard/materiais", label: "Materiais", icon: FileText },
   ];
 
-  if (isAdmin) {
-    menu.push({
-      href: "/portal/dashboard/admin/materials",
-      label: "Administração",
-      icon: ShieldCheck,
-    });
-  }
+  const adminMenu = [
+    { href: "/portal/dashboard/admin/materials", label: "Materiais (Admin)", icon: ShieldCheck },
+    { href: "/portal/dashboard/admin/teachers", label: "Professores", icon: Users },
+  ];
 
   return (
     <>
@@ -42,12 +40,12 @@ export function PortalSidebar({ isAdmin }: { isAdmin: boolean }) {
         {open ? <X /> : <Menu />}
       </button>
 
-      {/* CARD LATERAL */}
+      {/* SIDEBAR */}
       <aside
         className={`
           fixed z-40
           top-6 left-4
-          w-72 h-[calc(100vh-3rem)]   /* altura menor que a tela */
+          w-72 h-[calc(100vh-3rem)]
           transform transition-all duration-300 ease-in-out
           ${open ? "translate-x-0" : "-translate-x-[300px] md:translate-x-0"}
 
@@ -62,9 +60,9 @@ export function PortalSidebar({ isAdmin }: { isAdmin: boolean }) {
           Portal do Professor
         </h2>
 
-        {/* MENU */}
+        {/* MENU DO PROFESSOR */}
         <nav className="flex flex-col gap-2 flex-1">
-          {menu.map((item) => {
+          {teacherMenu.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
 
@@ -79,7 +77,7 @@ export function PortalSidebar({ isAdmin }: { isAdmin: boolean }) {
                   ${
                     active
                       ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/20 shadow-md shadow-cyan-500/10"
-                      : "text-white/70 hover:text-white hover:bg-white/10 hover:shadow-lg hover:shadow-white/10"
+                      : "text-white/70 hover:text-white hover:bg-white/10 hover:border-white/10"
                   }
                 `}
               >
@@ -88,6 +86,43 @@ export function PortalSidebar({ isAdmin }: { isAdmin: boolean }) {
               </Link>
             );
           })}
+
+          {/* SEÇÃO DE ADMIN */}
+          {isAdmin && (
+            <>
+              {/* Separador */}
+              <div className="my-4 border-t border-white/20"></div>
+
+              <h3 className="text-xs uppercase tracking-wider text-white/50 mb-2 pl-2">
+                Administração
+              </h3>
+
+              {adminMenu.map((item) => {
+                const Icon = item.icon;
+                const active = pathname === item.href;
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`
+                      flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium
+                      transition-all duration-300
+
+                      ${
+                        active
+                          ? "bg-purple-500/20 text-purple-300 border border-purple-500/20 shadow-md shadow-purple-500/10"
+                          : "text-white/70 hover:text-white hover:bg-white/10 hover:border-white/10"
+                      }
+                    `}
+                  >
+                    <Icon className="w-5 h-5" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         {/* LOGOUT */}

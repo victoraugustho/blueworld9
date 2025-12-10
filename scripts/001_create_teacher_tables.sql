@@ -59,3 +59,10 @@ CREATE TABLE categories (
 -- caso queira vincular materials → categories:
 ALTER TABLE materials
 ADD COLUMN category_id INTEGER REFERENCES categories(id);
+
+-- Teacher Ativo Column
+ALTER TABLE teachers
+ADD COLUMN active BOOLEAN DEFAULT TRUE;
+
+CREATE INDEX IF NOT EXISTS teachers_active_idx ON teachers(active);
+

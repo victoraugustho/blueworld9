@@ -3,58 +3,9 @@
 import { CheckCircle2, TrendingUp, Heart, Brain, Zap, Star, Sparkles } from "lucide-react"
 import { AnimatedBackground } from "./animated-background"
 import Image from "next/image"
+import { PrinciplesGallery } from "@/components/secundary/benefits-gallery"
 
 export function BenefitsSection() {
-  const benefits = [
-    {
-      icon: Brain,
-      title: "Desenvolvimento Cognitivo",
-      description: "Estimula pensamento crítico, resolução de problemas e criatividade através de metodologias ativas.",
-      gradient: "from-green-500/10 to-emerald-500/10",
-      borderColor: "border-green-400/50",
-      iconColor: "text-green-500",
-    },
-    {
-      icon: Heart,
-      title: "Educação Socioemocional",
-      description: "Desenvolve inteligência emocional, empatia, colaboração e habilidades de liderança.",
-      gradient: "from-green-500/10 to-emerald-500/10",
-      borderColor: "border-green-400/50",
-      iconColor: "text-green-500",
-    },
-    {
-      icon: Zap,
-      title: "Protagonismo Estudantil",
-      description: "Coloca o aluno como centro do aprendizado, promovendo autonomia e responsabilidade.",
-      gradient: "from-green-500/10 to-emerald-500/10",
-      borderColor: "border-green-400/50",
-      iconColor: "text-green-500",
-    },
-    {
-      icon: TrendingUp,
-      title: "Preparação para o Futuro",
-      description: "Ensina competências essenciais: criatividade, inovação, comunicação e adaptabilidade.",
-      gradient: "from-green-500/10 to-emerald-500/10",
-      borderColor: "border-green-400/50",
-      iconColor: "text-green-500",
-    },
-    {
-      icon: CheckCircle2,
-      title: "Aumento de Engajamento",
-      description: "Alunos mais motivados, participativos e conectados com o processo educacional.",
-      gradient: "from-green-500/10 to-emerald-500/10",
-      borderColor: "border-green-400/50",
-      iconColor: "text-green-500",
-    },
-    {
-      icon: Zap,
-      title: "Resultados Mensuráveis",
-      description: "Acompanhamento de progresso com dados e relatórios que demonstram impacto real.",
-      gradient: "from-green-500/10 to-emerald-500/10",
-      borderColor: "border-green-400/50",
-      iconColor: "text-green-500",
-    },
-  ]
 
   return (
     <section className="relative py-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden">
@@ -157,30 +108,8 @@ export function BenefitsSection() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {benefits.map((benefit, index) => {
-            const Icon = benefit.icon
-            return (
-              <div
-                key={index}
-                data-aos="fade-up"
-                className={`group relative overflow-hidden rounded-2xl p-8 bg-gradient-to-br ${benefit.gradient} border ${benefit.borderColor} backdrop-blur transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer`}
-              >
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-10 bg-white transition-opacity duration-300" />
-
-                <div className="relative">
-                  <div
-                    className={`mb-4 p-3 bg-white/30 rounded-lg w-fit group-hover:scale-110 group-hover:bg-white/50 transition-all duration-300`}
-                  >
-                    <Icon className={`w-6 h-6 ${benefit.iconColor}`} />
-                  </div>
-                  <h3 className="font-heading text-lg font-bold text-white mb-2">{benefit.title}</h3>
-                  <p className="text-slate-200 text-sm leading-relaxed">{benefit.description}</p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <PrinciplesGallery />
+        
       </div>
     </section>
   )

@@ -4,69 +4,10 @@ import { AnimatedBackground } from "./animated-background"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { PrinciplesGallery } from "@/components/secundary/about-gallery"
 
 
 export function AboutHomeSection() {
-  const principles = [
-    {
-      icon: Code,
-      title: "Criatividade sem Limites",
-      description:
-        "Ensinamos através da programação para desenvolver liberdade criativa, permitindo que estudantes explorem um mundo sem limites físicos criando ambientes, personagens e ações.",
-      gradient: "from-cyan-400/20 to-cyan-600/30",
-      borderColor: "border-cyan-600/50",
-      hoverBorder: "hover:border-cyan-500",
-      iconBg: "bg-cyan-500/20",
-      iconColor: "text-cyan-400",
-      hoverIconBg: "group-hover:bg-cyan-500",
-      shadowColor: "hover:shadow-cyan-500/20",
-    },
-    {
-      icon: Users,
-      title: "Experiência Prática Simplificada",
-      description:
-        "A abordagem STEAM só se completa com a ação. Por isso, a metodologia inclui recursos tangíveis e tecnológicos que possibilitam o aprendizado prático. É a combinação perfeita entre a exploração digital e a construção concreta, preparando nossos alunos para o futuro de forma integral.",
-      gradient: "from-cyan-400/20 to-cyan-600/30",
-      borderColor: "border-cyan-600/50",
-      hoverBorder: "hover:border-cyan-500",
-      iconBg: "bg-cyan-500/20",
-      iconColor: "text-cyan-400",
-      hoverIconBg: "group-hover:bg-cyan-500",
-      shadowColor: "hover:shadow-cyan-500/20",
-    },
-    {
-      icon: Target,
-      title: "Protagonismo Estudantil",
-      description:
-        "Posicionamos o estudante como o centro do processo criativo, promovendo autonomia e responsabilidade pelo próprio aprendizado e desenvolvimento.",
-      gradient: "from-cyan-400/20 to-cyan-600/30",
-      borderColor: "border-cyan-600/50",
-      hoverBorder: "hover:border-cyan-500",
-      iconBg: "bg-cyan-500/20",
-      iconColor: "text-cyan-400",
-      hoverIconBg: "group-hover:bg-cyan-500",
-      shadowColor: "hover:shadow-cyan-500/20",
-    },
-    {
-      icon: Zap,
-      title: "Educação 5.0",
-      description:
-        "Aplicamos a abordagem STEAM/Maker em conjunto com Metodologias Ativas, Inteligência Artificial (IA) e Educação Socioemocional, preparando nossos alunos para os desafios complexos do futuro.",
-      gradient: "from-cyan-400/20 to-cyan-600/30",
-      borderColor: "border-cyan-600/50",
-      hoverBorder: "hover:border-cyan-500",
-      iconBg: "bg-cyan-500/20",
-      iconColor: "text-cyan-400",
-      hoverIconBg: "group-hover:bg-cyan-500",
-      shadowColor: "hover:shadow-cyan-500/20",
-    },
-  ]
-
-  const stats = [
-    { number: "400k+", label: "Alunos Impactados", color: "from-pink-500 to-orange-500" },
-    { number: "3k+", label: "Professores Treinados", color: "from-purple-500 to-pink-500" },
-    { number: "2k+", label: "Escolas Parceiras", color: "from-cyan-500 to-blue-500" },
-  ]
 
   const router = useRouter()
 
@@ -145,8 +86,7 @@ export function AboutHomeSection() {
                 <Award className="w-9 h-9 text-white" />
                 </div>
 
-            </div>
-
+              </div>
             </div>
 
 
@@ -179,49 +119,8 @@ export function AboutHomeSection() {
             Saiba Mais
             </Button>
           </div>
-          
-
         </div>
-
-        {/* PRINCIPLES GRID */}
-        <div data-aos="fade-up" className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
-          {principles.map((principle, index) => {
-            const Icon = principle.icon
-            return (
-              <div
-                key={index}
-                className={`relative overflow-hidden rounded-2xl p-8 bg-gradient-to-br ${principle.gradient} border ${principle.borderColor} ${principle.hoverBorder} backdrop-blur ${principle.shadowColor} transition-all duration-300 group hover:shadow-lg cursor-pointer hover:-translate-y-1`}
-              >
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-10 bg-white transition-opacity duration-300" />
-
-                <div className="relative">
-                  <div
-                    className={`mb-4 p-3 ${principle.iconBg} rounded-lg w-fit ${principle.hoverIconBg} group-hover:text-white transition-all duration-300`}
-                  >
-                    <Icon className={`w-6 h-6 ${principle.iconColor} group-hover:text-white`} />
-                  </div>
-                  <h3 className="font-heading text-xl font-bold text-white mb-3">{principle.title}</h3>
-                  <p className="text-slate-200 leading-relaxed">{principle.description}</p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* STATS - VIBRANT COLORFUL 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className={`bg-gradient-to-br ${stat.color} rounded-2xl p-8 text-white shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer group`}
-            >
-              <div className="text-5xl font-bold mb-2 group-hover:scale-110 transition-transform duration-300">
-                {stat.number}
-              </div>
-              <p className="text-white/90 text-lg font-medium">{stat.label}</p>
-            </div>
-          ))}
-        </div>*/}
+          <PrinciplesGallery />
       </div>
     </section>
   )

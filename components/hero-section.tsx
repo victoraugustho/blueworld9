@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { BookOpen, Cpu, Lightbulb, Atom, GraduationCap } from "lucide-react"
 import Image from "next/image"
 
@@ -13,20 +13,12 @@ export function HeroSection() {
   })
 
   useEffect(() => {
+    const targets = { schools: 20, students: 15000, projects: 100 }
     const duration = 2000
-    const steps = 60
-    const interval = duration / steps
+    const start = performance.now()
 
-    const targets = {
-      schools: 20,
-      students: 15000,
-      projects: 100,
-    }
-
-    let step = 0
-    const timer = setInterval(() => {
-      step++
-      const progress = step / steps
+    function animate(now: number) {
+      const progress = Math.min((now - start) / duration, 1)
 
       setCounts({
         schools: Math.floor(targets.schools * progress),
@@ -34,59 +26,37 @@ export function HeroSection() {
         projects: Math.floor(targets.projects * progress),
       })
 
-      if (step >= steps) {
-        clearInterval(timer)
-        setCounts(targets)
-      }
-    }, interval)
+      if (progress < 1) requestAnimationFrame(animate)
+    }
 
-    return () => clearInterval(timer)
+    requestAnimationFrame(animate)
   }, [])
 
   const scrollToContact = () => {
-    const element = document.getElementById("contato")
-    if (element) element.scrollIntoView({ behavior: "smooth" })
+    document.getElementById("contato")?.scrollIntoView({ behavior: "smooth" })
   }
 
-  const [particles1, setParticles1] = useState<any[]>([])
-  const [particles2, setParticles2] = useState<any[]>([])
-  const [particles3, setParticles3] = useState<any[]>([])
-
-  useEffect(() => {
-    const p1 = Array.from({ length: 80 }).map(() => ({
-      size: 1 + Math.random() * 4,
-      top: Math.random() * 100,
-      left: Math.random() * 100,
-      opacity: 0.2 + Math.random() * 0.6,
-      blur: Math.random() * 3,
-      duration: 2 + Math.random() * 4,
-      delay: Math.random() * 4,
-    }))
-
-    const p2 = Array.from({ length: 60 }).map(() => ({
-      size: 1 + Math.random() * 4,
-      top: Math.random() * 100,
-      left: Math.random() * 100,
-      blur: 1 + Math.random() * 4,
-      duration: 3 + Math.random() * 5,
-    }))
-
-    const p3 = Array.from({ length: 40 }).map(() => ({
-      size: 2 + Math.random() * 5,
-      top: Math.random() * 100,
-      left: Math.random() * 100,
-      blur: 2 + Math.random() * 6,
-      duration: 4 + Math.random() * 6,
-    }))
-
-    setParticles1(p1)
-    setParticles2(p2)
-    setParticles3(p3)
-  }, [])
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 80 }).map(() => ({
+        size: 1 + Math.random() * 4,
+        top: Math.random() * 100,
+        left: Math.random() * 100,
+        opacity: 0.2 + Math.random() * 0.6,
+        blur: Math.random() * 4,
+        duration: 3 + Math.random() * 5,
+        color: Math.random() > 0.66
+          ? "bg-white/60"
+          : Math.random() > 0.33
+          ? "bg-cyan-200/40"
+          : "bg-purple-300/40",
+      })),
+    []
+  )
 
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden pt-32 pb-20">
-
+      {/* Background */}
       <div className="absolute inset-0 z-0">
         <Image
           src="/webp/bg-v5.webp"
@@ -98,34 +68,29 @@ export function HeroSection() {
         />
       </div>
 
-
+      {/* Efeitos */}
       <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden">
-
-        {[...Array(8)].map((_, i) => (
+        {[...Array(6)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-[2px] h-full bg-gradient-to-b from-transparent via-cyan-400/30 to-transparent animate-[flow_8s_linear_infinite]"
-            style={{
-              left: `${5 + i * 12}%`,
-              animationDelay: `${i * 0.8}s`,
-            }}
+            className="absolute w-[2px] h-full bg-gradient-to-b from-transparent via-cyan-400/30 to-transparent animate-[flow_10s_linear_infinite]"
+            style={{ left: `${10 + i * 14}%`, animationDelay: `${i}s` }}
           />
         ))}
 
-        <div className="absolute top-20 left-1/3 w-96 h-96 bg-cyan-400/20 rounded-full blur-[120px] animate-[organicMove_12s_ease-in-out_infinite]" />
-        <div className="absolute bottom-10 right-10 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[140px] animate-[organicMove_14s_ease-in-out_infinite]" />
-        <div className="absolute top-1/2 -left-20 w-[400px] h-[400px] bg-emerald-400/20 rounded-full blur-[110px] animate-[organicMove_10s_ease-in-out_infinite]" />
+        <div className="absolute top-20 left-1/3 w-96 h-96 bg-cyan-400/20 rounded-full blur-[120px] animate-[organicMove_14s_ease-in-out_infinite]" />
+        <div className="absolute bottom-10 right-10 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[140px] animate-[organicMove_16s_ease-in-out_infinite]" />
 
-        <BookOpen className="absolute top-32 left-12 w-20 h-20 text-white/30 animate-[float_7s_ease-in-out_infinite]" />
-        <Cpu className="absolute bottom-40 right-24 w-24 h-24 text-cyan-300/40 animate-[float_9s_ease-in-out_infinite]" />
-        <Lightbulb className="absolute top-1/4 right-14 w-20 h-20 text-yellow-300/40 animate-[float_8s_ease-in-out_infinite]" />
-        <Atom className="absolute bottom-1/3 left-1/3 w-24 h-24 text-orange-400/35 animate-[float_10s_ease-in-out_infinite]" />
-        <GraduationCap className="absolute top-1/2 right-1/3 w-20 h-20 text-purple-400/35 animate-[float_11s_ease-in-out_infinite]" />
+        <BookOpen className="absolute top-32 left-12 w-20 h-20 text-white/30 animate-[float_8s_ease-in-out_infinite]" />
+        <Cpu className="absolute bottom-40 right-24 w-24 h-24 text-cyan-300/40 animate-[float_10s_ease-in-out_infinite]" />
+        <Lightbulb className="absolute top-1/4 right-14 w-20 h-20 text-yellow-300/40 animate-[float_9s_ease-in-out_infinite]" />
+        <Atom className="absolute bottom-1/3 left-1/3 w-24 h-24 text-orange-400/35 animate-[float_11s_ease-in-out_infinite]" />
+        <GraduationCap className="absolute top-1/2 right-1/3 w-20 h-20 text-purple-400/35 animate-[float_12s_ease-in-out_infinite]" />
 
-        {particles1.map((p, i) => (
+        {particles.map((p, i) => (
           <div
-            key={`p1-${i}`}
-            className="absolute bg-white/60 rounded-full animate-twinkle"
+            key={i}
+            className={`absolute rounded-full animate-twinkle ${p.color}`}
             style={{
               width: p.size,
               height: p.size,
@@ -134,47 +99,15 @@ export function HeroSection() {
               opacity: p.opacity,
               filter: `blur(${p.blur}px)`,
               animationDuration: `${p.duration}s`,
-              animationDelay: `${p.delay}s`,
             }}
           />
         ))}
-
-        {particles2.map((p, i) => (
-          <div
-            key={`p2-${i}`}
-            className="absolute bg-cyan-200/40 rounded-full animate-twinkle"
-            style={{
-              width: p.size,
-              height: p.size,
-              top: `${p.top}%`,
-              left: `${p.left}%`,
-              filter: `blur(${p.blur}px)`,
-              animationDuration: `${p.duration}s`,
-            }}
-          />
-        ))}
-        {particles3.map((p, i) => (
-          <div
-            key={`p3-${i}`}
-            className="absolute bg-purple-300/40 rounded-full animate-twinkle"
-            style={{
-              width: p.size,
-              height: p.size,
-              top: `${p.top}%`,
-              left: `${p.left}%`,
-              filter: `blur(${p.blur}px)`,
-              animationDuration: `${p.duration}s`,
-            }}
-          />
-        ))}
-
       </div>
 
+      {/* Conteúdo */}
       <div className="container mx-auto px-6 relative z-10">
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-
-          <div data-aos="fade-right" className="space-y-8">
+          <div className="space-y-8">
             <h1 className="text-glow font-heading font-bold text-3xl md:text-5xl text-white leading-tight pt-10">
               Transformando a educação com{" "}
               <span className="text-cyan-400">Tecnologia</span>,{" "}
@@ -183,7 +116,8 @@ export function HeroSection() {
             </h1>
 
             <p className="text-lg md:text-xl text-white/90 max-w-xl">
-              Metodologias Ativas, Robótica, Tecnologia Maker, a abordagem STEAM, Inteligência Artificial (IA) e Educação Socioemocional são fundamentais para preparar os alunos para os desafios da Educação 5.0.
+              Metodologias Ativas, Robótica, Tecnologia Maker, STEAM, IA e Educação
+              Socioemocional para preparar alunos para a Educação 5.0.
             </p>
 
             <div className="flex flex-col md:flex-row gap-4">
@@ -206,9 +140,8 @@ export function HeroSection() {
             </div>
           </div>
 
-          <div data-aos="fade-left" className="relative w-full aspect-square">
+          <div className="relative w-full aspect-square">
             <div className="absolute -inset-4 bg-white/10 blur-2xl rounded-3xl" />
-
             <Image
               src="/webp/img-01.webp"
               alt="Tecnologia e Educação"
@@ -220,28 +153,27 @@ export function HeroSection() {
           </div>
         </div>
 
-        <div data-aos="fade-up" className="md:grid-cols-3 justify-items-center grid grid-cols-1 mt-20 pt-10 border-t border-white/20 text-glow">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mt-20 pt-10 border-t border-white/20 text-glow text-center">
           <div>
             <div className="text-5xl font-bold text-white">+{counts.schools}</div>
             <p className="text-white/80 text-sm">Escolas</p>
           </div>
 
           <div>
-            <div className="text-5xl font-bold text-white md:pt-1 pt-20">+{counts.students.toLocaleString()}</div>
+            <div className="text-5xl font-bold text-white">
+              +{counts.students.toLocaleString()}
+            </div>
             <p className="text-white/80 text-sm">Alunos</p>
           </div>
 
           <div>
-            <div className="text-5xl font-bold text-white md:pt-1 pt-20">+{counts.projects}</div>
+            <div className="text-5xl font-bold text-white">+{counts.projects}</div>
             <p className="text-white/80 text-sm">Projetos Maker</p>
           </div>
         </div>
-
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-40 z-[5]
-      bg-gradient-to-b from-transparent to-slate-950" />
-
+      <div className="absolute bottom-0 left-0 right-0 h-40 z-[5] bg-gradient-to-b from-transparent to-slate-950" />
     </section>
   )
 }

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Footer } from "@/components/footer"
 import { AnimatedBackground } from '@/components/animated-background'
+import { YoutubeHeroEmbed } from "@/components/subpage/youtube"
 
 const features = [
   {
@@ -51,6 +52,12 @@ export default function ParaEscolasPage() {
               comunidade escolar.
             </p>
           </div>
+
+          <YoutubeHeroEmbed
+            videoId="JG0G_lxcqYM"
+            title="Veja como a Blue World 9 transforma a educação"
+          />
+
 
           <div data-aos="fade-up" className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
             {features.map((feature, index) => {

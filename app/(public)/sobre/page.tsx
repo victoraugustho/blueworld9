@@ -1,6 +1,7 @@
 import { Target, Eye, Award } from "lucide-react"
 import { Footer } from "@/components/footer"
 import { AnimatedBackground } from "@/components/animated-background"
+import { SouthAmericaInteractiveMap } from "@/components/map-interativo"
 
 export default function SobrePage() {
   return (
@@ -96,6 +97,9 @@ export default function SobrePage() {
               </div>
             </div>
           </div>
+          {/*<div>
+            <SouthAmericaInteractiveMap />
+          </div>*/}
         </div>
       </section>
       <Footer />

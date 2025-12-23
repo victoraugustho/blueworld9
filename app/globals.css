@@ -308,15 +308,48 @@
     animation: bounce-spin 3s ease-in-out infinite;
   }
 
-  ::-webkit-scrollbar {
-    width: 0px;
-    height: 0px;
-  }
-
-  html {
-    scrollbar-width: none;
-  }
   button {
   cursor: pointer;
   }
+
+  /* Scrollbar BW9 – fundo transparente */
+
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+      180deg,
+      rgba(9, 93, 202, 0.9),
+      rgba(168, 85, 247, 0.9)
+    );
+    border-radius: 999px;
+    box-shadow: 0 0 8px rgba(9, 93, 202, 0.25);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      rgba(9, 93, 202, 1),
+      rgba(168, 85, 247, 1)
+    );
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.45);
+  }
+
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(9, 93, 202, 0.9) transparent;
+  }
+
+ button.benefits:hover {
+background: green;
+  }
+
+
+
 }

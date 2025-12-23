@@ -10,56 +10,55 @@ const testimonials = [
   {
     name: "Fabiana Vieira",
     role: "Educadora Maker STEAM",
-    school: "Blue World 9",
     text: "Ver nossos alunos explorando, criando e se superando nas práticas Maker STEAM é sempre emocionante. Cada conquista, por menor que seja, revela o potencial e a capacidade deles. Na Blue World, fortalecemos esse crescimento com cuidado, propósito e profundo significado.",
     image: "/webp/depoimento-01-fabiana-vieira.webp",
   },
   {
     name: "Isabele Brum",
     role: "Diretora escolar",
-    school: "Escola do Futuro",
     text: "A Blue World 9 é muito mais do que um ambiente de aprendizagem. É um universo onde a criatividade floresce, a tecnologia impulsiona a autonomia e cada estudante é motivado a descobrir e desenvolver todo o seu potencial. É um espaço que inspira, transforma e molda os talentos que construirão o futuro. Porque aprender com propósito faz toda a diferença.",
-    image: "/webp/depoimento-02.webp",
+    image: "/webp/depoimento-02-att.webp",
+  },
+  {
+    name: "Francis Mello",
+    role: "Coordenadora Pedagógica",
+    text: "As aulas de Blue World - Robótica foram um sucesso em nossa unidade! Com criatividade e diversão, os alunos exploraram o mundo da tecnologia e da inovação, desenvolvendo habilidades essenciais para o futuro.",
+    image: "/webp/depoimento-03.webp",
   },
 ]
 
 const impactMetrics = [
-  { icon: School, label: "Escolas Impactadas", value: "500+", color: "from-purple-500 to-pink-500" },
-  { icon: Users, label: "Alunos Transformados", value: "50.000+", color: "from-cyan-500 to-blue-500" },
+  { icon: School, label: "Escolas Impactadas", value: "20+", color: "from-purple-500 to-pink-500" },
+  { icon: Users, label: "Alunos Transformados", value: "15.000+", color: "from-cyan-500 to-blue-500" },
   { icon: Globe, label: "Países na América Latina", value: "3", color: "from-orange-500 to-red-500" },
-  { icon: Award, label: "Projetos Realizados", value: "2.500+", color: "from-green-500 to-emerald-500" },
+  { icon: Award, label: "Projetos Realizados", value: "100+", color: "from-green-500 to-emerald-500" },
 ]
 
 const photos = [
   {
-    src: "/carrosel-01.png",
+    src: "/webp/impact-moments/t-01.webp",
     alt: "Alunos trabalhando com robótica",
     color: "from-purple-500 to-pink-500",
   },
   {
-    src: "/carrosel-02.png",
+    src: "/webp/impact-moments/t-02.webp",
     alt: "Professor orientando atividades STEAM",
     color: "from-cyan-500 to-blue-500",
   },
-  {
-    src: "/carrosel-03.png",
+  /*{
+    src: "/webp/impact-moments/t-03.webp",
     alt: "Alunos apresentando projeto",
     color: "from-orange-500 to-yellow-500",
-  },
+  },*/
   {
-    src: "/carrosel-04.png",
+    src: "/webp/impact-moments/t-04.webp",
     alt: "Projeto de robótica educacional",
     color: "from-green-500 to-emerald-500",
   },
   {
-    src: "/carrosel-05.png",
+    src: "/webp/impact-moments/t-05.webp",
     alt: "Atividades maker space",
     color: "from-pink-500 to-rose-500",
-  },
-  {
-    src: "/carrosel-06.png",
-    alt: "Apresentação de projetos",
-    color: "from-blue-500 to-indigo-500",
   },
 ]
 
@@ -160,7 +159,6 @@ export default function ImpactoPage() {
                     {testimonials[currentTestimonial].name}
                   </p>
                   <p className="text-slate-300 font-medium">{testimonials[currentTestimonial].role}</p>
-                  <p className="text-slate-400 text-sm">{testimonials[currentTestimonial].school}</p>
                 </div>
               </div>
 

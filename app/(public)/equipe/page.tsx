@@ -14,10 +14,6 @@ export default function EquipePage() {
       bio: "Como CEO e Fundador da Blue World 9 Soluções Educacionais, Cleomar di Castro é a força motriz por trás da missão da empresa. Ele lidera a estratégia de crescimento e inovação, garantindo que a Blue World 9 permaneça na vanguarda do ensino. Sua visão é dedicada a inspirar a equipe e a elevar o padrão dos programas educacionais, redefinindo o sucesso no aprendizado em todo o mundo.",
       image: "/webp/cleomar.webp",
       color: "from-cyan-500 to-blue-600",
-      social: {
-        Phone: "5562993204235",
-        email: "ana.silva@blueworld9.com",
-      },
     },
     {
       name: "Diogo Oliveira",
@@ -26,9 +22,6 @@ export default function EquipePage() {
       bio: "Com uma sólida formação jurídica e pedagógica, sua direção conecta a excelência educacional à vanguarda da tecnologia na Blue World 9. Ele lidera a estratégia de ensino e inovação de programas, garantindo que a união entre pedagogia de alta performance e ferramentas tecnológicas impulsione a aprendizagem e o crescimento da empresa.",
       image: "/webp/diogo.webp",
       color: "from-purple-500 to-pink-600",
-      social: {
-        email: "carlos.santos@blueworld9.com",
-      },
     },
     {
       name: "Ricardo Oliveira",
@@ -37,9 +30,6 @@ export default function EquipePage() {
       bio: "Com sólida formação técnica, sua atuação lidera a padronização e a qualidade dos processos tecnológicos em todas as unidades da Blue World 9 (nacionais e internacionais). Sua função principal é capacitar a equipe, atuando no treinamento técnico e pedagógico dos professores para assegurar a excelência e o alto desempenho de toda a rede global.",
       image: "/webp/ricardo.webp",
       color: "from-orange-500 to-rose-600",
-      social: {
-        email: "mariana.costa@blueworld9.com",
-      },
     },
     {
       name: "Alexandra Castro",
@@ -48,9 +38,6 @@ export default function EquipePage() {
       bio: "Como a líder da excelência educacional, sua atuação lidera a coordenação pedagógica nacional da Blue World 9 Soluções Educacionais. Sua missão foca em potencializar o corpo docente e em garantir o alto padrão de qualidade e consistência dos programas, transformando o processo de aprendizado em cada unidade parceira no país.",
       image: "/webp/alexandra.webp",
       color: "from-green-500 to-emerald-600",
-      social: {
-        email: "rafael.oliveira@blueworld9.com",
-      },
     },
     {
       name: "Daniella Alquimim",
@@ -59,9 +46,6 @@ export default function EquipePage() {
       bio: "Com sua formação ampla e global, sua atuação lidera a coordenação pedagógica das unidades internacionais da Blue World 9. Sua missão foca em garantir o alinhamento pedagógico e a qualidade educacional das operações externas, dedicando-se ao acompanhamento docente e à orientação estratégica fora do Brasil.",
       image: "/webp/daniella.webp",
       color: "from-green-500 to-emerald-600",
-      social: {
-        email: "rafael.oliveira@blueworld9.com",
-      },
     },
     {
       name: "Renato Borges",
@@ -70,9 +54,6 @@ export default function EquipePage() {
       bio: "Com uma visão 360º, sua direção é responsável por toda a estrutura administrativa e comercial da Blue World 9. Ele integra e gere as operações, garantindo o alto padrão de estratégia de vendas, gestão financeira e eficiência administrativa para um crescimento sólido e de excelência em nível nacional e internacional.",
       image: "/webp/renato.webp",
       color: "from-yellow-500 to-orange-600",
-      social: {
-        email: "julia.mendes@blueworld9.com",
-      },
     },
   ]
 
@@ -131,37 +112,6 @@ export default function EquipePage() {
                     </p>
                     <p className="text-white/70 text-sm leading-relaxed mb-4">{member.formacao}</p>
                     <p className="text-white/70 text-sm leading-relaxed mb-4">{member.bio}</p>
-
-                    {/* Social Links */}
-                    <div className="flex gap-3">
-                      {member.social.Phone && (
-                        <a
-                          href={member.social.Phone}
-                          className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-400/50 flex items-center justify-center transition-all group/icon"
-                          aria-label="WhatsApp"
-                        >
-                          <Phone className="w-4 h-4 text-white/60 group-hover/icon:text-cyan-400 transition-colors" />
-                        </a>
-                      )}
-                      {/*member.social.github && (
-                        <a
-                          href={member.social.github}
-                          className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-400/50 flex items-center justify-center transition-all group/icon"
-                          aria-label="GitHub"
-                        >
-                          <Github className="w-4 h-4 text-white/60 group-hover/icon:text-purple-400 transition-colors" />
-                        </a>
-                      )*/}
-                      {member.social.email && (
-                        <a
-                          href={`mailto:${member.social.email}`}
-                          className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-orange-400/50 flex items-center justify-center transition-all group/icon"
-                          aria-label="Email"
-                        >
-                          <Mail className="w-4 h-4 text-white/60 group-hover/icon:text-orange-400 transition-colors" />
-                        </a>
-                      )}
-                    </div>
                   </div>
                 </div>
               ))}

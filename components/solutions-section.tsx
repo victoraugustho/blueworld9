@@ -3,74 +3,9 @@
 import { Zap, Users, Lightbulb, Award, Code, Rocket, Sparkles, Trophy, SmilePlus, Radio } from "lucide-react"
 import { AnimatedBackground } from "./animated-background"
 import Image from "next/image"
+import { PrinciplesGallery } from "@/components/secundary/solutions-gallery"
 
 export function SolutionsSection() {
-  const solutions = [
-    {
-      icon: Code,
-      title: "Plataforma de Aprendizado",
-      description:
-        "LMS intuitiva com conteúdo interativo, gamificação e acompanhamento em tempo real do progresso dos alunos.",
-      gradient: "from-purple-500/10 to-pink-500/10",
-      borderColor: "border-purple-400/50",
-      hoverBorder: "hover:border-purple-300",
-      iconColor: "text-purple-500",
-      badgeColor: "bg-purple-500/20 text-purple-600",
-    },
-    {
-      icon: Users,
-      title: "Capacitação de Professores",
-      description: "Oferecemos uma Formação Docente Contínua e focada em resultados. Nosso programa integra Metodologias Ativas, a abordagem STEAM e a Educação Socioemocional, capacitando seus professores a revolucionar a experiência de aprendizado em sala de aula.",
-      gradient: "from-purple-500/10 to-pink-500/10",
-      borderColor: "border-purple-400/50",
-      hoverBorder: "hover:border-purple-300",
-      iconColor: "text-purple-500",
-      badgeColor: "bg-purple-500/20 text-purple-600",
-    },
-    {
-      icon: Lightbulb,
-      title: "Projetos Maker",
-      description:
-        "Ambientes de Criação e Inovação onde nossos alunos desenvolvem soluções reais por meio da prototipagem e experimentação, formando as bases dos inovadores do futuro.",
-      gradient: "from-purple-500/10 to-pink-500/10",
-      borderColor: "border-purple-400/50",
-      hoverBorder: "hover:border-purple-300",
-      iconColor: "text-purple-500",
-      badgeColor: "bg-purple-500/20 text-purple-600",
-    },
-    {
-      icon: Award,
-      title: "BNCC",
-      description: "Base Nacional Comum Curricular, que define as aprendizagens essenciais (competências e habilidades) que todos os alunos devem desenvolver na Educação Básica.",
-      gradient: "from-purple-500/10 to-pink-500/10",
-      borderColor: "border-purple-400/50",
-      hoverBorder: "hover:border-purple-300",
-      iconColor: "text-purple-500",
-      badgeColor: "bg-purple-500/20 text-purple-600",
-    },
-    {
-      icon: Rocket,
-      title: "Inovação Pedagógica",
-      description:
-        "Metodologias que preparam alunos para os desafios do futuro com foco em pensamento crítico e criatividade.",
-      gradient: "from-purple-500/10 to-pink-500/10",
-      borderColor: "border-purple-400/50",
-      hoverBorder: "hover:border-purple-300",
-      iconColor: "text-purple-500",
-      badgeColor: "bg-purple-500/20 text-purple-600",
-    },
-    {
-      icon: Zap,
-      title: "Tecnologia Educacional Estratégica",
-      description:
-        "Aplicamos uma integração intencional de Inteligência Artificial (IA), robótica e ferramentas digitais avançadas para tornar o aprendizado não apenas prático, mas profundamente significativo e relevante para o futuro de nossos alunos.",
-      gradient: "from-purple-500/10 to-pink-500/10",
-      borderColor: "border-purple-400/50",
-      hoverBorder: "hover:border-purple-300",
-      iconColor: "text-purple-500",
-      badgeColor: "bg-purple-500/20 text-purple-600",
-    },
-  ]
 
   return (
     <section className="relative py-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden">
@@ -196,31 +131,7 @@ export function SolutionsSection() {
             </div>
 
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {solutions.map((solution, index) => {
-            const Icon = solution.icon
-            return (
-              <div
-                key={index}
-                data-aos="fade-up"
-                className={`group relative overflow-hidden rounded-2xl p-8 bg-gradient-to-br ${solution.gradient} border ${solution.borderColor} ${solution.hoverBorder} backdrop-blur transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer`}
-              >
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-10 bg-white transition-opacity duration-300" />
-
-                <div className="relative">
-                  <div
-                    className={`mb-4 p-3 ${solution.badgeColor} rounded-lg w-fit group-hover:scale-110 transition-transform duration-300`}
-                  >
-                    <Icon className={`w-6 h-6 ${solution.iconColor}`} />
-                  </div>
-                  <h3 className="font-heading text-xl font-bold text-white mb-3">{solution.title}</h3>
-                  <p className="text-slate-200 leading-relaxed">{solution.description}</p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+      <PrinciplesGallery />
       </div>
     </section>
   )

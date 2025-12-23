@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Instagram, Linkedin, Youtube, Mail, Phone, MapPin, Heart } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 export function Footer() {
   
@@ -37,13 +38,13 @@ export function Footer() {
             {/* Brand Section */}
             <div data-aos="fade-right" className="md:col-span-2 space-y-6">
               <div className="flex items-center justify-center">
-                <Image
+                <Link href="/"><Image
                   src="/webp/logo-branca-bw9.webp"
                   alt="BlueWorld9"
                   width={220}
                   height={180}
                   className="object-contain"
-                />
+                /></Link>
               </div>
               <p className="text-white/70 leading-relaxed max-w-md">
                 Transformamos a Educação com Tecnologia, Inovação e Metodologias Humanizadas. Preparamos nossos alunos para os desafios do futuro, integrando o STEAM, a Robótica e os pilares da Educação 5.0.

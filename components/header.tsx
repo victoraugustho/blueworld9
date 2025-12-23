@@ -73,13 +73,13 @@ export function GlassmorphismNav() {
 
           {/* LOGO */}
           <div className="flex items-center gap-2">
-            <Image
+            <Link href="/"><Image
               src="/webp/logo-branca-bw9-extends.webp"
               alt="BlueWorld9"
               width={180}
               height={80}
               className="object-contain mr-10"
-            />
+            /></Link>
           </div>
 
           {/* DESKTOP MENU */}

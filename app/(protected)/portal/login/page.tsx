@@ -102,7 +102,7 @@ export default function PortalLoginPage() {
   <div className="relative min-h-screen flex items-center justify-center p-4">
    <GlassmorphismNav />
 
-      <Card className="w-full max-w-md relative z-10 bg-slate-900/80 backdrop-blur-xl border-cyan-500/20">
+      <Card className="w-full max-w-md mt-30 relative z-10 bg-slate-900/80 backdrop-blur-xl border-cyan-500/20">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
             <GraduationCap className="w-8 h-8 text-white" />

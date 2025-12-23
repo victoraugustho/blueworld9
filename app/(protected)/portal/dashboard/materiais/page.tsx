@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { FileText, Download } from "lucide-react";
+import { FileText, Eye } from "lucide-react";
 import Link from "next/link";
 
 export default async function MateriaisPage() {
@@ -60,8 +60,8 @@ export default async function MateriaisPage() {
 
                   <Link href={mat.file_url} target="_blank">
                     <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-600 hover:opacity-90 transition">
-                      <Download className="w-4 h-4" />
-                      Baixar
+                      <Eye className="w-4 h-4" />
+                      Visualizar
                     </button>
                   </Link>
                 </div>

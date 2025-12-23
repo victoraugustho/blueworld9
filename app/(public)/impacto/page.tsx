@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, MapPin, Users, School, Globe, Heart, Star, S
 import { Button } from "@/components/ui/button"
 import { AnimatedBackground } from "@/components/animated-background"
 import { Footer } from "@/components/footer"
+import { VideoTestimonialsCarousel } from "@/components/subpage/depoiments"
 
 const testimonials = [
   {
@@ -195,6 +196,10 @@ export default function ImpactoPage() {
                 ))}
               </div>
             </div>
+
+                <VideoTestimonialsCarousel />
+
+
           </div>
 
           <div className="mb-20">

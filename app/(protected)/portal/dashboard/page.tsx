@@ -1,36 +1,82 @@
-import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import { db } from "@/lib/db";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlayCircle, FileText, BookOpen, Video, LogOut, User } from "lucide-react";
-import Link from "next/link";
+import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
+import { db } from "@/lib/db"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { PlayCircle, FileText, BookOpen, Video, LogOut, User } from "lucide-react"
+import Link from "next/link"
+
+type Material = {
+  id: string
+  title: string
+  description: string
+  file_url: string
+  file_type: "video" | "document"
+  thumbnail_url?: string | null
+  created_at?: string
+  language: "pt-BR" | "es"
+  category_name?: string | null
+}
 
 export default async function PortalDashboardPage() {
-  const cookieStore = await cookies();
-  const teacherId = cookieStore.get("teacher_id")?.value;
+  const cookieStore = await cookies()
+  const teacherId = cookieStore.get("teacher_id")?.value
 
-  if (!teacherId) {
-    redirect("/portal/login");
-  }
+  if (!teacherId) redirect("/portal/login")
 
   // Buscar teacher no banco
   const [teacher] = await db`
-    SELECT * FROM teachers WHERE id = ${teacherId}
-  `;
+    SELECT id, name, email, approved, active, locale
+    FROM teachers
+    WHERE id = ${teacherId}
+    LIMIT 1
+  `
 
-  if (!teacher || !teacher.approved) {
-    redirect("/portal/login");
+  if (!teacher || !teacher.approved || teacher.active === false) {
+    redirect("/portal/login")
   }
 
-  // Buscar materials
-  const materials = await db`
-    SELECT * FROM materials ORDER BY created_at DESC
-  `;
+  const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
 
-  const videos = materials.filter((m) => m.file_type === "video");
-  const documents = materials.filter((m) => m.file_type === "document");
-  const documents_vazio = documents.length === 0;
+  // Buscar materials filtrados por idioma do professor
+  const materials: Material[] = await db`
+    SELECT
+      m.id,
+      m.title,
+      m.description,
+      m.file_url,
+      m.file_type,
+      m.thumbnail_url,
+      m.created_at,
+      m.language,
+      c.name AS category_name
+    FROM materials m
+    LEFT JOIN categories c ON c.id = m.category_id
+    WHERE m.language = ${locale}
+    ORDER BY m.created_at DESC
+  `
+
+  const videos = materials.filter((m) => m.file_type === "video")
+  const documents = materials.filter((m) => m.file_type === "document")
+  const documents_vazio = documents.length === 0
+
+  const t = {
+    title: locale === "es" ? "Portal del Profesor" : "Portal do Professor",
+    subtitle:
+      locale === "es"
+        ? "Accede a videos y materiales de apoyo para tus clases"
+        : "Acesse vídeos e materiais de apoio para suas aulas",
+    videos: locale === "es" ? "Videos" : "Vídeos",
+    documents: locale === "es" ? "Documentos" : "Documentos",
+    total: locale === "es" ? "Total" : "Total",
+    videosSection: locale === "es" ? "Videos de Apoyo" : "Vídeos de Apoio",
+    docsSection: locale === "es" ? "Materiales de Apoyo" : "Materiais de Apoio",
+    watch: locale === "es" ? "Ver" : "Assistir",
+    view: locale === "es" ? "Visualizar" : "Visualizar",
+    emptyDocs:
+      locale === "es" ? "No hay documentos disponibles por el momento." : "Nenhum documento disponível no momento.",
+    logout: locale === "es" ? "Salir" : "Sair",
+  }
 
   return (
     <div className="relative min-h-screen rounded-xl bg-cyan-900/10">
@@ -46,6 +92,7 @@ export default async function PortalDashboardPage() {
               <p className="text-sm text-slate-400">{teacher.email}</p>
             </div>
           </div>
+
           <form action="/api/portal/logout" method="POST">
             <Button
               type="submit"
@@ -53,7 +100,7 @@ export default async function PortalDashboardPage() {
               className="border-red-500/20 text-red-400 hover:bg-red-500/10 bg-transparent"
             >
               <LogOut className="w-4 h-4 mr-2" />
-              Sair
+              {t.logout}
             </Button>
           </form>
         </div>
@@ -62,9 +109,9 @@ export default async function PortalDashboardPage() {
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent mb-2">
-            Portal do Professor
+            {t.title}
           </h2>
-          <p className="text-slate-300">Acesse vídeos e materiais de apoio para suas aulas</p>
+          <p className="text-slate-300">{t.subtitle}</p>
         </div>
 
         {/* Stats */}
@@ -73,7 +120,7 @@ export default async function PortalDashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-cyan-400">
                 <Video className="w-5 h-5" />
-                Vídeos
+                {t.videos}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -85,7 +132,7 @@ export default async function PortalDashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-purple-400">
                 <FileText className="w-5 h-5" />
-                Documentos
+                {t.documents}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -97,7 +144,7 @@ export default async function PortalDashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-orange-400">
                 <BookOpen className="w-5 h-5" />
-                Total
+                {t.total}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -110,8 +157,9 @@ export default async function PortalDashboardPage() {
         <section className="mb-8">
           <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
             <PlayCircle className="w-6 h-6 text-cyan-400" />
-            Vídeos de Apoio
+            {t.videosSection}
           </h3>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {videos.map((video) => (
               <Card
@@ -126,19 +174,22 @@ export default async function PortalDashboardPage() {
                       className="w-full h-40 object-cover rounded-lg mb-2"
                     />
                   )}
+
                   <CardTitle className="text-white group-hover:text-cyan-400 transition-colors">
                     {video.title}
                   </CardTitle>
                   <CardDescription className="text-slate-400">{video.description}</CardDescription>
                 </CardHeader>
+
                 <CardContent>
                   <span className="inline-block px-3 py-1 bg-cyan-500/20 text-cyan-400 text-xs rounded-full mb-3">
-                    {video.category}
+                    {video.category_name ?? "Sem categoria"}
                   </span>
+
                   <Link href={video.file_url} target="_blank">
                     <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700">
                       <PlayCircle className="w-4 h-4 mr-2" />
-                      Assistir
+                      {t.watch}
                     </Button>
                   </Link>
                 </CardContent>
@@ -151,14 +202,12 @@ export default async function PortalDashboardPage() {
         <section>
           <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
             <FileText className="w-6 h-6 text-purple-400" />
-            Materiais de Apoio
+            {t.docsSection}
           </h3>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
             {documents_vazio ? (
-              <div className="text-center text-slate-400 py-10">
-                Nenhum documento disponível no momento.
-              </div>
+              <div className="text-center text-slate-400 py-10">{t.emptyDocs}</div>
             ) : (
               documents.map((doc) => (
                 <Card
@@ -170,15 +219,13 @@ export default async function PortalDashboardPage() {
                       <FileText className="w-5 h-5 text-purple-400" />
                       {doc.title}
                     </CardTitle>
-                    <CardDescription className="text-slate-400">
-                      {doc.description}
-                    </CardDescription>
+                    <CardDescription className="text-slate-400">{doc.description}</CardDescription>
                   </CardHeader>
 
                   <CardContent>
                     <div className="flex items-center justify-between">
                       <span className="inline-block px-3 py-1 bg-purple-500/20 text-purple-400 text-xs rounded-full">
-                        {doc.category}
+                        {doc.category_name ?? "Sem categoria"}
                       </span>
 
                       <Link href={doc.file_url} target="_blank">
@@ -186,7 +233,7 @@ export default async function PortalDashboardPage() {
                           size="sm"
                           className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
                         >
-                          Download
+                          {t.view}
                         </Button>
                       </Link>
                     </div>
@@ -198,5 +245,5 @@ export default async function PortalDashboardPage() {
         </section>
       </main>
     </div>
-  );
+  )
 }

@@ -172,7 +172,7 @@ export default async function PortalDashboardPage() {
                         size="sm"
                         className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
                       >
-                        Download
+                        Visualizar
                       </Button>
                     </Link>
                   </div>

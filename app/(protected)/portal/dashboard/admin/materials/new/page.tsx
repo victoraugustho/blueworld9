@@ -1,19 +1,19 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import type { Category } from "@/app/types/portal";
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import type { Category } from "@/app/types/portal"
 
 export default function NewMaterialPage() {
-  const router = useRouter();
+  const router = useRouter()
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoadingCat, setIsLoadingCat] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([])
+  const [isLoadingCat, setIsLoadingCat] = useState(false)
 
   const [form, setForm] = useState({
     title: "",
@@ -21,63 +21,56 @@ export default function NewMaterialPage() {
     file_url: "",
     file_type: "video",
     category_id: "",
-    new_category: "",
-  });
+    language: "pt-BR" as "pt-BR" | "es",
+  })
 
-  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState("")
 
-  /** 📌 Carrega categorias */
   async function loadCategories() {
-    const res = await fetch("/api/admin/categories", { cache: "no-store" });
-    const data = await res.json();
-    setCategories(data ?? []);
+    const res = await fetch("/api/admin/categories", { cache: "no-store" })
+    const data = await res.json()
+    setCategories(data ?? [])
   }
 
   useEffect(() => {
-    loadCategories();
-  }, []);
+    loadCategories()
+  }, [])
 
-  /** 📌 Criar material */
   async function submitMaterial(e: React.FormEvent) {
-    e.preventDefault();
+    e.preventDefault()
 
     await fetch("/api/admin/materials/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
-    });
+    })
 
-    router.push("/portal/dashboard/admin/materials");
+    router.push("/portal/dashboard/admin/materials")
   }
 
-  /** 📌 Criar categoria separadamente */
   async function createCategory(e: React.FormEvent) {
-    e.preventDefault();
+    e.preventDefault()
+    if (!newCategoryName.trim()) return
 
-    if (!newCategoryName.trim()) return;
-
-    setIsLoadingCat(true);
+    setIsLoadingCat(true)
 
     const res = await fetch("/api/admin/categories/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newCategoryName }),
-    });
+    })
 
-    setIsLoadingCat(false);
+    setIsLoadingCat(false)
 
     if (res.ok) {
-      setNewCategoryName("");
-      loadCategories(); // 🔄 Atualiza a lista no select
+      setNewCategoryName("")
+      loadCategories()
     }
   }
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row gap-10 items-start justify-center px-4 py-10 text-white">
-
-      {/* ========================== */}
-      {/* 🎬 CARD 1 — NOVO MATERIAL */}
-      {/* ========================== */}
+      {/* CARD 1 */}
       <Card className="w-full max-w-2xl bg-slate-900/20 backdrop-blur-xl border border-cyan-500/20 shadow-2xl">
         <CardHeader>
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
@@ -87,8 +80,6 @@ export default function NewMaterialPage() {
 
         <CardContent>
           <form className="space-y-6" onSubmit={submitMaterial}>
-
-            {/* TÍTULO */}
             <div className="space-y-2">
               <Label className="text-white">Título</Label>
               <Input
@@ -100,7 +91,6 @@ export default function NewMaterialPage() {
               />
             </div>
 
-            {/* DESCRIÇÃO */}
             <div className="space-y-2">
               <Label className="text-white">Descrição</Label>
               <Textarea
@@ -112,7 +102,6 @@ export default function NewMaterialPage() {
               />
             </div>
 
-            {/* URL */}
             <div className="space-y-2">
               <Label className="text-white">URL</Label>
               <Input
@@ -124,7 +113,6 @@ export default function NewMaterialPage() {
               />
             </div>
 
-            {/* TIPO */}
             <div className="space-y-2">
               <Label className="text-white">Tipo</Label>
               <select
@@ -137,18 +125,27 @@ export default function NewMaterialPage() {
               </select>
             </div>
 
-            {/* CATEGORIA */}
+            {/* ✅ Idioma */}
+            <div className="space-y-2">
+              <Label className="text-white">Idioma</Label>
+              <select
+                className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                value={form.language}
+                onChange={(e) => setForm({ ...form, language: e.target.value as "pt-BR" | "es" })}
+              >
+                <option value="pt-BR">Português (BR)</option>
+                <option value="es">Español</option>
+              </select>
+            </div>
+
             <div className="space-y-2">
               <Label className="text-white">Categoria</Label>
               <select
                 className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-white"
                 value={form.category_id}
-                onChange={(e) =>
-                  setForm({ ...form, category_id: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, category_id: e.target.value })}
               >
                 <option value="">Selecione</option>
-
                 {categories.map((cat) => (
                   <option key={cat.id} value={String(cat.id)}>
                     {cat.name}
@@ -157,7 +154,6 @@ export default function NewMaterialPage() {
               </select>
             </div>
 
-            {/* BOTÃO */}
             <Button
               type="submit"
               className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 py-6"
@@ -168,19 +164,14 @@ export default function NewMaterialPage() {
         </CardContent>
       </Card>
 
-      {/* =================================== */}
-      {/* 🏷️ CARD 2 — CRIAÇÃO DE CATEGORIA */}
-      {/* =================================== */}
+      {/* CARD 2 */}
       <Card className="w-full max-w-md bg-slate-900/20 backdrop-blur-xl border border-purple-500/20 shadow-xl">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-purple-300">
-            Criar Categoria
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold text-purple-300">Criar Categoria</CardTitle>
         </CardHeader>
 
         <CardContent>
           <form className="space-y-4" onSubmit={createCategory}>
-
             <div className="space-y-2">
               <Label className="text-white">Nome da Categoria</Label>
               <Input
@@ -199,11 +190,9 @@ export default function NewMaterialPage() {
             >
               {isLoadingCat ? "Salvando..." : "Criar Categoria"}
             </Button>
-
           </form>
         </CardContent>
       </Card>
-
     </div>
-  );
+  )
 }

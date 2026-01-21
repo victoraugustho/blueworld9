@@ -3,10 +3,14 @@ import { cookies } from "next/headers"
 import { db } from "@/lib/db"
 import OpenAI from "openai"
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
 type Role = "user" | "assistant" | "system"
 type Locale = "pt-BR" | "es"
+
+function getOpenAI() {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error("OPENAI_API_KEY missing")
+  return new OpenAI({ apiKey })
+}
 
 function buildSystemPrompt(params: { mode: "teacher" | "admin"; locale: Locale; aiName: string }) {
   const { mode, locale, aiName } = params
@@ -84,7 +88,6 @@ async function maybeUpdateSummary(conversationId: string) {
     LIMIT 1
   `
   const summary = conv?.summary ?? ""
-
   const last = await loadRecentMessages(conversationId, 40)
 
   const prompt = [
@@ -101,6 +104,7 @@ async function maybeUpdateSummary(conversationId: string) {
     },
   ]
 
+  const openai = getOpenAI()
   const r = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.2,
@@ -125,19 +129,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-
     const message = String(body?.message ?? "").trim()
     if (!message) return NextResponse.json({ error: "Mensagem vazia" }, { status: 400 })
 
     const mode = (body?.mode === "admin" ? "admin" : "teacher") as "teacher" | "admin"
-
-    // ✅ locale vem do front, mas garantimos um fallback seguro
     const locale = (body?.locale === "es" ? "es" : "pt-BR") as Locale
-
-    // ✅ nome da IA (fallback fixo)
     const aiName = String(body?.aiName ?? "BW9 AI").trim() || "BW9 AI"
 
-    // conversa + memória
     const conv = await getOrCreateConversation(teacherId)
     const recent = await loadRecentMessages(conv.id, 30)
 
@@ -145,7 +143,7 @@ export async function POST(req: NextRequest) {
 
     const messages: { role: Role; content: string }[] = [{ role: "system", content: system }]
 
-    if (conv.summary && conv.summary.trim().length > 0) {
+    if (conv.summary?.trim()) {
       messages.push({
         role: "system",
         content: `Memória (resumo da conversa até aqui):\n${conv.summary}`,
@@ -153,7 +151,6 @@ export async function POST(req: NextRequest) {
     }
 
     for (const m of recent) messages.push(m)
-
     messages.push({ role: "user", content: message })
 
     await db`
@@ -161,6 +158,7 @@ export async function POST(req: NextRequest) {
       VALUES (${conv.id}, 'user', ${message})
     `
 
+    const openai = getOpenAI()
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.4,

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, BookOpen, FileText, LogOut, ShieldCheck, Menu, X, Users, Bell } from "lucide-react"
+import { Home, BookOpen, FileText, LogOut, ShieldCheck, Menu, X, Users, Bell, Sparkles } from "lucide-react"
 import { useState } from "react"
 
 type Locale = "pt-BR" | "es"
@@ -23,6 +23,7 @@ export function PortalSidebar({ isAdmin, locale }: { isAdmin: boolean; locale: L
       adminMaterials: locale === "es" ? "Materiales (Admin)" : "Materiais (Admin)",
       teachers: locale === "es" ? "Profesores" : "Professores",
       adminNotifications: locale === "es" ? "Notificaciones (Admin)" : "Notificações (Admin)",
+      ai: locale === "es" ? "IA" : "IA",
     },
   }
 
@@ -31,6 +32,7 @@ export function PortalSidebar({ isAdmin, locale }: { isAdmin: boolean; locale: L
     { href: "/portal/dashboard/aulas", label: t.menu.aulas, icon: BookOpen },
     { href: "/portal/dashboard/materiais", label: t.menu.materiais, icon: FileText },
     { href: "/portal/dashboard/notificacoes", label: t.menu.notificacoes, icon: Bell },
+    { href: "/portal/dashboard/ia", label: t.menu.ai, icon: Sparkles },
   ]
 
   const adminMenu = [

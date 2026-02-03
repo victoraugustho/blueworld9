@@ -22,6 +22,7 @@ function extFromMime(mime: string) {
 function looksLikeImage(buf: Buffer, mime: string) {
   // JPEG: FF D8 FF
   if (mime === "image/jpeg") return buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff
+
   // PNG: 89 50 4E 47 0D 0A 1A 0A
   if (mime === "image/png") {
     return (
@@ -36,23 +37,29 @@ function looksLikeImage(buf: Buffer, mime: string) {
       buf[7] === 0x0a
     )
   }
+
   // WEBP: "RIFF" .... "WEBP"
   if (mime === "image/webp") {
-    return (
-      buf.length > 12 &&
-      buf.toString("ascii", 0, 4) === "RIFF" &&
-      buf.toString("ascii", 8, 12) === "WEBP"
-    )
+    return buf.length > 12 && buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP"
   }
+
   return false
 }
 
-function safeUnlinkPublicUrl(url: string) {
-  // url esperada: /uploads/avatars/<file>
-  if (!url?.startsWith("/uploads/avatars/")) return null
-  const filename = url.replace("/uploads/avatars/", "")
+// ✅ pega filename do avatar_url antigo OU novo
+function filenameFromAvatarUrl(url: string) {
+  if (!url) return null
+
+  // Aceita:
+  // /uploads/avatars/<file>
+  // /api/files/avatar/<file>
+  const m = url.match(/\/(?:uploads\/avatars|api\/files\/avatar)\/([^\/]+)$/)
+  if (!m) return null
+
+  const filename = m[1]
   // bloqueia path traversal
   if (filename.includes("..") || filename.includes("/") || filename.includes("\\")) return null
+
   return filename
 }
 
@@ -96,8 +103,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Arquivo inválido (assinatura)" }, { status: 400 })
     }
 
-    // diretório público para servir estático
-    const relDir = "/uploads/avatars"
+    // ✅ grava no disco (mesmo caminho que você já usa)
     const absDir = path.join(process.cwd(), "public", "uploads", "avatars")
     await mkdir(absDir, { recursive: true })
 
@@ -106,24 +112,23 @@ export async function POST(req: NextRequest) {
 
     await writeFile(absPath, buf)
 
-    const publicUrl = `${relDir}/${filename}`
+    // ✅ Agora salva URL da API que SERVE o arquivo
+    const avatarUrl = `/api/files/avatar/${filename}`
 
-    // se tinha avatar anterior do próprio sistema, remove
-    const old = safeUnlinkPublicUrl(String(teacher.avatar_url ?? ""))
+    // remove avatar anterior (aceita formato antigo e novo)
+    const old = filenameFromAvatarUrl(String(teacher.avatar_url ?? ""))
     if (old) {
-      const oldAbs = path.join(absDir, old)
-      // best effort
-      unlink(oldAbs).catch(() => {})
+      unlink(path.join(absDir, old)).catch(() => {})
     }
 
     await db`
       UPDATE teachers
-      SET avatar_url = ${publicUrl},
+      SET avatar_url = ${avatarUrl},
           updated_at = NOW()
       WHERE id = ${teacherId}
     `
 
-    return NextResponse.json({ ok: true, avatar_url: publicUrl })
+    return NextResponse.json({ ok: true, avatar_url: avatarUrl })
   } catch (e) {
     console.error(e)
     return NextResponse.json({ error: "Erro ao enviar avatar" }, { status: 500 })
@@ -146,7 +151,7 @@ export async function DELETE() {
     }
 
     const absDir = path.join(process.cwd(), "public", "uploads", "avatars")
-    const old = safeUnlinkPublicUrl(String(teacher.avatar_url ?? ""))
+    const old = filenameFromAvatarUrl(String(teacher.avatar_url ?? ""))
     if (old) {
       unlink(path.join(absDir, old)).catch(() => {})
     }

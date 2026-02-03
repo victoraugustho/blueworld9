@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     await writeFile(absPath, buf)
 
     // ✅ Agora salva URL da API que SERVE o arquivo
-    const avatarUrl = `/api/files/avatar/${filename}`
+    const avatarUrl = `/api/files/${filename}`
 
     // remove avatar anterior (aceita formato antigo e novo)
     const old = filenameFromAvatarUrl(String(teacher.avatar_url ?? ""))

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Footer } from "@/components/footer"
 import { AnimatedBackground } from '@/components/animated-background'
 import { YoutubeHeroEmbed } from "@/components/subpage/youtube"
+import { SchoolsUnits } from "@/components/schools-units"
 
 const features = [
   {
@@ -90,6 +91,10 @@ export default function ParaEscolasPage() {
                 </Button>
               </Link>
             </div>
+          </div>
+          {/* SECTION DE TODAS AS ESCOLAS*/ }
+          <div>
+            <SchoolsUnits/>
           </div>
         </div>
       </section>

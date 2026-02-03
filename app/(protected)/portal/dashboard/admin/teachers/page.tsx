@@ -1,10 +1,23 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card"
 import type { Teacher } from "@/app/types/portal"
+import {
+  Search,
+  X,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Pencil,
+  CheckCircle2,
+  Ban,
+  RotateCcw,
+  RefreshCcw,
+} from "lucide-react"
 
 type TeachersGrouped = {
   approved: Teacher[]
@@ -12,10 +25,13 @@ type TeachersGrouped = {
   disabled: Teacher[]
 }
 
-function countryLabel(c: Teacher["country"]) {
+type Tab = "approved" | "pending" | "disabled"
+type Country = Teacher["country"]
+
+function countryLabel(c: Country) {
   if (c === "BR") return "Brasil"
-  if (c === "UY") return "Uruguay"
-  return "Paraguay"
+  if (c === "UY") return "Uruguai"
+  return "Paraguai"
 }
 
 function docLabel(t: Teacher) {
@@ -25,26 +41,105 @@ function docLabel(t: Teacher) {
 
 function localeBadge(locale: Teacher["locale"]) {
   return locale === "pt-BR"
-    ? { label: "Português", cls: "bg-emerald-500/20 text-emerald-300" }
-    : { label: "Español", cls: "bg-amber-500/20 text-amber-300" }
+    ? { label: "PT", cls: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/20" }
+    : { label: "ES", cls: "bg-amber-500/15 text-amber-300 border border-amber-500/20" }
 }
 
-export default function AdminTeachersPage() {
-  const [data, setData] = useState<TeachersGrouped>({
-    approved: [],
-    pending: [],
-    disabled: [],
-  })
+function statusBadge(tab: Tab) {
+  if (tab === "pending")
+    return { label: "Pendente", cls: "bg-yellow-500/15 text-yellow-300 border border-yellow-500/20" }
+  if (tab === "approved")
+    return { label: "Aprovado", cls: "bg-green-500/15 text-green-300 border border-green-500/20" }
+  return { label: "Desativado", cls: "bg-red-500/15 text-red-300 border border-red-500/20" }
+}
 
-  const [activeTab, setActiveTab] = useState<"approved" | "pending" | "disabled">("pending")
+function normalize(v: any) {
+  return String(v ?? "").trim().toLowerCase()
+}
+
+function groupByCountry(list: Teacher[]) {
+  const groups: Record<string, Teacher[]> = { BR: [], UY: [], PY: [] }
+  for (const t of list) {
+    const key = (t.country as string) || "BR"
+    if (!groups[key]) groups[key] = []
+    groups[key].push(t)
+  }
+  return groups as Record<Country, Teacher[]>
+}
+
+function formatDate(dt?: any) {
+  if (!dt) return "-"
+  const d = new Date(dt)
+  if (Number.isNaN(d.getTime())) return String(dt)
+  return d.toLocaleString("pt-BR")
+}
+
+function maskPhone(phone?: string) {
+  const p = String(phone ?? "").replace(/\D/g, "")
+  if (p.length < 10) return phone ?? "-"
+  const ddd = p.slice(0, 2)
+  const mid = p.length === 11 ? p.slice(2, 7) : p.slice(2, 6)
+  const end = p.length === 11 ? p.slice(7) : p.slice(6)
+  return `(${ddd}) ${mid}-${end}`
+}
+
+function IconButton({
+  title,
+  onClick,
+  children,
+  className = "",
+  disabled,
+}: {
+  title: string
+  onClick?: () => void
+  children: React.ReactNode
+  className?: string
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      disabled={disabled}
+      className={`
+        inline-flex items-center justify-center
+        w-9 h-9 rounded-xl
+        border transition-all
+        disabled:opacity-50 disabled:cursor-not-allowed
+        ${className}
+      `}
+    >
+      {children}
+    </button>
+  )
+}
+
+
+export default function AdminTeachersPage() {
+  const [data, setData] = useState<TeachersGrouped>({ approved: [], pending: [], disabled: [] })
+  const [activeTab, setActiveTab] = useState<Tab>("pending")
   const [loading, setLoading] = useState(true)
+
+  const [query, setQuery] = useState("")
+  const [selected, setSelected] = useState<Teacher | null>(null)
+
+  const [openCountries, setOpenCountries] = useState<Record<Country, boolean>>({
+    BR: true,
+    UY: true,
+    PY: true,
+  })
 
   async function load() {
     setLoading(true)
-    const res = await fetch("/api/admin/teachers", { cache: "no-store" })
-    const json = await res.json()
-    setData(json)
-    setLoading(false)
+    try {
+      const res = await fetch("/api/admin/teachers", { cache: "no-store" })
+      const json = await res.json()
+      setData(json)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -74,107 +169,399 @@ export default function AdminTeachersPage() {
     load()
   }
 
-  const teachers = data[activeTab]
+  const teachersRaw = data[activeTab] ?? []
+
+  const teachers = useMemo(() => {
+    const q = normalize(query)
+    if (!q) return teachersRaw
+
+    return teachersRaw.filter((t) => {
+      const hay = [
+        t.id,
+        t.name,
+        t.email,
+        t.phone,
+        t.country,
+        t.locale,
+        t.document_type,
+        t.document_number,
+      ]
+        .map(normalize)
+        .join(" | ")
+
+      return hay.includes(q)
+    })
+  }, [teachersRaw, query])
+
+  const grouped = useMemo(() => groupByCountry(teachers), [teachers])
+
+  const counts = useMemo(
+    () => ({
+      pending: data.pending.length,
+      approved: data.approved.length,
+      disabled: data.disabled.length,
+    }),
+    [data]
+  )
+
+  const badgeStatus = statusBadge(activeTab)
+
+  async function copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {}
+  }
+
+  function toggleCountry(c: Country) {
+    setOpenCountries((prev) => ({ ...prev, [c]: !prev[c] }))
+  }
 
   return (
-    <div className="p-6 text-white">
-      <h1 className="text-3xl font-bold mb-8">Gerenciar Professores</h1>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 text-white">
+      {/* Header */}
+      <div className="mb-6 sm:mb-8 space-y-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold">Gerenciar Professores</h1>
+            <p className="text-slate-300 mt-1 text-sm sm:text-base">
+              Pesquise, organize por país e veja detalhes em um pop-up.
+            </p>
+          </div>
 
-      {/* Tabs */}
-      <div className="flex gap-4 mb-8 flex-wrap">
-        <Button className={activeTab === "pending" ? "bg-yellow-600" : "bg-white/10"} onClick={() => setActiveTab("pending")}>
-          Pendentes ({data.pending.length})
-        </Button>
+          <span className={`text-xs rounded-full px-3 py-1 ${badgeStatus.cls}`}>{badgeStatus.label}</span>
+        </div>
 
-        <Button className={activeTab === "approved" ? "bg-green-600" : "bg-white/10"} onClick={() => setActiveTab("approved")}>
-          Aprovados ({data.approved.length})
-        </Button>
+        {/* Tabs + refresh */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              className={activeTab === "pending" ? "bg-yellow-600 hover:bg-yellow-700" : "bg-white/10 hover:bg-white/15"}
+              onClick={() => setActiveTab("pending")}
+            >
+              Pendentes ({counts.pending})
+            </Button>
 
-        <Button className={activeTab === "disabled" ? "bg-red-600" : "bg-white/10"} onClick={() => setActiveTab("disabled")}>
-          Desativados ({data.disabled.length})
-        </Button>
+            <Button
+              className={activeTab === "approved" ? "bg-green-600 hover:bg-green-700" : "bg-white/10 hover:bg-white/15"}
+              onClick={() => setActiveTab("approved")}
+            >
+              Aprovados ({counts.approved})
+            </Button>
+
+            <Button
+              className={activeTab === "disabled" ? "bg-red-600 hover:bg-red-700" : "bg-white/10 hover:bg-white/15"}
+              onClick={() => setActiveTab("disabled")}
+            >
+              Desativados ({counts.disabled})
+            </Button>
+          </div>
+
+          <Button
+            onClick={load}
+            disabled={loading}
+            className="sm:ml-auto bg-white/10 hover:bg-white/15 border border-white/10"
+          >
+            <RefreshCcw className="w-4 h-4 mr-2" />
+            Atualizar
+          </Button>
+        </div>
+
+        {/* Search */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="w-full relative">
+            <Search className="w-4 h-4 text-white/80 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Pesquisar nome, email, telefone, documento ou ID..."
+              className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-900/80 border border-white/15 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+                aria-label="Limpar pesquisa"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {loading && <p className="text-slate-400">Carregando...</p>}
 
-      {!loading && teachers.length === 0 && <p className="text-slate-400">Nenhum professor encontrado.</p>}
+      {!loading && teachers.length === 0 && (
+        <p className="text-slate-400">Nenhum professor encontrado neste filtro.</p>
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {teachers.map((t) => {
-          const badge = localeBadge(t.locale)
-          return (
-            <Card key={t.id} className="bg-white/10 backdrop-blur-xl border border-white/10">
-              <CardHeader>
-                <CardTitle className="text-white flex flex-wrap items-center gap-2">
-                  {t.name}
+      {/* Groups */}
+      {!loading && teachers.length > 0 && (
+        <div className="space-y-10">
+          {(["BR", "UY", "PY"] as Country[]).map((c) => {
+            const list = grouped[c] ?? []
+            const open = openCountries[c]
+            if (list.length === 0) return null
 
-                  <span className="text-slate-300 text-xs bg-cyan-600/40 rounded-full px-3 py-1">
-                    {countryLabel(t.country)}
-                  </span>
+            return (
+              <section key={c} className="space-y-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <button
+                    onClick={() => toggleCountry(c)}
+                    className="flex items-center gap-2 text-left"
+                  >
+                    <span className="text-base sm:text-lg font-semibold">{countryLabel(c)}</span>
+                    <span className="text-xs text-white/80 border border-white/10 rounded-full px-2 py-1">
+                      {list.length}
+                    </span>
+                    {open ? <ChevronUp className="w-4 h-4 text-white" /> : <ChevronDown className="w-4 h-4 text-white" />}
+                  </button>
+                </div>
 
-                  <span className={`text-xs rounded-full px-3 py-1 ${badge.cls}`}>
-                    {badge.label}
-                  </span>
-                </CardTitle>
-              </CardHeader>
+                {open && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                    {list.map((t) => {
+                      const lb = localeBadge(t.locale)
 
-              <CardContent>
-                <p className="text-slate-300 text-sm mb-2">
-                  <b>Email:</b> {t.email}
-                </p>
-                <p className="text-slate-300 text-sm mb-2">
-                  <b>Telefone:</b> {t.phone}
-                </p>
+                      return (
+                        <Card
+                          key={t.id}
+                          className="bg-white/10 backdrop-blur-xl border border-white/10"
+                        >
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-white flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-sm sm:text-base font-semibold truncate">{t.name}</div>
+                                <div className="text-xs text-white/50 truncate">{t.email}</div>
+                              </div>
 
-                <p className="text-slate-300 text-sm mb-2">
-                  <b>{docLabel(t)}:</b> {t.document_number}
-                </p>
+                              <span className={`shrink-0 text-[11px] rounded-full px-2 py-1 ${lb.cls}`}>
+                                {lb.label}
+                              </span>
+                            </CardTitle>
+                          </CardHeader>
 
-                {activeTab === "pending" && (
-                  <span className="px-3 py-1 rounded bg-yellow-500/20 text-yellow-400 text-xs inline-block mb-4">
-                    Pendente de aprovação
-                  </span>
+                          <CardContent className="pt-0">
+                            {/* Basic mini rows */}
+                            <div className="space-y-1.5 text-xs text-white/70">
+                              <div className="flex items-center justify-between gap-2">
+                                <b>Telefone</b>
+                                <span className="truncate">{maskPhone(t.phone)}</span>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-2">
+                                <b>{docLabel(t)}</b>
+                                <span className="truncate">{t.document_number}</span>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-2">
+                                <b>ID</b>
+                                <span className="font-mono text-[11px] text-white/80 truncate max-w-[180px]">{t.id}</span>
+                              </div>
+                            </div>
+
+                            {/* Footer actions */}
+                            <div className="mt-4 flex items-center justify-between gap-2">
+                              <span className={`text-[11px] rounded-full px-2 py-1 ${badgeStatus.cls}`}>
+                                {badgeStatus.label}
+                              </span>
+
+                              <div className="flex items-center gap-2">
+                                {/* copiar ID */}
+                                <IconButton title="Copiar ID" onClick={() => copy(t.id)}
+                                  className="border-white/30 bg-white/10 hover:bg-white/15 text-white">
+                                  <Copy className="w-4 h-4 text-white/70" />
+                                </IconButton>
+
+                                {/* infos */}
+                                <IconButton title="Informações" onClick={() => setSelected(t)}
+                                  className="border-cyan-500/20 bg-cyan-500/10 hover:bg-cyan-500/15 text-cyan-200">
+                                  <Info className="w-4 h-4" />
+                                </IconButton>
+
+                                {/* editar */}
+                                <Link href={`/portal/dashboard/admin/teachers/${t.id}`} title="Editar">
+                                  <span className="inline-flex">
+                                    <IconButton title="Editar" className="border-green-500/20 bg-green-500/10 hover:bg-green-500/15 text-green-200" >
+                                      <Pencil className="w-4 h-4" />
+                                    </IconButton>
+                                  </span>
+                                </Link>
+
+                                {/* ações por status */}
+                                {activeTab === "pending" && (
+                                  <IconButton
+                                    title="Aprovar"
+                                    onClick={() => approve(t.id)}
+                                    className="border-green-500/20 bg-green-500/10 hover:bg-green-500/15 text-green-200"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  </IconButton>
+                                )}
+
+                                {activeTab !== "disabled" ? (
+                                  <IconButton
+                                    title="Desativar"
+                                    onClick={() => disable(t.id)}
+                                    className="border-red-500/20 bg-red-500/10 hover:bg-red-500/15 text-red-200"
+                                  >
+                                    <Ban className="w-4 h-4" />
+                                  </IconButton>
+                                ) : (
+                                  <IconButton
+                                    title="Reativar"
+                                    onClick={() => enable(t.id)}
+                                    className="border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-200"
+                                  >
+                                    <RotateCcw className="w-4 h-4" />
+                                  </IconButton>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
                 )}
+              </section>
+            )
+          })}
+        </div>
+      )}
 
-                {activeTab === "approved" && (
-                  <span className="px-3 py-1 rounded bg-green-500/20 text-green-400 text-xs inline-block mb-4">
-                    Aprovado
-                  </span>
-                )}
+      {/* Modal (responsivo) */}
+      {selected && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setSelected(null)
+          }}
+        >
+          <div
+            className="
+              w-full max-w-2xl
+              rounded-2xl border border-white/15
+              bg-slate-950/80 backdrop-blur-xl
+              shadow-2xl shadow-black/40
+              overflow-hidden
+              max-h-[85vh]
+              flex flex-col
+            "
+          >
+            <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-white font-semibold text-base sm:text-lg truncate">{selected.name}</p>
+                <p className="text-white/50 text-sm truncate">{selected.email}</p>
+              </div>
 
-                {activeTab === "disabled" && (
-                  <span className="px-3 py-1 rounded bg-red-500/20 text-red-400 text-xs inline-block mb-4">
-                    Desativado
-                  </span>
-                )}
+              <button
+                onClick={() => setSelected(null)}
+                className="p-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white/80"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-                {/* Actions */}
-                <div className="flex justify-between mt-4 gap-2">
-                  <Link href={`/portal/dashboard/admin/teachers/${t.id}`}>
-                    <Button className="bg-blue-600 hover:bg-blue-700">Editar</Button>
+            <div className="p-4 sm:p-5 space-y-4 text-sm overflow-y-auto">
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs text-white/70 bg-white/10 border border-white/10 rounded-full px-3 py-1">
+                  ID: {selected.id}
+                </span>
+                <span className="text-xs text-white/70 bg-white/10 border border-white/10 rounded-full px-3 py-1">
+                  {countryLabel(selected.country)}
+                </span>
+                <span className={`text-xs rounded-full px-3 py-1 ${localeBadge(selected.locale).cls}`}>
+                  {localeBadge(selected.locale).label}
+                </span>
+                <span className={`text-xs rounded-full px-3 py-1 ${badgeStatus.cls}`}>{badgeStatus.label}</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-white/60 text-xs">Telefone</p>
+                  <p className="text-white mt-1">{maskPhone(selected.phone)}</p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-white/60 text-xs">Documento</p>
+                  <p className="text-white mt-1">
+                    {docLabel(selected)}: {selected.document_number}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-white/60 text-xs">Locale</p>
+                  <p className="text-white mt-1">{selected.locale}</p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-white/60 text-xs">País</p>
+                  <p className="text-white mt-1">{selected.country}</p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-white/60 text-xs">Criado em</p>
+                  <p className="text-white mt-1">{formatDate((selected as any).created_at)}</p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-white/60 text-xs">Atualizado em</p>
+                  <p className="text-white mt-1">{formatDate((selected as any).updated_at)}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    className="bg-white/10 hover:bg-white/15 border border-white/10"
+                    onClick={() => copy(selected.id)}
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copiar ID
+                  </Button>
+
+                  <Link href={`/portal/dashboard/admin/teachers/${selected.id}`}>
+                    <Button className="bg-blue-600 hover:bg-blue-700">
+                      <Pencil className="w-4 h-4 mr-2" />
+                      Editar
+                    </Button>
                   </Link>
+                </div>
 
+                <div className="flex gap-2 flex-wrap">
                   {activeTab === "pending" && (
-                    <Button className="bg-green-600 hover:bg-green-700" onClick={() => approve(t.id)}>
+                    <Button className="bg-green-600 hover:bg-green-700" onClick={() => approve(selected.id)}>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
                       Aprovar
                     </Button>
                   )}
 
                   {activeTab !== "disabled" ? (
-                    <Button className="bg-red-600 hover:bg-red-700" onClick={() => disable(t.id)}>
+                    <Button className="bg-red-600 hover:bg-red-700" onClick={() => disable(selected.id)}>
+                      <Ban className="w-4 h-4 mr-2" />
                       Desativar
                     </Button>
                   ) : (
-                    <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => enable(t.id)}>
+                    <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => enable(selected.id)}>
+                      <RotateCcw className="w-4 h-4 mr-2" />
                       Reativar
                     </Button>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+              </div>
+            </div>
+
+            {/* footer mobile quick close */}
+            <div className="p-3 border-t border-white/10 sm:hidden">
+              <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10" onClick={() => setSelected(null)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

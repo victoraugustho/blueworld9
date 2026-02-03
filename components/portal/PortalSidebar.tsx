@@ -1,20 +1,54 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { Home, BookOpen, FileText, LogOut, ShieldCheck, Menu, X, Users, Bell, Sparkles } from "lucide-react"
-import { useState } from "react"
+import {
+  Home,
+  BookOpen,
+  FileText,
+  LogOut,
+  ShieldCheck,
+  Menu,
+  X,
+  Users,
+  Bell,
+  Sparkles,
+  UserRound,
+  ChevronDown,
+} from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 type Locale = "pt-BR" | "es"
 
-export function PortalSidebar({ isAdmin, locale }: { isAdmin: boolean; locale: Locale }) {
+type TeacherMini = {
+  name: string
+  avatarUrl?: string | null
+}
+
+export function PortalSidebar({
+  isAdmin,
+  locale,
+  teacher,
+  logoSrc = "/webp/logo-branca-bw9.webp", // garanta que exista em /public ou altere
+}: {
+  isAdmin: boolean
+  locale: Locale
+  teacher?: TeacherMini
+  logoSrc?: string
+}) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [logoError, setLogoError] = useState(false)
+
+  const sidebarRef = useRef<HTMLElement | null>(null)
+  const profileRef = useRef<HTMLDivElement | null>(null)
 
   const t = {
-    title: locale === "es" ? "Portal del Profesor" : "Portal do Professor",
     adminSection: locale === "es" ? "Administración" : "Administração",
     logout: locale === "es" ? "Salir" : "Sair",
+    profile: locale === "es" ? "Perfil" : "Perfil",
     menu: {
       home: locale === "es" ? "Inicio" : "Início",
       aulas: locale === "es" ? "Clases" : "Aulas",
@@ -27,19 +61,71 @@ export function PortalSidebar({ isAdmin, locale }: { isAdmin: boolean; locale: L
     },
   }
 
-  const teacherMenu = [
-    { href: "/portal/dashboard", label: t.menu.home, icon: Home },
-    { href: "/portal/dashboard/aulas", label: t.menu.aulas, icon: BookOpen },
-    { href: "/portal/dashboard/materiais", label: t.menu.materiais, icon: FileText },
-    { href: "/portal/dashboard/notificacoes", label: t.menu.notificacoes, icon: Bell },
-    { href: "/portal/dashboard/ia", label: t.menu.ai, icon: Sparkles },
-  ]
+  const teacherMenu = useMemo(
+    () => [
+      { href: "/portal/dashboard", label: t.menu.home, icon: Home },
+      { href: "/portal/dashboard/aulas", label: t.menu.aulas, icon: BookOpen },
+      { href: "/portal/dashboard/materiais", label: t.menu.materiais, icon: FileText },
+      { href: "/portal/dashboard/notificacoes", label: t.menu.notificacoes, icon: Bell },
+      { href: "/portal/dashboard/ia", label: t.menu.ai, icon: Sparkles },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [locale]
+  )
 
-  const adminMenu = [
-    { href: "/portal/dashboard/admin/materials", label: t.menu.adminMaterials, icon: ShieldCheck },
-    { href: "/portal/dashboard/admin/teachers", label: t.menu.teachers, icon: Users },
-    { href: "/portal/dashboard/admin/notifications", label: t.menu.adminNotifications, icon: Bell },
-  ]
+  const adminMenu = useMemo(
+    () => [
+      { href: "/portal/dashboard/admin/materials", label: t.menu.adminMaterials, icon: ShieldCheck },
+      { href: "/portal/dashboard/admin/teachers", label: t.menu.teachers, icon: Users },
+      { href: "/portal/dashboard/admin/notifications", label: t.menu.adminNotifications, icon: Bell },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [locale]
+  )
+
+  // ✅ corrige active do "Início" (só ativo quando for exatamente /portal/dashboard)
+  function isActive(href: string) {
+    if (href === "/portal/dashboard") return pathname === href
+    return pathname === href || pathname.startsWith(href + "/")
+  }
+
+  // Fechar sidebar (mobile) ao clicar fora
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!open) return
+      const el = sidebarRef.current
+      if (!el) return
+      if (!el.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", onDown)
+    return () => document.removeEventListener("mousedown", onDown)
+  }, [open])
+
+  // Fechar dropdown do perfil ao clicar fora
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!profileOpen) return
+      const el = profileRef.current
+      if (!el) return
+      if (!el.contains(e.target as Node)) setProfileOpen(false)
+    }
+    document.addEventListener("mousedown", onDown)
+    return () => document.removeEventListener("mousedown", onDown)
+  }, [profileOpen])
+
+  // Quando navegar (pathname muda), fecha tudo
+  useEffect(() => {
+    setOpen(false)
+    setProfileOpen(false)
+  }, [pathname])
+
+  const displayName = teacher?.name?.trim() || (locale === "es" ? "Profesor" : "Professor")
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("")
 
   return (
     <>
@@ -55,6 +141,9 @@ export function PortalSidebar({ isAdmin, locale }: { isAdmin: boolean; locale: L
 
       {/* SIDEBAR */}
       <aside
+        ref={(node) => {
+          sidebarRef.current = node
+        }}
         className={`
           fixed z-40
           top-6 left-4
@@ -69,13 +158,101 @@ export function PortalSidebar({ isAdmin, locale }: { isAdmin: boolean; locale: L
           flex flex-col p-6
         `}
       >
-        <h2 className="text-xl font-semibold text-white mb-8 tracking-wide">{t.title}</h2>
+        {/* TOPO: LOGO + PERFIL */}
+        <div className="flex items-center justify-between mb-8">
+          <Link
+              href="/portal/dashboard"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 group"
+            >
+              {!logoError ? (
+                <Image
+                  src={logoSrc}
+                  alt="Blue World 9"
+                  width={140}
+                  height={40}
+                  priority
+                  className="object-contain max-h-10 sm:max-h-12 w-auto
+                            transition-opacity group-hover:opacity-90"
+                  onError={() => setLogoError(true)}
+                />
+              ) : (
+                <span className="text-white font-bold text-lg">Blue World 9</span>
+              )}
+            </Link>
+
+          {/* Perfil + dropdown */}
+          <div ref={profileRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setProfileOpen((v) => !v)}
+              className="flex items-center gap-2 rounded-xl px-2 py-1.5 
+              hover:bg-white/10 transition-colors border border-white/10"
+              aria-label="Perfil"
+            >
+              {/* Avatar */}
+              <div className="relative w-9 h-9 rounded-full overflow-hidden border border-white/15 bg-white/10 flex items-center justify-center">
+                {teacher?.avatarUrl ? (
+                  <Image
+                    src={teacher.avatarUrl} // ✅ sem query string
+                    alt={displayName}
+                    fill
+                    sizes="36px"
+                    className="object-cover"
+                  />
+                ) : (
+                  <span className="text-xs font-semibold text-white/80">{initials || "BW"}</span>
+                )}
+              </div>
+
+              <ChevronDown
+                className={`w-4 h-4 text-white/70 transition-transform ${profileOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {profileOpen && (
+              <div
+                className="absolute right-0 mt-2 w-48 rounded-xl border border-white/15 
+                bg-slate-950/90 backdrop-blur-xl shadow-2xl shadow-black/30 overflow-hidden"
+              >
+                <div className="px-3 py-2 border-b border-white/10">
+                  <p className="text-sm text-white font-semibold truncate">{displayName}</p>
+                  <p className="text-xs text-white/50 truncate">
+                    {isAdmin ? "Admin" : locale === "es" ? "Profesor" : "Professor"}
+                  </p>
+                </div>
+
+                <Link
+                  href="/portal/dashboard/perfil"
+                  onClick={() => {
+                    setProfileOpen(false)
+                    setOpen(false)
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+                >
+                  <UserRound className="w-4 h-4" />
+                  {t.profile}
+                </Link>
+
+                <form action="/api/portal/logout" method="POST">
+                  <button
+                    type="submit"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-300 hover:bg-red-500/10"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    {t.logout}
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* MENU DO PROFESSOR */}
         <nav className="flex flex-col gap-2 flex-1">
           {teacherMenu.map((item) => {
             const Icon = item.icon
-            const active = pathname === item.href || pathname.startsWith(item.href + "/")
+            const active = isActive(item.href)
 
             return (
               <Link
@@ -98,7 +275,7 @@ export function PortalSidebar({ isAdmin, locale }: { isAdmin: boolean; locale: L
             )
           })}
 
-          {/* SEÇÃO DE ADMIN */}
+          {/* SEÇÃO ADMIN */}
           {isAdmin && (
             <>
               <div className="my-4 border-t border-white/20" />
@@ -109,7 +286,7 @@ export function PortalSidebar({ isAdmin, locale }: { isAdmin: boolean; locale: L
 
               {adminMenu.map((item) => {
                 const Icon = item.icon
-                const active = pathname === item.href || pathname.startsWith(item.href + "/")
+                const active = isActive(item.href)
 
                 return (
                   <Link
@@ -134,21 +311,10 @@ export function PortalSidebar({ isAdmin, locale }: { isAdmin: boolean; locale: L
             </>
           )}
         </nav>
-
-        {/* LOGOUT */}
-        <form action="/api/portal/logout" method="POST" className="mt-auto pt-4 border-t border-white/20">
-          <button
-            type="submit"
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
-            bg-red-800/50 text-red-300 border border-red-500/20
-            hover:bg-red-900/60 hover:shadow-md hover:shadow-red-500/10 
-            transition-all"
-          >
-            <LogOut className="w-5 h-5" />
-            {t.logout}
-          </button>
-        </form>
       </aside>
+
+      {/* Overlay mobile */}
+      {open && <div className="md:hidden fixed inset-0 z-30 bg-black/40" onClick={() => setOpen(false)} />}
     </>
   )
 }

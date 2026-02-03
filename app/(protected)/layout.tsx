@@ -1,6 +1,7 @@
-import type React from "react";
-import { AOSInit } from "@/components/AOSInit";
-import { AnimatedBackground } from "@/components/animated-background";
+import type React from "react"
+import { AOSInit } from "@/components/AOSInit"
+import { AnimatedBackground } from "@/components/animated-background"
+
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   return (

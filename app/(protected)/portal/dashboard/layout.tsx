@@ -11,8 +11,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   if (!teacherId) redirect("/portal/login")
 
   const [teacher] = await db`
-    SELECT id, name, email, approved, active, locale, role
-    FROM teachers
+    SELECT id, name, email, approved, active, locale, role, avatar_url
+    FROM public.teachers
     WHERE id = ${teacherId}
     LIMIT 1
   `
@@ -25,10 +25,18 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
 
   return (
-    <div className="min-h-screen flex">
-      <PortalSidebar isAdmin={isAdmin} locale={locale} />
+    <div className="min-h-screen">
+      <PortalSidebar
+        isAdmin={isAdmin}
+        locale={locale}
+        teacher={{
+          name: teacher.name,
+          avatarUrl: teacher.avatar_url ?? null,
+        }}
+        logoSrc="/webp/logo-branca-bw9.webp" // garanta em /public
+      />
 
-      <main className="flex-1 p-10 ml-0 lg:ml-72 transition-all">
+      <main className="px-6 sm:px-8 py-10 ml-0 md:ml-[320px] transition-all">
         <header className="mb-10">
           <h1 className="text-3xl font-semibold text-white">
             {locale === "es" ? "Bienvenido(a)," : "Bem-vindo(a),"} {teacher.name}

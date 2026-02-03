@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2 } from "lucide-react"
+import { Trash2, RotateCcw, ArrowDown } from "lucide-react"
 
 type ChatRole = "user" | "assistant" | "system"
 
@@ -175,84 +175,121 @@ export function AIChatPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
-        <div className="text-white font-semibold">{t.title}</div>
+  <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden flex flex-col">
+    {/* HEADER */}
+    <div className="px-4 sm:px-5 py-4 border-b border-white/10">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-white font-semibold min-w-0 truncate">{t.title}</div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {farFromBottom && (
             <Button
               variant="outline"
-              className="bg-transparent border-white/20 text-white"
+              className="bg-transparent border-white/20 text-white px-3"
               onClick={() => scrollToBottom(true)}
+              title={t.goBottom}
             >
-              {t.goBottom}
+              <ArrowDown className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t.goBottom}</span>
             </Button>
           )}
 
           <Button
             variant="outline"
-            className="bg-transparent border-white/20 text-white"
+            className="bg-transparent border-white/20 text-white px-3"
             onClick={loadHistory}
             disabled={loadingHistory}
+            title={t.retry}
           >
-            {t.retry}
+            <RotateCcw className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">{t.retry}</span>
           </Button>
 
           <Button
             variant="outline"
-            className="bg-transparent border-red-500/30 text-red-300 hover:bg-red-500/10"
+            className="bg-transparent border-red-500/30 text-red-300 hover:bg-red-500/10 px-3"
             onClick={clearHistory}
             disabled={clearing}
             title={t.clear}
           >
-            <Trash2 className="w-4 h-4 mr-2" />
-            {clearing ? t.clearing : t.clear}
+            <Trash2 className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">{clearing ? t.clearing : t.clear}</span>
           </Button>
         </div>
       </div>
+    </div>
 
-      <div className="relative">
-        <div ref={listRef} className="h-[60vh] md:h-[65vh] overflow-y-auto px-5 py-5 space-y-3">
-          {loadingHistory && <p className="text-slate-400">{t.loading}</p>}
+    {/* BODY (scroll) */}
+    <div className="relative flex-1 min-h-0">
+      <div
+        ref={listRef}
+        className="
+          overflow-y-auto overscroll-contain
+          px-4 sm:px-5 py-5 space-y-3
+          h-[58dvh] sm:h-[60dvh] md:h-[65dvh]
+        "
+        // padding extra pro chat não ficar escondido atrás do footer sticky
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 120px)" }}
+      >
+        {loadingHistory && <p className="text-slate-400">{t.loading}</p>}
 
-          {!loadingHistory && messages.length === 0 && <p className="text-slate-400">{t.empty}</p>}
+        {!loadingHistory && messages.length === 0 && (
+          <p className="text-slate-400">{t.empty}</p>
+        )}
 
-          {!loadingHistory &&
-            messages
-              .filter((m) => m.role !== "system")
-              .map((m, idx) => {
-                const isUser = m.role === "user"
-                return (
-                  <div key={`${m.at ?? idx}-${idx}`} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[92%] md:max-w-[75%] rounded-2xl px-4 py-3 border ${
-                        isUser
-                          ? "bg-cyan-500/10 border-cyan-500/20 text-white"
-                          : "bg-slate-800/40 border-white/10 text-slate-100"
-                      }`}
-                    >
-                      <div className="text-xs mb-1 opacity-70">{isUser ? t.you : t.ai}</div>
-                      <div className="whitespace-pre-wrap text-sm leading-relaxed">{m.content}</div>
+        {!loadingHistory &&
+          messages
+            .filter((m) => m.role !== "system")
+            .map((m, idx) => {
+              const isUser = m.role === "user"
+              return (
+                <div
+                  key={`${m.at ?? idx}-${idx}`}
+                  className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[95%] sm:max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 border break-words ${
+                      isUser
+                        ? "bg-cyan-500/10 border-cyan-500/20 text-white"
+                        : "bg-slate-800/40 border-white/10 text-slate-100"
+                    }`}
+                  >
+                    <div className="text-xs mb-1 opacity-70">
+                      {isUser ? t.you : t.ai}
+                    </div>
+                    <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {m.content}
                     </div>
                   </div>
-                )
-              })}
+                </div>
+              )
+            })}
 
-          <div ref={bottomRef} />
-        </div>
-
-        {error && (
-          <div className="px-5 pb-4">
-            <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-              {error}
-            </div>
-          </div>
-        )}
+        <div ref={bottomRef} />
       </div>
 
-      <div className="p-4 border-t border-white/10">
-        <div className="flex gap-2">
+      {error && (
+        <div className="px-4 sm:px-5 pb-4">
+          <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+            {error}
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* FOOTER sticky + safe-area */}
+    <div
+      className="
+        sticky bottom-0 z-20
+        border-t border-white/10
+        bg-slate-950/60 backdrop-blur-xl
+      "
+      style={{
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
+      }}
+    >
+      <div className="p-4">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Input
             value={input}
             placeholder={t.placeholder}
@@ -260,13 +297,14 @@ export function AIChatPanel({
             onKeyDown={(e) => {
               if (e.key === "Enter") send()
             }}
-            className="bg-white/10 border-white/20 text-white"
+            className="bg-white/10 border-white/20 text-white h-11"
             disabled={sending}
           />
+
           <Button
             onClick={send}
             disabled={sending || !input.trim()}
-            className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90"
+            className="h-11 w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90"
           >
             {t.send}
           </Button>
@@ -275,5 +313,7 @@ export function AIChatPanel({
         <p className="text-xs text-slate-400 mt-2">{t.note}</p>
       </div>
     </div>
-  )
+  </div>
+)
+
 }

@@ -25,6 +25,7 @@ const i18n = {
     loading: "Entrando...",
     noAccount: "Ainda não tem cadastro?",
     signup: "Cadastre-se aqui",
+    forgot: "Esqueci minha senha",
     errors: {
       required: "Documento e senha são obrigatórios",
       passMin: "Senha deve ter no mínimo 6 caracteres",
@@ -44,6 +45,7 @@ const i18n = {
     loading: "Ingresando...",
     noAccount: "¿Aún no tienes registro?",
     signup: "Regístrate aquí",
+    forgot: "Olvidé mi contraseña",
     errors: {
       required: "Documento y contraseña son obligatorios",
       passMin: "La contraseña debe tener al menos 6 caracteres",
@@ -52,7 +54,7 @@ const i18n = {
       notApproved: "Tu registro aún no fue aprobado. Espera la revisión.",
     },
   },
-}
+} as const
 
 function onlyDigits(v: string) {
   return (v ?? "").replace(/\D/g, "")
@@ -157,7 +159,6 @@ export default function PortalLoginPage() {
         return
       }
 
-      // ✅ NUNCA setar cookie no client (o server já setou httpOnly)
       router.push("/portal/dashboard")
     } catch (err: any) {
       setError(err.message)
@@ -194,6 +195,7 @@ export default function PortalLoginPage() {
                     const c = e.target.value as Country
                     setCountry(c)
                     setDocumentNumber("")
+                    setPassword("")
                     setError("")
                   }}
                   className="w-full h-10 rounded-md pl-10 pr-3 bg-slate-800/50 border border-slate-700 text-white"
@@ -231,6 +233,7 @@ export default function PortalLoginPage() {
               <Label htmlFor="password" className="text-slate-200">
                 {t.password}
               </Label>
+
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-400" />
                 <Input
@@ -249,6 +252,16 @@ export default function PortalLoginPage() {
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
+              </div>
+
+              {/* Recuperar senha */}
+              <div className="flex justify-end pt-1">
+                <Link
+                  href="/portal/forgot-password"
+                  className="text-sm text-cyan-300 hover:text-cyan-200 hover:underline transition-colors"
+                >
+                  {t.forgot}
+                </Link>
               </div>
             </div>
 
@@ -269,7 +282,10 @@ export default function PortalLoginPage() {
             <div className="text-center">
               <p className="text-slate-400 text-sm">
                 {t.noAccount}{" "}
-                <Link href="/portal/cadastro" className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors">
+                <Link
+                  href="/portal/cadastro"
+                  className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"
+                >
                   {t.signup}
                 </Link>
               </p>

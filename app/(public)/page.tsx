@@ -6,12 +6,15 @@ import { ProjectsSection } from "@/components/projects-section"
 import { ContactSection } from "@/components/contact-section"
 import { Footer } from "@/components/footer"
 import { SectionDivider } from "@/components/section-divider"
+import { SchoolsSectionUnits } from "@/components/schools-section-units"
 
 export default function Home() {
   return (
     <main className="min-h-screen">
       <HeroSection/>
       <AboutHomeSection />
+      <SectionDivider variant="gradient" />
+      <SchoolsSectionUnits/>
       <SectionDivider variant="default" />
       <SolutionsSection />
       <SectionDivider variant="gradient" />

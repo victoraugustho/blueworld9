@@ -1,7 +1,6 @@
 "use client"
 
 import { AnimatedBackground } from "@/components/animated-background"
-import { Linkedin, Mail, Github, Phone } from "lucide-react"
 import Image from "next/image"
 import { Footer } from "@/components/footer"
 
@@ -12,7 +11,7 @@ export default function EquipePage() {
       role: "CEO e Fundador da Blue World 9",
       formacao: "",
       bio: "Como CEO e Fundador da Blue World 9 Soluções Educacionais, Cleomar di Castro é a força motriz por trás da missão da empresa. Ele lidera a estratégia de crescimento e inovação, garantindo que a Blue World 9 permaneça na vanguarda do ensino. Sua visão é dedicada a inspirar a equipe e a elevar o padrão dos programas educacionais, redefinindo o sucesso no aprendizado em todo o mundo.",
-      image: "/webp/cleomar.webp",
+      image: "/webp/cleomar-att.webp",
       color: "from-cyan-500 to-blue-600",
     },
     {
@@ -20,7 +19,7 @@ export default function EquipePage() {
       role: "Diretor de Educação e Tecnologia Global",
       formacao:"Graduado em Direito e Pedagogia, com especializações em Pedagogia Empresarial, Supervisão Educacional, Robótica Educacional, Psicopedagogia Clínica e Institucional, e Docência Universitária.",
       bio: "Com uma sólida formação jurídica e pedagógica, sua direção conecta a excelência educacional à vanguarda da tecnologia na Blue World 9. Ele lidera a estratégia de ensino e inovação de programas, garantindo que a união entre pedagogia de alta performance e ferramentas tecnológicas impulsione a aprendizagem e o crescimento da empresa.",
-      image: "/webp/diogo.webp",
+      image: "/webp/Diogo-att.webp",
       color: "from-purple-500 to-pink-600",
     },
     {
@@ -36,7 +35,7 @@ export default function EquipePage() {
       role: "Coordenadora Pedagógica Nacional",
       formacao:"Graduada em Pedagogia",
       bio: "Como a líder da excelência educacional, sua atuação lidera a coordenação pedagógica nacional da Blue World 9 Soluções Educacionais. Sua missão foca em potencializar o corpo docente e em garantir o alto padrão de qualidade e consistência dos programas, transformando o processo de aprendizado em cada unidade parceira no país.",
-      image: "/webp/alexandra.webp",
+      image: "/webp/Alexandra-att.webp",
       color: "from-green-500 to-emerald-600",
     },
     {
@@ -45,7 +44,7 @@ export default function EquipePage() {
       formacao:"Graduada em Letras (Português/Inglês) e Pedagogia, com especializações em Espanhol e Educação Ambiental.",
       bio: "Com sua formação ampla e global, sua atuação lidera a coordenação pedagógica das unidades internacionais da Blue World 9. Sua missão foca em garantir o alinhamento pedagógico e a qualidade educacional das operações externas, dedicando-se ao acompanhamento docente e à orientação estratégica fora do Brasil.",
       image: "/webp/daniella.webp",
-      color: "from-green-500 to-emerald-600",
+      color: "from-rose-400 to-red-600",
     },
     {
       name: "Renato Borges",
@@ -54,6 +53,14 @@ export default function EquipePage() {
       bio: "Com uma visão 360º, sua direção é responsável por toda a estrutura administrativa e comercial da Blue World 9. Ele integra e gere as operações, garantindo o alto padrão de estratégia de vendas, gestão financeira e eficiência administrativa para um crescimento sólido e de excelência em nível nacional e internacional.",
       image: "/webp/renato.webp",
       color: "from-yellow-500 to-orange-600",
+    },
+    {
+      name: "Augustho",
+      role: "Desenvolvedor e Arquiteto de Sistemas",
+      formacao: "Programador Full Stack Node.js, com especialização em soluções baseadas em Inteligência Artificial",
+      bio: "Responsável pelo desenvolvimento, gerenciamento e inovação tecnológica da Blue World 9, atuando na criação de sistemas inteligentes, automações e soluções digitais de alta performance.",
+      image: "/webp/Augustho-att.webp",
+      color: "from-cyan-500 to-orange-600",
     },
   ]
 

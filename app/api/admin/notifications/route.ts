@@ -17,6 +17,38 @@ async function requireAdmin() {
   return { teacherId }
 }
 
+async function notifyN8N(payload: any) {
+  const url = process.env.N8N_NOTIFICATIONS_WEBHOOK_URL
+  if (!url) return
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 6000)
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(process.env.N8N_WEBHOOK_SECRET
+          ? { "x-webhook-secret": process.env.N8N_WEBHOOK_SECRET }
+          : {}),
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+
+    if (!res.ok) {
+      // não vaza detalhes pro cliente; só loga no servidor
+      const text = await res.text().catch(() => "")
+      console.error("[n8n webhook] status:", res.status, text)
+    }
+  } catch (err) {
+    console.error("[n8n webhook] error:", err)
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export async function GET() {
   const admin = await requireAdmin()
   if (!admin) return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
@@ -69,6 +101,14 @@ export async function POST(req: NextRequest) {
     VALUES (${title}, ${message}, ${audience}, ${country}, ${locale}, ${teacher_id}, ${active}, ${expires_at}, ${admin.teacherId})
     RETURNING *
   `
+
+  // Dispara para o n8n (sem impedir o retorno pro cliente)
+  await notifyN8N({
+    event: "notification.created",
+    notification: created,
+    createdBy: admin.teacherId,
+    at: new Date().toISOString(),
+  })
 
   return NextResponse.json(created)
 }

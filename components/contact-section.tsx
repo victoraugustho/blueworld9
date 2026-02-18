@@ -280,7 +280,7 @@ export function ContactSection() {
                       rel="noopener noreferrer"
                       className="text-orange-400 hover:text-orange-300 transition-colors"
                     >
-                      +55 (62) 9275-2970
+                      +55 (62) 99275-2970
                     </a>
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
@@ -11,8 +11,7 @@ export function AOSInit() {
     if (pathname === "/portal/login" || pathname === "/portal/cadastro") return;
 
     const run = async () => {
-      // CSS + lib carregados fora do caminho crítico
-      await import("aos/dist/aos.css");
+      // CSS do AOS fica em globals.css para evitar erro no build
       const AOS = (await import("aos")).default;
       AOS.init({
         duration: 800,

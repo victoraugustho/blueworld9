@@ -3,15 +3,26 @@ import { requireTeacherPage } from "@/lib/auth/server"
 import { FileText, Eye } from "lucide-react"
 import Link from "next/link"
 
-export default async function MateriaisPage() {
+type SearchParams = { year?: string | string[] }
+
+export default async function MateriaisPage({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams>
+}) {
   const teacher = await requireTeacherPage()
   const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
 
   const t = {
     title: locale === "es" ? "Materiales de Apoyo" : "Materiais de Apoio",
-    empty: locale === "es" ? "No hay materiales disponibles." : "Nenhum material disponível.",
+    empty: locale === "es" ? "No hay materiales disponibles." : "Nenhum material disponivel.",
     view: locale === "es" ? "Ver" : "Visualizar",
-    noCategory: locale === "es" ? "Sin categoría" : "Sem Categoria",
+    noCategory: locale === "es" ? "Sin categoria" : "Sem Categoria",
+    yearLabel: "Ano",
+    noYear: locale === "es" ? "Sin ano" : "Sem ano",
+    yearTitle: locale === "es" ? "Ano del Alumno" : "Ano do Aluno",
+    ageLabel: "anos",
+    highLabel: locale === "es" ? "Ensenanza Media" : "Ensino Medio",
   }
 
   const materiais = await db`
@@ -23,7 +34,63 @@ export default async function MateriaisPage() {
     ORDER BY c.name ASC NULLS LAST, m.created_at DESC
   `
 
-  const categorias = materiais.reduce((acc: Record<string, any[]>, mat: any) => {
+  function getYearInfo(value: any) {
+    if (typeof value === "number") {
+      if (value >= 103 && value <= 105) {
+        const age = value - 100
+        return { key: `age-${age}`, label: `${age} ${t.ageLabel}` }
+      }
+      if (value >= 1 && value <= 9) {
+        return { key: `grade-${value}`, label: `${t.yearLabel} ${value}` }
+      }
+      if (value >= 201 && value <= 203) {
+        const year = value - 200
+        return { key: `hs-${year}`, label: `${t.highLabel} ${year}` }
+      }
+    }
+    return { key: "none", label: t.noYear }
+  }
+
+  const yearMap = new Map<string, string>()
+  const materialsWithYear = materiais.map((mat: any) => {
+    const info = getYearInfo(mat.student_year)
+    yearMap.set(info.key, info.label)
+    return { ...mat, yearKey: info.key }
+  })
+
+  const yearOrder = [
+    "age-3",
+    "age-4",
+    "age-5",
+    "grade-1",
+    "grade-2",
+    "grade-3",
+    "grade-4",
+    "grade-5",
+    "grade-6",
+    "grade-7",
+    "grade-8",
+    "grade-9",
+    "hs-1",
+    "hs-2",
+    "hs-3",
+    "none",
+  ]
+
+  const yearOptions = yearOrder
+    .filter((key) => yearMap.has(key))
+    .map((key) => ({ key, label: yearMap.get(key)! }))
+
+  const resolvedSearch = (await searchParams) ?? {}
+  const yearParamRaw = Array.isArray(resolvedSearch.year) ? resolvedSearch.year[0] : resolvedSearch.year
+  const yearParam = yearParamRaw ?? yearOptions[0]?.key
+  const selected = yearOptions.find((o) => o.key === yearParam) ?? yearOptions[0]
+
+  const filtered = selected
+    ? materialsWithYear.filter((mat: any) => mat.yearKey === selected.key)
+    : []
+
+  const categorias = filtered.reduce((acc: Record<string, any[]>, mat: any) => {
     const cat = mat.category_name || t.noCategory
     if (!acc[cat]) acc[cat] = []
     acc[cat].push(mat)
@@ -36,6 +103,30 @@ export default async function MateriaisPage() {
         <FileText className="w-7 h-7 text-purple-400" />
         {t.title}
       </h1>
+
+      {yearOptions.length > 0 && (
+        <div className="mb-8">
+          <p className="text-sm text-slate-300 mb-2">{t.yearTitle}</p>
+          <div className="flex flex-wrap gap-2">
+            {yearOptions.map((opt) => {
+              const active = selected?.key === opt.key
+              return (
+                <Link key={opt.key} href={`/portal/dashboard/materiais?year=${opt.key}`}>
+                  <span
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs border transition ${
+                      active
+                        ? "bg-purple-500/20 text-purple-200 border-purple-500/40"
+                        : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                    }`}
+                  >
+                    {opt.label}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {Object.keys(categorias).length === 0 && <p className="text-slate-400">{t.empty}</p>}
 
@@ -76,4 +167,3 @@ export default async function MateriaisPage() {
     </div>
   )
 }
-

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
+import { writeAuditLog } from "@/lib/audit"
 
 type Country = "BR" | "UY" | "PY"
 
@@ -27,20 +28,44 @@ export async function POST(request: NextRequest) {
     const password = body.password
 
     if (!name || !email || !phone || !country || !documentNumber || !password) {
+      await writeAuditLog({
+        req: request,
+        action: "auth.register",
+        status: "failed",
+        metadata: { reason: "missing_fields", country: country ?? null, email: email ?? null },
+      })
       return NextResponse.json({ error: "Todos os campos são obrigatórios" }, { status: 400 })
     }
 
     if (!["BR", "UY", "PY"].includes(country)) {
+      await writeAuditLog({
+        req: request,
+        action: "auth.register",
+        status: "failed",
+        metadata: { reason: "invalid_country", country, email },
+      })
       return NextResponse.json({ error: "País inválido" }, { status: 400 })
     }
 
     const doc = getDocumentConfig(country)
 
     if (documentNumber.length < doc.min || documentNumber.length > doc.max) {
+      await writeAuditLog({
+        req: request,
+        action: "auth.register",
+        status: "failed",
+        metadata: { reason: "invalid_document", country, email },
+      })
       return NextResponse.json({ error: "Documento inválido" }, { status: 400 })
     }
 
     if (password.length < 6) {
+      await writeAuditLog({
+        req: request,
+        action: "auth.register",
+        status: "failed",
+        metadata: { reason: "weak_password", country, email },
+      })
       return NextResponse.json({ error: "A senha deve ter no mínimo 6 caracteres" }, { status: 400 })
     }
 
@@ -53,12 +78,18 @@ export async function POST(request: NextRequest) {
     `
 
     if (existing.length > 0) {
+      await writeAuditLog({
+        req: request,
+        action: "auth.register",
+        status: "failed",
+        metadata: { reason: "already_exists", country, email },
+      })
       return NextResponse.json({ error: "E-mail ou documento já cadastrado" }, { status: 400 })
     }
 
     const passwordHash = await bcrypt.hash(password, 10)
 
-    await db`
+    const [created] = await db`
       INSERT INTO teachers (
         name, email, phone, password_hash, approved, active,
         country, document_type, document_number
@@ -67,7 +98,16 @@ export async function POST(request: NextRequest) {
         ${name}, ${email}, ${phone}, ${passwordHash}, false, true,
         ${country}, ${doc.type}, ${documentNumber}
       )
+      RETURNING id, email
     `
+
+    await writeAuditLog({
+      req: request,
+      action: "auth.register",
+      status: "success",
+      actor: { id: created?.id ?? null, email: created?.email ?? email, role: "teacher" },
+      metadata: { country },
+    })
 
     return NextResponse.json({
       success: true,
@@ -78,6 +118,12 @@ export async function POST(request: NextRequest) {
     })
   } catch (err: any) {
     console.error("Registration error:", err)
+    await writeAuditLog({
+      req: request,
+      action: "auth.register",
+      status: "failed",
+      metadata: { reason: "exception" },
+    })
     return NextResponse.json({ error: "Erro inesperado ao cadastrar." }, { status: 500 })
   }
 }

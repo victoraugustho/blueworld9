@@ -22,7 +22,13 @@ export async function GET() {
         n.audience = 'all'
         OR (n.audience = 'country' AND n.country = ${teacher.country})
         OR (n.audience = 'locale' AND n.locale = ${teacher.locale})
-        OR (n.audience = 'teacher' AND n.teacher_id = ${teacherId})
+        OR (
+          n.audience = 'teacher'
+          AND (
+            n.teacher_id = ${teacherId}
+            OR ${teacherId} = ANY(COALESCE(n.teacher_ids, ARRAY[]::uuid[]))
+          )
+        )
       )
     ORDER BY n.created_at DESC
   `

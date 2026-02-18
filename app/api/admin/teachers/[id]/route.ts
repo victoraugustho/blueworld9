@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
+import { writeAuditLog } from "@/lib/audit"
 
 type Country = "BR" | "UY" | "PY"
 type DocType = "CPF" | "CI_UY" | "CI_PY"
@@ -90,6 +91,15 @@ export async function PUT(req: NextRequest, context: any) {
     return NextResponse.json({ error: "Professor não encontrado" }, { status: 404 })
   }
 
+  await writeAuditLog({
+    req,
+    action: "admin.teachers.update",
+    status: "success",
+    actor: { id: admin.teacherId, email: admin.teacher.email, role: "admin", sessionId: admin.sessionId },
+    target: { type: "teacher", id },
+    metadata: { name, email, country, approved, active },
+  })
+
   return NextResponse.json(updated)
 }
 
@@ -113,6 +123,14 @@ export async function PATCH(req: NextRequest, context: any) {
     return NextResponse.json({ error: "Professor não encontrado" }, { status: 404 })
   }
 
+  await writeAuditLog({
+    req,
+    action: "admin.teachers.approve",
+    status: "success",
+    actor: { id: admin.teacherId, email: admin.teacher.email, role: "admin", sessionId: admin.sessionId },
+    target: { type: "teacher", id },
+  })
+
   return NextResponse.json(result)
 }
 
@@ -127,6 +145,13 @@ export async function DELETE(req: NextRequest, context: any) {
     WHERE id = ${id}
   `
 
+  await writeAuditLog({
+    req,
+    action: "admin.teachers.delete",
+    status: "success",
+    actor: { id: admin.teacherId, email: admin.teacher.email, role: "admin", sessionId: admin.sessionId },
+    target: { type: "teacher", id },
+  })
+
   return NextResponse.json({ success: true })
 }
-

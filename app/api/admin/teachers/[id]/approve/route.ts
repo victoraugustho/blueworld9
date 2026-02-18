@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
+import { writeAuditLog } from "@/lib/audit"
 
 type Ctx = { params: Promise<{ id: string }> } // ✅ params como Promise (Next 16 sync-dynamic-apis)
 
-export async function PATCH(_req: NextRequest, ctx: Ctx) {
+export async function PATCH(req: NextRequest, ctx: Ctx) {
   // ✅ unwrap correto do params
   const { id } = await ctx.params
 
@@ -30,6 +31,14 @@ export async function PATCH(_req: NextRequest, ctx: Ctx) {
   if (!result) {
     return NextResponse.json({ error: "Professor não encontrado" }, { status: 404 })
   }
+
+  await writeAuditLog({
+    req,
+    action: "admin.teachers.approve",
+    status: "success",
+    actor: { id: admin.teacherId, email: admin.teacher.email, role: "admin", sessionId: admin.sessionId },
+    target: { type: "teacher", id },
+  })
 
   return NextResponse.json(result)
 }

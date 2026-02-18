@@ -23,10 +23,14 @@ export default function EditMaterialPage({ params }: EditPageProps) {
     file_type: "video",
     category_id: null,
     language: "pt-BR",
+    student_year: null,
   })
 
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const ageYears = [3, 4, 5]
+  const highYears = [1, 2, 3]
+  const gradeYears = Array.from({ length: 9 }, (_, i) => i + 1)
 
   useEffect(() => {
     async function load() {
@@ -65,7 +69,7 @@ export default function EditMaterialPage({ params }: EditPageProps) {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-6">
-      <div className="w-full max-w-2xl bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8">
+      <div className="w-full max-w-2xl bg-slate-900/40 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-8">
         <h1 className="text-4xl font-bold mb-6 text-center bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
           Editar Material
         </h1>
@@ -74,7 +78,7 @@ export default function EditMaterialPage({ params }: EditPageProps) {
           <div>
             <Label className="text-slate-200">Título</Label>
             <Input
-              className="bg-white/10 border-white/20 text-white placeholder-slate-400"
+              className="bg-slate-700 border-white/20 text-white placeholder-slate-400"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
             />
@@ -83,7 +87,7 @@ export default function EditMaterialPage({ params }: EditPageProps) {
           <div>
             <Label className="text-slate-200">Descrição</Label>
             <Input
-              className="bg-white/10 border-white/20 text-white placeholder-slate-400"
+              className="bg-slate-700 border-white/20 text-white placeholder-slate-400"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
@@ -92,7 +96,7 @@ export default function EditMaterialPage({ params }: EditPageProps) {
           <div>
             <Label className="text-slate-200">URL</Label>
             <Input
-              className="bg-white/10 border-white/20 text-white placeholder-slate-400"
+              className="bg-slate-700 border-white/20 text-white placeholder-slate-400"
               value={form.file_url}
               onChange={(e) => setForm({ ...form, file_url: e.target.value })}
             />
@@ -101,12 +105,12 @@ export default function EditMaterialPage({ params }: EditPageProps) {
           <div>
             <Label className="text-slate-200">Tipo</Label>
             <select
-              className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-slate-700 border border-white/20 text-white focus:ring-2 focus:ring-blue-500"
               value={form.file_type}
               onChange={(e) => setForm({ ...form, file_type: e.target.value as Material["file_type"] })}
             >
-              <option className="text-black" value="video">Vídeo</option>
-              <option className="text-black" value="document">Documento</option>
+              <option className="text-white" value="video">Vídeo</option>
+              <option className="text-white" value="document">Documento</option>
             </select>
           </div>
 
@@ -114,25 +118,60 @@ export default function EditMaterialPage({ params }: EditPageProps) {
           <div>
             <Label className="text-slate-200">Idioma</Label>
             <select
-              className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-slate-700 border border-white/20 text-white focus:ring-2 focus:ring-blue-500"
               value={form.language}
               onChange={(e) => setForm({ ...form, language: e.target.value as Material["language"] })}
             >
-              <option className="text-black" value="pt-BR">Português (BR)</option>
-              <option className="text-black" value="es">Español</option>
+              <option className="text-white" value="pt-BR">Português (BR)</option>
+              <option className="text-white" value="es">Español</option>
             </select>
           </div>
 
           <div>
+            <Label className="text-slate-200">Ano do Aluno (opcional)</Label>
+            <select
+              className="w-full p-3 rounded-lg bg-slate-700 border border-white/20 text-white focus:ring-2 focus:ring-blue-500"
+              value={form.student_year ?? ""}
+              onChange={(e) =>
+                setForm({ ...form, student_year: e.target.value ? Number(e.target.value) : null })
+              }
+            >
+              <option className="text-white bg-slate-700" value="">Sem ano</option>
+              <optgroup label="Idade (anos)">
+                {ageYears.map((y) => (
+                  <option className="text-white bg-slate-700" key={`age-${y}`} value={100 + y}>
+                    {y} anos
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Ensino Medio">
+                {highYears.map((y) => (
+                  <option className="text-white bg-slate-700" key={`hs-${y}`} value={200 + y}>
+                    Ensino Medio {y}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Ano (serie)">
+                {gradeYears.map((y) => (
+                  <option className="text-white bg-slate-700 " key={`grade-${y}`} value={y}>
+                    Ano {y}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+
+
+          <div>
             <Label className="text-slate-200">Categoria</Label>
             <select
-              className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 rounded-lg bg-slate-700 border border-white/20 text-white focus:ring-2 focus:ring-blue-500"
               value={form.category_id ?? ""}
               onChange={(e) => setForm({ ...form, category_id: Number(e.target.value) || null })}
             >
-              <option className="text-black" value="">Sem categoria</option>
+              <option className="text-white" value="">Sem categoria</option>
               {categories.map((c) => (
-                <option className="text-black" key={c.id} value={c.id}>
+                <option className="text-white" key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}

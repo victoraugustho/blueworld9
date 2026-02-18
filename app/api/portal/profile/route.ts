@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { writeAuditLog } from "@/lib/audit"
 
 export async function PUT(req: NextRequest) {
   try {
@@ -32,9 +33,24 @@ export async function PUT(req: NextRequest) {
       WHERE id = ${teacherId}
     `
 
+    await writeAuditLog({
+      req,
+      action: "profile.update",
+      status: "success",
+      actor: { id: auth.teacherId, email: auth.teacher.email, role: "teacher" },
+      target: { type: "teacher", id: teacherId },
+      metadata: { fields: ["name", "phone"] },
+    })
+
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)
+    await writeAuditLog({
+      req,
+      action: "profile.update",
+      status: "failed",
+      metadata: { reason: "exception" },
+    })
     return NextResponse.json({ error: "Erro interno" }, { status: 500 })
   }
 }

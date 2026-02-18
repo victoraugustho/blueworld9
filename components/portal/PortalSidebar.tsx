@@ -13,9 +13,11 @@ import {
   X,
   Users,
   Bell,
+  ClipboardList,
   Sparkles,
   UserRound,
   ChevronDown,
+  CalendarDays,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -41,22 +43,27 @@ export function PortalSidebar({
   const [open, setOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [unreadLoading, setUnreadLoading] = useState(false)
 
   const sidebarRef = useRef<HTMLElement | null>(null)
   const profileRef = useRef<HTMLDivElement | null>(null)
 
   const t = {
-    adminSection: locale === "es" ? "Administración" : "Administração",
+    adminSection: locale === "es" ? "Administraci\u00f3n" : "Administra\u00e7\u00e3o",
     logout: locale === "es" ? "Salir" : "Sair",
     profile: locale === "es" ? "Perfil" : "Perfil",
     menu: {
-      home: locale === "es" ? "Inicio" : "Início",
+      home: locale === "es" ? "Inicio" : "In\u00edcio",
       aulas: locale === "es" ? "Clases" : "Aulas",
+      agenda: locale === "es" ? "Agenda" : "Agenda",
       materiais: locale === "es" ? "Materiales" : "Materiais",
-      notificacoes: locale === "es" ? "Notificaciones" : "Notificações",
+      notificacoes: locale === "es" ? "Notificaciones" : "Notifica\u00e7\u00f5es",
       adminMaterials: locale === "es" ? "Materiales (Admin)" : "Materiais (Admin)",
       teachers: locale === "es" ? "Profesores" : "Professores",
-      adminNotifications: locale === "es" ? "Notificaciones (Admin)" : "Notificações (Admin)",
+      adminSchedules: locale === "es" ? "Horarios (Admin)" : "Hor\u00e1rios (Admin)",
+      adminNotifications: locale === "es" ? "Notificaciones (Admin)" : "Notifica\u00e7\u00f5es (Admin)",
+      logs: locale === "es" ? "Auditoria" : "Auditoria",
       ai: locale === "es" ? "IA" : "IA",
     },
   }
@@ -65,8 +72,8 @@ export function PortalSidebar({
     () => [
       { href: "/portal/dashboard", label: t.menu.home, icon: Home },
       { href: "/portal/dashboard/aulas", label: t.menu.aulas, icon: BookOpen },
+      { href: "/portal/dashboard/agenda", label: t.menu.agenda, icon: CalendarDays },
       { href: "/portal/dashboard/materiais", label: t.menu.materiais, icon: FileText },
-      { href: "/portal/dashboard/notificacoes", label: t.menu.notificacoes, icon: Bell },
       { href: "/portal/dashboard/ia", label: t.menu.ai, icon: Sparkles },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -77,13 +84,15 @@ export function PortalSidebar({
     () => [
       { href: "/portal/dashboard/admin/materials", label: t.menu.adminMaterials, icon: ShieldCheck },
       { href: "/portal/dashboard/admin/teachers", label: t.menu.teachers, icon: Users },
+      { href: "/portal/dashboard/admin/schedules", label: t.menu.adminSchedules, icon: CalendarDays },
       { href: "/portal/dashboard/admin/notifications", label: t.menu.adminNotifications, icon: Bell },
+      { href: "/portal/dashboard/admin/logs", label: t.menu.logs, icon: ClipboardList },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [locale]
   )
 
-  // ✅ corrige active do "Início" (só ativo quando for exatamente /portal/dashboard)
+  // ✅ corrige active do "In\u00edcio" (só ativo quando for exatamente /portal/dashboard)
   function isActive(href: string) {
     if (href === "/portal/dashboard") return pathname === href
     return pathname === href || pathname.startsWith(href + "/")
@@ -117,6 +126,28 @@ export function PortalSidebar({
   useEffect(() => {
     setOpen(false)
     setProfileOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    let active = true
+    async function loadUnread() {
+      setUnreadLoading(true)
+      try {
+        const res = await fetch("/api/portal/notifications/unread", { cache: "no-store" })
+        const data = await res.json().catch(() => null)
+        if (!active) return
+        setUnreadCount(Number(data?.unread ?? 0))
+      } catch {
+        if (!active) return
+        setUnreadCount(0)
+      } finally {
+        if (active) setUnreadLoading(false)
+      }
+    }
+    loadUnread()
+    return () => {
+      active = false
+    }
   }, [pathname])
 
   const displayName = teacher?.name?.trim() || (locale === "es" ? "Profesor" : "Professor")
@@ -178,6 +209,21 @@ export function PortalSidebar({
                 />
               ) : (
                 <span className="text-white font-bold text-lg">Blue World 9</span>
+              )}
+            </Link>
+
+          <div className="flex items-center gap-2">
+            <Link
+              href="/portal/dashboard/notificacoes"
+              onClick={() => setOpen(false)}
+              className="relative w-10 h-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 flex items-center justify-center transition-colors"
+              aria-label={t.menu.notificacoes}
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && !unreadLoading && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
               )}
             </Link>
 
@@ -245,6 +291,7 @@ export function PortalSidebar({
                 </form>
               </div>
             )}
+          </div>
           </div>
         </div>
 
@@ -318,3 +365,4 @@ export function PortalSidebar({
     </>
   )
 }
+

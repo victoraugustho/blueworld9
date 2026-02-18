@@ -1,5 +1,8 @@
 import NotificationForm from "../../NotificationForm"
 
-export default function EditNotificationPage({ params }: { params: { id: string } }) {
-  return <NotificationForm id={params.id} />
+type PageProps = { params: Promise<{ id: string }> }
+
+export default async function EditNotificationPage({ params }: PageProps) {
+  const { id } = await params
+  return <NotificationForm id={id} />
 }

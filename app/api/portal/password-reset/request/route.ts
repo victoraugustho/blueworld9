@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import crypto from "crypto"
+import { writeAuditLog } from "@/lib/audit"
 
 type Country = "BR" | "UY" | "PY"
 
@@ -56,7 +57,16 @@ export async function POST(req: NextRequest) {
       WHERE teacher_id = ${teacher.id}
         AND created_at > now() - interval '30 minutes'
     `
-    if ((rl?.count ?? 0) >= 3) return genericOk
+    if ((rl?.count ?? 0) >= 3) {
+      await writeAuditLog({
+        req: req,
+        action: "auth.password_reset.request",
+        status: "failed",
+        actor: { id: teacher.id, email: teacher.email, role: "teacher" },
+        metadata: { reason: "rate_limited" },
+      })
+      return genericOk
+    }
 
     // cria token cru + hash
     const rawToken = crypto.randomBytes(32).toString("hex") // 64 chars
@@ -108,10 +118,23 @@ export async function POST(req: NextRequest) {
       console.warn("N8N_PASSWORD_RESET_WEBHOOK_URL não definido. ResetUrl:", resetUrl)
     }
 
+    await writeAuditLog({
+      req: req,
+      action: "auth.password_reset.request",
+      status: "success",
+      actor: { id: teacher.id, email: teacher.email, role: "teacher" },
+    })
+
     return genericOk
   } catch (e) {
     console.error(e)
     // Mesmo em erro, devolve genérico (pra não vazar info)
+    await writeAuditLog({
+      req: req,
+      action: "auth.password_reset.request",
+      status: "failed",
+      metadata: { reason: "exception" },
+    })
     return NextResponse.json({
       ok: true,
       message:

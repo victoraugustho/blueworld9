@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import { createSession, sessionCookieOptions } from "@/lib/auth/session"
 import { SESSION_COOKIE } from "@/lib/auth/constants"
+import { writeAuditLog } from "@/lib/audit"
 
 type Country = "BR" | "UY" | "PY"
 
@@ -24,6 +25,12 @@ export async function POST(request: NextRequest) {
     const doc = onlyDigits(documentNumber)
 
     if (!c || !doc || !password) {
+      await writeAuditLog({
+        req: request,
+        action: "auth.login",
+        status: "failed",
+        metadata: { reason: "missing_fields", country: c ?? null },
+      })
       return NextResponse.json(
         { error: c === "BR" ? "Documento e senha são obrigatórios" : "Documento y contraseña son obligatorios" },
         { status: 400 }
@@ -31,13 +38,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (!["BR", "UY", "PY"].includes(c)) {
+      await writeAuditLog({
+        req: request,
+        action: "auth.login",
+        status: "failed",
+        metadata: { reason: "invalid_country", country: c ?? null },
+      })
       return NextResponse.json({ error: "País inválido" }, { status: 400 })
     }
 
     const docType = getDocType(c)
 
     const [teacher] = await db`
-      SELECT id, approved, active, password_hash, locale
+      SELECT id, name, email, approved, active, password_hash, locale
       FROM teachers
       WHERE country = ${c}
         AND document_type = ${docType}
@@ -46,6 +59,12 @@ export async function POST(request: NextRequest) {
     `
 
     if (!teacher) {
+      await writeAuditLog({
+        req: request,
+        action: "auth.login",
+        status: "failed",
+        metadata: { reason: "not_found", country: c },
+      })
       return NextResponse.json(
         { error: c === "BR" ? "Documento ou senha incorretos" : "Documento o contraseña incorrectos" },
         { status: 401 }
@@ -55,6 +74,13 @@ export async function POST(request: NextRequest) {
     const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
 
     if (teacher.active === false) {
+      await writeAuditLog({
+        req: request,
+        action: "auth.login",
+        status: "failed",
+        actor: { id: teacher.id, name: teacher.name, email: teacher.email, role: "teacher" },
+        metadata: { reason: "inactive", country: c },
+      })
       return NextResponse.json(
         { error: locale === "pt-BR" ? "Conta inativa. Contate um administrador." : "Cuenta inactiva. Contacte a un administrador." },
         { status: 403 }
@@ -63,6 +89,13 @@ export async function POST(request: NextRequest) {
 
     // ✅ BLOQUEIA LOGIN SE NÃO ESTIVER APROVADO
     if (teacher.approved === false) {
+      await writeAuditLog({
+        req: request,
+        action: "auth.login",
+        status: "failed",
+        actor: { id: teacher.id, name: teacher.name, email: teacher.email, role: "teacher" },
+        metadata: { reason: "not_approved", country: c },
+      })
       return NextResponse.json(
         { error: locale === "pt-BR" ? "Seu cadastro ainda não foi aprovado." : "Tu registro aún no fue aprobado." },
         { status: 403 }
@@ -71,6 +104,13 @@ export async function POST(request: NextRequest) {
 
     const passwordMatch = await bcrypt.compare(password, teacher.password_hash)
     if (!passwordMatch) {
+      await writeAuditLog({
+        req: request,
+        action: "auth.login",
+        status: "failed",
+        actor: { id: teacher.id, name: teacher.name, email: teacher.email, role: "teacher" },
+        metadata: { reason: "invalid_password", country: c },
+      })
       return NextResponse.json(
         { error: locale === "pt-BR" ? "Documento ou senha incorretos" : "Documento o contraseña incorrectos" },
         { status: 401 }
@@ -107,9 +147,23 @@ export async function POST(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 30,
     })
 
+    await writeAuditLog({
+      req: request,
+      action: "auth.login",
+      status: "success",
+      actor: { id: teacher.id, name: teacher.name, email: teacher.email, role: "teacher" },
+      metadata: { country: c },
+    })
+
     return response
   } catch (err) {
     console.error("Login error:", err)
+    await writeAuditLog({
+      req: request,
+      action: "auth.login",
+      status: "failed",
+      metadata: { reason: "exception" },
+    })
     return NextResponse.json({ error: "Erro ao fazer login" }, { status: 500 })
   }
 }

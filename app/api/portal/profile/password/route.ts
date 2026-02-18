@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
 import { clearSessionCookie, revokeSessionsForTeacher } from "@/lib/auth/session"
 import bcrypt from "bcryptjs"
+import { writeAuditLog } from "@/lib/audit"
 
 export async function PUT(req: NextRequest) {
   try {
@@ -32,7 +33,16 @@ export async function PUT(req: NextRequest) {
     }
 
     const ok = await bcrypt.compare(currentPassword, teacher.password_hash)
-    if (!ok) return NextResponse.json({ error: "Senha atual incorreta" }, { status: 401 })
+    if (!ok) {
+      await writeAuditLog({
+        req,
+        action: "profile.password.change",
+        status: "failed",
+        actor: { id: auth.teacherId, email: auth.teacher.email, role: "teacher" },
+        metadata: { reason: "invalid_current" },
+      })
+      return NextResponse.json({ error: "Senha atual incorreta" }, { status: 401 })
+    }
 
     const hash = await bcrypt.hash(newPassword, 10)
 
@@ -46,9 +56,24 @@ export async function PUT(req: NextRequest) {
     await revokeSessionsForTeacher(teacherId)
     const res = NextResponse.json({ ok: true })
     clearSessionCookie(res)
+
+    await writeAuditLog({
+      req,
+      action: "profile.password.change",
+      status: "success",
+      actor: { id: auth.teacherId, email: auth.teacher.email, role: "teacher" },
+      target: { type: "teacher", id: teacherId },
+    })
+
     return res
   } catch (e) {
     console.error(e)
+    await writeAuditLog({
+      req,
+      action: "profile.password.change",
+      status: "failed",
+      metadata: { reason: "exception" },
+    })
     return NextResponse.json({ error: "Erro interno" }, { status: 500 })
   }
 }

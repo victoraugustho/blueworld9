@@ -3,12 +3,14 @@ import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import crypto from "crypto"
 import { revokeSessionsForTeacher } from "@/lib/auth/session"
+import { writeAuditLog } from "@/lib/audit"
 
 function sha256(input: string) {
   return crypto.createHash("sha256").update(input).digest("hex")
 }
 
 export async function POST(req: NextRequest) {
+  let resetTeacherId: string | null = null
   try {
     const { token, password } = await req.json()
 
@@ -16,6 +18,12 @@ export async function POST(req: NextRequest) {
     const newPassword = String(password ?? "")
 
     if (!rawToken || newPassword.length < 8) {
+      await writeAuditLog({
+        req,
+        action: "auth.password_reset.confirm",
+        status: "failed",
+        metadata: { reason: "invalid_payload" },
+      })
       return NextResponse.json(
         { error: "Token inválido ou senha muito curta (mínimo 8 caracteres)." },
         { status: 400 }
@@ -24,7 +32,6 @@ export async function POST(req: NextRequest) {
 
     const tokenHash = sha256(rawToken)
     const hash = await bcrypt.hash(newPassword, 10)
-    let resetTeacherId: string | null = null
 
     // ✅ transação segura (postgres.js style)
     await db.begin(async (tx) => {
@@ -70,22 +77,53 @@ export async function POST(req: NextRequest) {
       await revokeSessionsForTeacher(resetTeacherId)
     }
 
+    await writeAuditLog({
+      req,
+      action: "auth.password_reset.confirm",
+      status: "success",
+      actor: resetTeacherId ? { id: resetTeacherId, role: "teacher" } : undefined,
+    })
+
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     console.error(e)
 
     // erros “controlados” dentro do begin
     if (e?.message === "TOKEN_INVALID") {
+      await writeAuditLog({
+        req,
+        action: "auth.password_reset.confirm",
+        status: "failed",
+        metadata: { reason: "token_invalid" },
+      })
       return NextResponse.json({ error: "Token inválido." }, { status: 400 })
     }
     if (e?.message === "TOKEN_EXPIRED") {
+      await writeAuditLog({
+        req,
+        action: "auth.password_reset.confirm",
+        status: "failed",
+        metadata: { reason: "token_expired" },
+      })
       return NextResponse.json({ error: "Token expirado." }, { status: 400 })
     }
     if (e?.message === "TOKEN_USED") {
+      await writeAuditLog({
+        req,
+        action: "auth.password_reset.confirm",
+        status: "failed",
+        metadata: { reason: "token_used" },
+      })
       return NextResponse.json({ error: "Token já utilizado." }, { status: 400 })
     }
+
+    await writeAuditLog({
+      req,
+      action: "auth.password_reset.confirm",
+      status: "failed",
+      metadata: { reason: "exception" },
+    })
 
     return NextResponse.json({ error: "Erro interno." }, { status: 500 })
   }
 }
-

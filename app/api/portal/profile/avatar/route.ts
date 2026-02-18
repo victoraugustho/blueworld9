@@ -4,6 +4,7 @@ import { requireTeacherApi } from "@/lib/auth/require"
 import { mkdir, writeFile, unlink } from "node:fs/promises"
 import path from "node:path"
 import crypto from "node:crypto"
+import { writeAuditLog } from "@/lib/audit"
 
 // IMPORTANTE: precisa rodar em Node runtime (não Edge) por causa de fs
 export const runtime = "nodejs"
@@ -129,14 +130,28 @@ export async function POST(req: NextRequest) {
       WHERE id = ${teacherId}
     `
 
+    await writeAuditLog({
+      req,
+      action: "profile.avatar.update",
+      status: "success",
+      actor: { id: auth.teacherId, email: auth.teacher.email, role: "teacher" },
+      target: { type: "teacher", id: teacherId },
+    })
+
     return NextResponse.json({ ok: true, avatar_url: avatarUrl })
   } catch (e) {
     console.error(e)
+    await writeAuditLog({
+      req,
+      action: "profile.avatar.update",
+      status: "failed",
+      metadata: { reason: "exception" },
+    })
     return NextResponse.json({ error: "Erro ao enviar avatar" }, { status: 500 })
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   try {
     const auth = await requireTeacherApi()
     if (!auth.ok) return auth.response
@@ -165,9 +180,23 @@ export async function DELETE() {
       WHERE id = ${teacherId}
     `
 
+    await writeAuditLog({
+      req,
+      action: "profile.avatar.delete",
+      status: "success",
+      actor: { id: auth.teacherId, email: auth.teacher.email, role: "teacher" },
+      target: { type: "teacher", id: teacherId },
+    })
+
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)
+    await writeAuditLog({
+      req,
+      action: "profile.avatar.delete",
+      status: "failed",
+      metadata: { reason: "exception" },
+    })
     return NextResponse.json({ error: "Erro ao remover avatar" }, { status: 500 })
   }
 }

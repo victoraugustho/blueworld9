@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { writeAuditLog } from "@/lib/audit"
 
 export async function POST(req: NextRequest, context: any) {
   const auth = await requireTeacherApi()
@@ -13,6 +14,14 @@ export async function POST(req: NextRequest, context: any) {
     ON CONFLICT (notification_id, teacher_id)
     DO UPDATE SET read_at = NOW()
   `
+
+  await writeAuditLog({
+    req,
+    action: "notifications.read",
+    status: "success",
+    actor: { id: auth.teacherId, email: auth.teacher.email, role: "teacher" },
+    target: { type: "notification", id },
+  })
 
   return NextResponse.json({ success: true })
 }
@@ -28,11 +37,13 @@ export async function DELETE(req: NextRequest, context: any) {
       AND teacher_id = ${auth.teacherId}
   `
 
+  await writeAuditLog({
+    req,
+    action: "notifications.unread",
+    status: "success",
+    actor: { id: auth.teacherId, email: auth.teacher.email, role: "teacher" },
+    target: { type: "notification", id },
+  })
+
   return NextResponse.json({ success: true })
 }
-
-
-
-
-
-

@@ -21,8 +21,13 @@ export default function NewMaterialPage() {
     file_url: "",
     file_type: "video",
     category_id: "",
+    student_year: "",
     language: "pt-BR" as "pt-BR" | "es",
   })
+
+  const ageYears = [3, 4, 5]
+  const highYears = [1, 2, 3]
+  const gradeYears = Array.from({ length: 9 }, (_, i) => i + 1)
 
   const [newCategoryName, setNewCategoryName] = useState("")
 
@@ -120,8 +125,8 @@ export default function NewMaterialPage() {
                 value={form.file_type}
                 onChange={(e) => setForm({ ...form, file_type: e.target.value })}
               >
-                <option value="video">Vídeo (YouTube)</option>
-                <option value="document">Documento</option>
+                <option className="text-white" value="video">Vídeo (YouTube)</option>
+                <option className="text-white" value="document">Documento</option>
               </select>
             </div>
 
@@ -133,8 +138,40 @@ export default function NewMaterialPage() {
                 value={form.language}
                 onChange={(e) => setForm({ ...form, language: e.target.value as "pt-BR" | "es" })}
               >
-                <option value="pt-BR">Português (BR)</option>
-                <option value="es">Español</option>
+                <option className="text-white" value="pt-BR">Português (BR)</option>
+                <option className="text-white" value="es">Español</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-white">Ano do Aluno (opcional)</Label>
+              <select
+                className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                value={form.student_year}
+                onChange={(e) => setForm({ ...form, student_year: e.target.value })}
+              >
+                <option className="text-white" value="">Sem ano</option>
+                <optgroup label="Idade (anos)">
+                  {ageYears.map((y) => (
+                    <option className="text-white" key={`age-${y}`} value={String(100 + y)}>
+                      {y} anos
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Ensino Medio">
+                  {highYears.map((y) => (
+                    <option className="text-white" key={`hs-${y}`} value={String(200 + y)}>
+                      Ensino Medio {y}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Ano (serie)">
+                  {gradeYears.map((y) => (
+                    <option className="text-white" key={`grade-${y}`} value={String(y)}>
+                      Ano {y}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </div>
 
@@ -145,9 +182,9 @@ export default function NewMaterialPage() {
                 value={form.category_id}
                 onChange={(e) => setForm({ ...form, category_id: e.target.value })}
               >
-                <option value="">Selecione</option>
+                <option className="text-white" value="">Selecione</option>
                 {categories.map((cat) => (
-                  <option key={cat.id} value={String(cat.id)}>
+                  <option className="text-white" key={cat.id} value={String(cat.id)}>
                     {cat.name}
                   </option>
                 ))}

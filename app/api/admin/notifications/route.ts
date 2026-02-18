@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
+import { writeAuditLog } from "@/lib/audit"
 
 async function notifyN8N(payload: any) {
   const url = process.env.N8N_NOTIFICATIONS_WEBHOOK_URL
@@ -35,8 +36,8 @@ async function notifyN8N(payload: any) {
 }
 
 export async function GET() {
-  const admin = await requireAdmin()
-  if (!admin) return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+  const admin = await requireAdminApi()
+  if (!admin.ok) return admin.response
 
   const rows = await db`
     SELECT *
@@ -47,25 +48,33 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const admin = await requireAdmin()
-  if (!admin) return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+  const admin = await requireAdminApi()
+  if (!admin.ok) return admin.response
 
   const body = await req.json()
 
   const title = body.title?.trim()
   const message = body.message?.trim()
-  const audience = body.audience ?? "all"
-  const country = body.country ?? null
-  const locale = body.locale ?? null
-  const teacher_id = body.teacher_id ?? null
+  const rawAudience = body.audience ?? "all"
+  const teacherIdsRaw = Array.isArray(body.teacher_ids) ? body.teacher_ids : []
+  const teacherIds = Array.from(
+    new Set(teacherIdsRaw.map((id: any) => String(id).trim()).filter(Boolean))
+  )
+  const teacher_id = body.teacher_id ?? (teacherIds[0] ?? null)
+  const audience = teacherIds.length > 0 ? "teacher" : rawAudience
+  const country = audience === "country" ? body.country ?? null : null
+  const locale = audience === "locale" ? body.locale ?? null : null
   const active = body.active !== undefined ? !!body.active : true
   const expires_at = body.expires_at ? new Date(body.expires_at) : null
+  const teacher_ids =
+    audience === "teacher" ? (teacherIds.length > 0 ? teacherIds : teacher_id ? [teacher_id] : null) : null
+  const teacher_id_final = audience === "teacher" ? teacher_id : null
 
   if (!title || !message) {
     return NextResponse.json({ error: "Título e mensagem são obrigatórios" }, { status: 400 })
   }
 
-  if (!["all", "country", "locale", "teacher"].includes(audience)) {
+  if (!['all', 'country', 'locale', 'teacher'].includes(audience)) {
     return NextResponse.json({ error: "Audience inválido" }, { status: 400 })
   }
 
@@ -77,13 +86,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Locale inválido para audience=locale" }, { status: 400 })
   }
 
-  if (audience === "teacher" && !teacher_id) {
-    return NextResponse.json({ error: "teacher_id obrigatório para audience=teacher" }, { status: 400 })
+  if (audience === "teacher" && (!teacher_ids || teacher_ids.length === 0)) {
+    return NextResponse.json({ error: "Selecione ao menos um professor" }, { status: 400 })
   }
 
   const [created] = await db`
-    INSERT INTO notifications (title, message, audience, country, locale, teacher_id, active, expires_at, created_by)
-    VALUES (${title}, ${message}, ${audience}, ${country}, ${locale}, ${teacher_id}, ${active}, ${expires_at}, ${admin.teacherId})
+    INSERT INTO notifications (
+      title, message, audience, country, locale, teacher_id, teacher_ids, active, expires_at, created_by
+    )
+    VALUES (
+      ${title}, ${message}, ${audience}, ${country}, ${locale}, ${teacher_id_final}, ${teacher_ids}::uuid[], ${active}, ${expires_at}, ${admin.teacherId}
+    )
     RETURNING *
   `
 
@@ -95,6 +108,14 @@ export async function POST(req: NextRequest) {
     at: new Date().toISOString(),
   })
 
+  await writeAuditLog({
+    req,
+    action: "admin.notifications.create",
+    status: "success",
+    actor: { id: admin.teacherId, email: admin.teacher.email, role: "admin", sessionId: admin.sessionId },
+    target: { type: "notification", id: created?.id },
+    metadata: { title, audience, country, locale, teacher_id: teacher_id_final, teacher_ids, active, expires_at },
+  })
+
   return NextResponse.json(created)
 }
-

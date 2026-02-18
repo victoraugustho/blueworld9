@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { db } from "@/lib/db"
 import OpenAI from "openai"
+import { requireTeacherApi } from "@/lib/auth/require"
 
 type Role = "user" | "assistant" | "system"
 type Locale = "pt-BR" | "es"
@@ -122,11 +122,9 @@ async function maybeUpdateSummary(conversationId: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const teacherId = cookieStore.get("teacher_id")?.value
-    if (!teacherId) {
-      return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
-    }
+    const auth = await requireTeacherApi()
+    if (!auth.ok) return auth.response
+    const teacherId = auth.teacherId
 
     const body = await req.json()
     const message = String(body?.message ?? "").trim()

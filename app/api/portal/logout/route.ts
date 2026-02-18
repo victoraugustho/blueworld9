@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { SESSION_COOKIE } from "@/lib/auth/constants";
+import { clearSessionCookie, revokeSessionByToken } from "@/lib/auth/session";
 
 export async function POST() {
-  const response = NextResponse.redirect(process.env.NEXT_PUBLIC_SITE_URL + "/portal/login")
-  response.cookies.set("teacher_id", "", {
-    maxAge: 0,
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-  });
+  const token = (await cookies()).get(SESSION_COOKIE)?.value
+  if (token) {
+    await revokeSessionByToken(token)
+  }
 
-  return response;
+  const response = NextResponse.redirect(process.env.NEXT_PUBLIC_SITE_URL + "/portal/login")
+  clearSessionCookie(response)
+
+  return response
 }

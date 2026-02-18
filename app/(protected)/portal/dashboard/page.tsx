@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation"
-import { cookies } from "next/headers"
 import { db } from "@/lib/db"
+import { requireTeacherPage } from "@/lib/auth/server"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PlayCircle, FileText, BookOpen, Video, LogOut, User } from "lucide-react"
@@ -19,23 +18,7 @@ type Material = {
 }
 
 export default async function PortalDashboardPage() {
-  const cookieStore = await cookies()
-  const teacherId = cookieStore.get("teacher_id")?.value
-
-  if (!teacherId) redirect("/portal/login")
-
-  // Buscar teacher no banco
-  const [teacher] = await db`
-    SELECT id, name, email, approved, active, locale
-    FROM teachers
-    WHERE id = ${teacherId}
-    LIMIT 1
-  `
-
-  if (!teacher || !teacher.approved || teacher.active === false) {
-    redirect("/portal/login")
-  }
-
+  const teacher = await requireTeacherPage()
   const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
 
   // Buscar materials filtrados por idioma do professor
@@ -247,3 +230,4 @@ export default async function PortalDashboardPage() {
     </div>
   )
 }
+

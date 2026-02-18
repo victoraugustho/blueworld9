@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { db } from "@/lib/db"
+import { requireAdminApi } from "@/lib/auth/require"
 
 type Ctx = { params: Promise<{ id: string }> } // ✅ params como Promise (Next 16 sync-dynamic-apis)
 
@@ -12,22 +12,8 @@ export async function PATCH(_req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 })
   }
 
-  // ✅ (recomendado) checar admin
-  const teacherId = (await cookies()).get("teacher_id")?.value
-  if (!teacherId) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
-  }
-
-  const [me] = await db`
-    SELECT role, is_admin
-    FROM public.teachers
-    WHERE id = ${teacherId}
-    LIMIT 1
-  `
-  const isAdmin = me?.is_admin === true || me?.role === "admin"
-  if (!isAdmin) {
-    return NextResponse.json({ error: "Sem permissão" }, { status: 403 })
-  }
+  const admin = await requireAdminApi()
+  if (!admin.ok) return admin.response
 
   // ✅ aprova professor
   const [result] = await db`

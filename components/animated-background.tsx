@@ -49,24 +49,6 @@ function AnimatedBackgroundComponent({ variant = "default" }: AnimatedBackground
     }));
   }, [icons]);
 
-  /* RENDERIZAÇÃO DOS ÍCONES FLOATING */
-  {icons.map((Icon, i) => (
-    <Icon
-      key={i}
-      className="absolute animate-[float_9s_ease-in-out_infinite]"
-      style={{
-        width: iconPositions[i].size,
-        height: iconPositions[i].size,
-        top: `${iconPositions[i].top}%`,
-        left: `${iconPositions[i].left}%`,
-        opacity: iconPositions[i].opacity,
-        color: "white",
-        filter: "drop-shadow(0 0 8px rgba(255,255,255,0.2))",
-        animationDelay: `${iconPositions[i].delay}s`,
-      }}
-    />
-  ))}
-
   /* PARTICLES LAYER 1 */
   const particles1 = useMemo(() => {
     return [...Array(40)].map((_, i) => ({

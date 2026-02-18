@@ -2,7 +2,7 @@
 
 import { Home, Globe, School, Info, Users, X, Menu } from "lucide-react"
 import Image from "next/image"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -11,7 +11,8 @@ import { useRouter } from "next/navigation"
 export function GlassmorphismNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showNav, setShowNav] = useState(true)
-  const [lastScrollY, setLastScrollY] = useState(0)
+  const lastScrollY = useRef(0)
+  const ticking = useRef(false)
   const pathname = usePathname()
 
 
@@ -44,21 +45,23 @@ export function GlassmorphismNav() {
 
   useEffect(() => {
     const handleScroll = () => {
-      const currentScroll = window.scrollY
-
-      if (currentScroll > lastScrollY && currentScroll > 620) {
-        setShowNav(false)
-      } 
-      else {
-        setShowNav(true)
-      }
-
-      setLastScrollY(currentScroll)
+      if (ticking.current) return
+      ticking.current = true
+      requestAnimationFrame(() => {
+        const currentScroll = window.scrollY
+        if (currentScroll > lastScrollY.current && currentScroll > 620) {
+          setShowNav(false)
+        } else {
+          setShowNav(true)
+        }
+        lastScrollY.current = currentScroll
+        ticking.current = false
+      })
     }
 
-    window.addEventListener("scroll", handleScroll)
+    window.addEventListener("scroll", handleScroll, { passive: true })
     return () => window.removeEventListener("scroll", handleScroll)
-  }, [lastScrollY])
+  }, [])
 
   return (
     <header

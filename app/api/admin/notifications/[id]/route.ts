@@ -1,21 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { db } from "@/lib/db"
-
-async function requireAdmin() {
-  const teacherId = (await cookies()).get("teacher_id")?.value
-  if (!teacherId) return null
-
-  const [t] = await db`
-    SELECT id, approved, active, role
-    FROM teachers
-    WHERE id = ${teacherId}
-    LIMIT 1
-  `
-  if (!t || t.approved !== true || t.active === false) return null
-  if (t.role !== "admin") return null
-  return { teacherId }
-}
+import { requireAdminApi } from "@/lib/auth/require"
 
 export async function GET(req: NextRequest, context: any) {
   const admin = await requireAdmin()
@@ -75,3 +60,4 @@ export async function DELETE(req: NextRequest, context: any) {
   await db`DELETE FROM notifications WHERE id = ${id}`
   return NextResponse.json({ success: true })
 }
+

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
+import { createSession, sessionCookieOptions } from "@/lib/auth/session"
+import { SESSION_COOKIE } from "@/lib/auth/constants"
 
 type Country = "BR" | "UY" | "PY"
 
@@ -84,13 +86,8 @@ export async function POST(request: NextRequest) {
     })
 
     // ✅ cookie httpOnly (auth)
-    response.cookies.set("teacher_id", String(teacher.id), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    })
+    const sessionToken = await createSession(teacher.id, request)
+    response.cookies.set(SESSION_COOKIE, sessionToken, sessionCookieOptions())
 
     // ✅ cookie NÃO httpOnly (somente UI/idioma)
     response.cookies.set("portal_locale", locale, {

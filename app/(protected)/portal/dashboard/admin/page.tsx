@@ -1,27 +1,12 @@
-import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { db } from "@/lib/db";
+import { requireAdminPage } from "@/lib/auth/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlayCircle, FileText, BookOpen, Video, LogOut, User } from "lucide-react";
 import Link from "next/link";
 
 export default async function PortalDashboardPage() {
-  const cookieStore = await cookies();
-  const teacherId = cookieStore.get("teacher_id")?.value;
-
-  if (!teacherId) {
-    redirect("/portal/login");
-  }
-
-  // Buscar teacher no banco
-  const [teacher] = await db`
-    SELECT * FROM teachers WHERE id = ${teacherId}
-  `;
-
-  if (!teacher || !teacher.approved) {
-    redirect("/portal/login");
-  }
+  const teacher = await requireAdminPage();
 
   // Buscar materials
   const materials = await db`
@@ -185,3 +170,4 @@ export default async function PortalDashboardPage() {
     </div>
   );
 }
+

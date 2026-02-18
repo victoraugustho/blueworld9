@@ -1,27 +1,10 @@
 import { ReactNode } from "react"
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
-import { db } from "@/lib/db"
 import { PortalSidebar } from "@/components/portal/PortalSidebar"
+import { requireTeacherPage } from "@/lib/auth/server"
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
-  const cookieStore = await cookies()
-  const teacherId = cookieStore.get("teacher_id")?.value
-
-  if (!teacherId) redirect("/portal/login")
-
-  const [teacher] = await db`
-    SELECT id, name, email, approved, active, locale, role, avatar_url
-    FROM public.teachers
-    WHERE id = ${teacherId}
-    LIMIT 1
-  `
-
-  if (!teacher || teacher.approved !== true || teacher.active === false) {
-    redirect("/portal/login")
-  }
-
-  const isAdmin = teacher.role === "admin"
+  const teacher = await requireTeacherPage()
+  const isAdmin = teacher.is_admin === true || teacher.role === "admin"
   const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
 
   return (
@@ -49,3 +32,4 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     </div>
   )
 }
+

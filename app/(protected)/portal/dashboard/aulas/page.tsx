@@ -1,6 +1,5 @@
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
 import { db } from "@/lib/db"
+import { requireTeacherPage } from "@/lib/auth/server"
 
 function extractYouTubeId(url: string): string | null {
   try {
@@ -19,20 +18,7 @@ function extractYouTubeId(url: string): string | null {
 }
 
 export default async function AulasPage() {
-  const teacherId = (await cookies()).get("teacher_id")?.value
-  if (!teacherId) redirect("/portal/login")
-
-  const [teacher] = await db`
-    SELECT id, approved, active, locale
-    FROM teachers
-    WHERE id = ${teacherId}
-    LIMIT 1
-  `
-
-  if (!teacher || teacher.approved !== true || teacher.active === false) {
-    redirect("/portal/login")
-  }
-
+  const teacher = await requireTeacherPage()
   const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
 
   const t = {
@@ -107,3 +93,4 @@ export default async function AulasPage() {
     </div>
   )
 }
+

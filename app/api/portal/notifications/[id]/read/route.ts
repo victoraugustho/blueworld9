@@ -1,25 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { db } from "@/lib/db"
-
-async function requireTeacher() {
-  const teacherId = (await cookies()).get("teacher_id")?.value
-  if (!teacherId) return null
-
-  const [teacher] = await db`
-    SELECT id, approved, active
-    FROM teachers
-    WHERE id = ${teacherId}
-    LIMIT 1
-  `
-  if (!teacher || teacher.approved !== true || teacher.active === false) return null
-  return { teacherId }
-}
+import { requireTeacherApi } from "@/lib/auth/require"
 
 export async function POST(req: NextRequest, context: any) {
-  const auth = await requireTeacher()
-  if (!auth) return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
-
+  const auth = await requireTeacherApi()
+  if (!auth.ok) return auth.response
   const { id } = await context.params
 
   await db`
@@ -33,9 +18,8 @@ export async function POST(req: NextRequest, context: any) {
 }
 
 export async function DELETE(req: NextRequest, context: any) {
-  const auth = await requireTeacher()
-  if (!auth) return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
-
+  const auth = await requireTeacherApi()
+  if (!auth.ok) return auth.response
   const { id } = await context.params
 
   await db`
@@ -46,3 +30,9 @@ export async function DELETE(req: NextRequest, context: any) {
 
   return NextResponse.json({ success: true })
 }
+
+
+
+
+
+

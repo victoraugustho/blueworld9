@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { requireAdminApi } from "@/lib/auth/require"
 
 type Country = "BR" | "UY" | "PY"
 type DocType = "CPF" | "CI_UY" | "CI_PY"
@@ -16,6 +17,8 @@ function docTypeForCountry(country: Country): DocType {
 
 // buscar professor
 export async function GET(req: NextRequest, context: any) {
+  const admin = await requireAdminApi()
+  if (!admin.ok) return admin.response
   const { id } = await context.params
 
   const [teacher] = await db`
@@ -37,6 +40,8 @@ export async function GET(req: NextRequest, context: any) {
 
 // atualizar professor
 export async function PUT(req: NextRequest, context: any) {
+  const admin = await requireAdminApi()
+  if (!admin.ok) return admin.response
   const { id } = await context.params
   const body = await req.json()
 
@@ -90,6 +95,8 @@ export async function PUT(req: NextRequest, context: any) {
 
 // aprovar professor
 export async function PATCH(req: NextRequest, context: any) {
+  const admin = await requireAdminApi()
+  if (!admin.ok) return admin.response
   const { id } = await context.params
 
   const [result] = await db`
@@ -111,6 +118,8 @@ export async function PATCH(req: NextRequest, context: any) {
 
 // deletar professor (se quiser manter)
 export async function DELETE(req: NextRequest, context: any) {
+  const admin = await requireAdminApi()
+  if (!admin.ok) return admin.response
   const { id } = await context.params
 
   await db`
@@ -120,3 +129,4 @@ export async function DELETE(req: NextRequest, context: any) {
 
   return NextResponse.json({ success: true })
 }
+

@@ -1,13 +1,11 @@
-import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { requireTeacherApi } from "@/lib/auth/require"
 
 export async function DELETE() {
-  const teacherId = (await cookies()).get("teacher_id")?.value
-
-  if (!teacherId) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
-  }
+  const auth = await requireTeacherApi()
+  if (!auth.ok) return auth.response
+  const teacherId = auth.teacherId
 
   await db`
     DELETE FROM public.ai_conversations

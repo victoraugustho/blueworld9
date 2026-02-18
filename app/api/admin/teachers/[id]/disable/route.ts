@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { requireAdminApi } from "@/lib/auth/require"
 
 export async function PATCH(req: NextRequest, context: any) {
+  const admin = await requireAdminApi()
+  if (!admin.ok) return admin.response
   const { id } = await context.params
 
   const body = await req.json().catch(() => ({}))
@@ -23,3 +26,4 @@ export async function PATCH(req: NextRequest, context: any) {
 
   return NextResponse.json(result)
 }
+

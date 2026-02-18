@@ -1,31 +1,11 @@
-"use client"
-
 import { Button } from "@/components/ui/button"
 import { Instagram, Linkedin, Youtube, Mail, Phone, MapPin, Heart } from "lucide-react"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 export function Footer() {
-  
-  const router = useRouter()
-  const scrollToContact = () => {
-  const isHome = window.location.pathname === "/"
-
-  if (isHome) {
-    // Já está na página certa → faz scroll suave
-    const element = document.getElementById("contato")
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" })
-    }
-  } else {
-    // Não está na home → redireciona para lá com hash
-    router.push("/#contato")
-  }
-}
-
   return (
-    <footer className="relative bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 text-white py-16 overflow-hidden">
+    <footer className="relative bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 text-white py-16 overflow-hidden cv-auto">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl" />
@@ -137,9 +117,9 @@ export function Footer() {
               <Button
                 size="lg"
                 className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-lg px-8 shadow-lg hover:shadow-orange-500/50 transition-all"
-                onClick={scrollToContact}
+                asChild
               >
-                Leve a Educação 5.0 para sua escola
+                <Link href="/#contato">Leve a Educação 5.0 para sua escola</Link>
               </Button>
             </div>
           </div>

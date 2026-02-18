@@ -124,6 +124,7 @@ function PrincipleCard({ principle }: { principle: Principle }) {
             src={principle.image}
             alt={principle.title}
             fill
+            sizes="(max-width: 768px) 90vw, (max-width: 1200px) 45vw, 30vw"
             className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent" />

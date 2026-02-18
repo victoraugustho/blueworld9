@@ -157,7 +157,7 @@ export function SchoolsSectionUnits() {
   return (
     <section
       id="unidades"
-      className="relative py-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden"
+      className="relative py-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden cv-auto"
     >
       <AnimatedBackground variant="about" />
 

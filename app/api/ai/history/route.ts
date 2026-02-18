@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { db } from "@/lib/db"
+import { requireTeacherApi } from "@/lib/auth/require"
 
 export async function GET() {
-  const teacherId = (await cookies()).get("teacher_id")?.value
-  if (!teacherId) return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
+  const auth = await requireTeacherApi()
+  if (!auth.ok) return auth.response
+  const teacherId = auth.teacherId
 
   const [conv] = await db`
     SELECT id

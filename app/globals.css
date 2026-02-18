@@ -347,7 +347,12 @@
   html {
     scrollbar-width: thin;
     scrollbar-color: rgba(9, 93, 202, 0.9) transparent;
+    scroll-behavior: smooth;
+  }
+
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 1000px;
   }
 
 }
-

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import crypto from "crypto"
+import { revokeSessionsForTeacher } from "@/lib/auth/session"
 
 function sha256(input: string) {
   return crypto.createHash("sha256").update(input).digest("hex")
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
 
     const tokenHash = sha256(rawToken)
     const hash = await bcrypt.hash(newPassword, 10)
+    let resetTeacherId: string | null = null
 
     // ✅ transação segura (postgres.js style)
     await db.begin(async (tx) => {
@@ -37,6 +39,7 @@ export async function POST(req: NextRequest) {
       `
 
       if (!row) throw Object.assign(new Error("TOKEN_INVALID"), { status: 400 })
+      resetTeacherId = row.teacher_id
 
       const expired = new Date(row.expires_at).getTime() < Date.now()
       if (expired) throw Object.assign(new Error("TOKEN_EXPIRED"), { status: 400 })
@@ -63,6 +66,10 @@ export async function POST(req: NextRequest) {
       `
     })
 
+    if (resetTeacherId) {
+      await revokeSessionsForTeacher(resetTeacherId)
+    }
+
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     console.error(e)
@@ -81,3 +88,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Erro interno." }, { status: 500 })
   }
 }
+

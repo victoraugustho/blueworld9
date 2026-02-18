@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { requireAdminApi } from "@/lib/auth/require"
 
 export async function GET() {
+  const admin = await requireAdminApi()
+  if (!admin.ok) return admin.response
   const approved = await db`
     SELECT
       id, name, email, phone,
@@ -34,3 +37,4 @@ export async function GET() {
 
   return NextResponse.json({ approved, pending, disabled })
 }
+

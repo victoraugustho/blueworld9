@@ -1,18 +1,14 @@
-"use client"
 import { Zap, Users, Target, Code, Rocket, Lightbulb, Award } from "lucide-react"
 import { AnimatedBackground } from "./animated-background"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { useRouter } from "next/navigation"
 import { PrinciplesGallery } from "@/components/secundary/about-gallery"
+import Link from "next/link"
 
 
 export function AboutHomeSection() {
-
-  const router = useRouter()
-
   return (
-    <section className="relative py-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden">
+    <section className="relative py-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden cv-auto">
       <AnimatedBackground variant="about" />
       {/* HEADER */}
       <div className="container mx-auto px-6 relative z-10 max-w-300">
@@ -41,9 +37,8 @@ export function AboutHomeSection() {
                 src="/webp/sala-de-aula.webp"
                 alt="Estudantes trabalhando com robótica e tecnologia em sala de aula"
                 fill
-                priority
-                sizes="(max-width: 768px) 100vw,
-                      (max-width: 1200px) 50vw,
+                sizes="(max-width: 768px) 90vw,
+                      (max-width: 1200px) 45vw,
                       33vw"
                 className="object-cover"
               />
@@ -110,13 +105,13 @@ export function AboutHomeSection() {
               </span>
             </div>
             <Button
-            size="lg"
-            variant="outline"
-            className="w-full border-white bg-white/10 hover:bg-cyan-500 hover:border-cyan-500 
+              size="lg"
+              variant="outline"
+              className="w-full border-white bg-white/10 hover:bg-cyan-500 hover:border-cyan-500 
                         text-white text-lg px-8 backdrop-blur hover:scale-[1.05]"
-            onClick={() => router.push("/sobre")} // 👈 coloque seu link aqui
+              asChild
             >
-            Saiba Mais
+              <Link href="/sobre">Saiba Mais</Link>
             </Button>
           </div>
         </div>

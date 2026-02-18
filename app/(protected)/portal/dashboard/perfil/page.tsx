@@ -1,11 +1,10 @@
-import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { db } from "@/lib/db"
+import { requireTeacherPage } from "@/lib/auth/server"
 import { ProfileForms } from "./ProfileForms"
 
 export default async function PerfilPage() {
-  const teacherId = (await cookies()).get("teacher_id")?.value
-  if (!teacherId) redirect("/portal/login")
+  const base = await requireTeacherPage()
 
   const [teacher] = await db`
     SELECT
@@ -13,11 +12,10 @@ export default async function PerfilPage() {
       email, country, document_type, document_number,
       avatar_url
     FROM teachers
-    WHERE id = ${teacherId}
+    WHERE id = ${base.id}
     LIMIT 1
   `
-
-  if (!teacher || teacher.active === false || teacher.approved === false) {
+  if (!teacher) {
     redirect("/portal/login")
   }
 
@@ -41,3 +39,5 @@ export default async function PerfilPage() {
     </div>
   )
 }
+
+

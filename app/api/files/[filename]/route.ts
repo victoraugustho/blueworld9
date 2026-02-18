@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { db } from "@/lib/db"
+import { requireTeacherApi } from "@/lib/auth/require"
 import path from "node:path"
 import { readFile } from "node:fs/promises"
 
@@ -45,21 +44,6 @@ function isAvatarFilename(filename: string) {
   return /^[0-9a-f-]{36}-[0-9a-f-]{36}\.(jpg|jpeg|png|webp)$/i.test(filename)
 }
 
-async function requireTeacherAuth() {
-  const teacherId = (await cookies()).get("teacher_id")?.value
-  if (!teacherId) return { ok: false as const }
-
-  const [teacher] = await db`
-    SELECT id, approved, active
-    FROM teachers
-    WHERE id = ${teacherId}
-    LIMIT 1
-  `
-  if (!teacher || teacher.approved !== true || teacher.active === false) return { ok: false as const }
-
-  return { ok: true as const, teacherId }
-}
-
 export async function GET(req: NextRequest, ctx: { params: Promise<{ filename: string }> }) {
   const { filename } = await ctx.params
   const safe = safeFilename(filename)
@@ -75,9 +59,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ filename: s
 
   if (!avatarPublic) {
     // ✅ OUTROS ARQUIVOS: protegidos
-    const auth = await requireTeacherAuth()
+    const auth = await requireTeacherApi()
     if (!auth.ok) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+      return auth.response
     }
   }
 

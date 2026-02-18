@@ -1,37 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { SESSION_COOKIE } from "@/lib/auth/constants";
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const session = request.cookies.get(SESSION_COOKIE)?.value;
 
-  const teacherId = request.cookies.get("teacher_id")?.value;
+  const isAuthPage = pathname === "/portal/login" || pathname === "/portal/cadastro";
 
-  // ROTAS ADMIN
-  if (request.nextUrl.pathname.startsWith("/portal/dashboard/admin")) {
-    if (!teacherId) {
-      return NextResponse.redirect(new URL("/portal/login", request.url));
-    }
-
-    const [user] = await db`
-      SELECT role FROM teachers WHERE id = ${teacherId}
-    `;
-
-    if (!user || user.role !== "admin") {
-      return NextResponse.redirect(new URL("/portal/dashboard", request.url));
-    }
+  if (isAuthPage && session) {
+    return NextResponse.redirect(new URL("/portal/dashboard", request.url));
   }
 
-  // ROTAS PROTEGIDAS
-  if (request.nextUrl.pathname.startsWith("/portal/dashboard")) {
-    if (!teacherId) {
-      return NextResponse.redirect(new URL("/portal/login", request.url));
-    }
+  if (pathname.startsWith("/portal/dashboard") && !session) {
+    return NextResponse.redirect(new URL("/portal/login", request.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/portal/:path*",
-  ],
+  matcher: ["/portal/:path*"],
 };

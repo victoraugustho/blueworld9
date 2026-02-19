@@ -5,7 +5,7 @@ import { GlassmorphismNav } from "@/components/header"
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div className="public-shell relative min-h-screen overflow-x-hidden">
       <AnimatedBackground fixed parallax />
       <GlassmorphismNav />
       <AOSInit />

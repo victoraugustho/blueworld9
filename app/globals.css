@@ -370,6 +370,22 @@
       display: none !important;
     }
 
+    .public-shell {
+      overflow: visible;
+    }
+
+    [class*="animate-"] {
+      animation: none !important;
+    }
+
+    [class*="blur-"] {
+      filter: none !important;
+    }
+
+    [class*="shadow-"] {
+      box-shadow: none !important;
+    }
+
     .backdrop-blur,
     .backdrop-blur-sm,
     .backdrop-blur-md,

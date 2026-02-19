@@ -44,6 +44,10 @@ export function GlassmorphismNav() {
 
 
   useEffect(() => {
+    if (typeof window === "undefined") return
+    const mqMobile = window.matchMedia("(max-width: 768px)")
+    if (mqMobile.matches) return
+
     const handleScroll = () => {
       if (ticking.current) return
       ticking.current = true

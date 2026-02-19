@@ -6,6 +6,7 @@ import { BookOpen, Cpu, Lightbulb, Atom, GraduationCap } from "lucide-react"
 import Image from "next/image"
 
 export function HeroSection() {
+  const [fxEnabled, setFxEnabled] = useState(false)
   const [counts, setCounts] = useState({
     schools: 0,
     students: 0,
@@ -15,6 +16,17 @@ export function HeroSection() {
   useEffect(() => {
     const targets = { schools: 20, students: 15000, projects: 100 }
     const duration = 2000
+    const mqMobile = window.matchMedia("(max-width: 768px)")
+    const mqReduce = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const saveData = (navigator as any)?.connection?.saveData === true
+    const enableFx = !mqMobile.matches && !mqReduce.matches && !saveData
+    setFxEnabled(enableFx)
+
+    if (!enableFx) {
+      setCounts(targets)
+      return
+    }
+
     const start = performance.now()
 
     function animate(now: number) {
@@ -38,7 +50,7 @@ export function HeroSection() {
 
   const particles = useMemo(
     () =>
-      Array.from({ length: 80 }).map(() => ({
+      Array.from({ length: fxEnabled ? 80 : 0 }).map(() => ({
         size: 1 + Math.random() * 4,
         top: Math.random() * 100,
         left: Math.random() * 100,
@@ -51,7 +63,7 @@ export function HeroSection() {
           ? "bg-cyan-200/40"
           : "bg-purple-300/40",
       })),
-    []
+    [fxEnabled]
   )
 
   return (
@@ -69,40 +81,42 @@ export function HeroSection() {
       </div>
 
       {/* Efeitos */}
-      <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden">
-        {[...Array(6)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-[2px] h-full bg-gradient-to-b from-transparent via-cyan-400/30 to-transparent animate-[flow_10s_linear_infinite]"
-            style={{ left: `${10 + i * 14}%`, animationDelay: `${i}s` }}
-          />
-        ))}
+      {fxEnabled && (
+        <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-[2px] h-full bg-gradient-to-b from-transparent via-cyan-400/30 to-transparent animate-[flow_10s_linear_infinite]"
+              style={{ left: `${10 + i * 14}%`, animationDelay: `${i}s` }}
+            />
+          ))}
 
-        <div className="absolute top-20 left-1/3 w-96 h-96 bg-cyan-400/20 rounded-full blur-[120px] animate-[organicMove_14s_ease-in-out_infinite]" />
-        <div className="absolute bottom-10 right-10 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[140px] animate-[organicMove_16s_ease-in-out_infinite]" />
+          <div className="absolute top-20 left-1/3 w-96 h-96 bg-cyan-400/20 rounded-full blur-[120px] animate-[organicMove_14s_ease-in-out_infinite]" />
+          <div className="absolute bottom-10 right-10 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[140px] animate-[organicMove_16s_ease-in-out_infinite]" />
 
-        <BookOpen className="absolute top-32 left-12 w-20 h-20 text-white/30 animate-[float_8s_ease-in-out_infinite]" />
-        <Cpu className="absolute bottom-40 right-24 w-24 h-24 text-cyan-300/40 animate-[float_10s_ease-in-out_infinite]" />
-        <Lightbulb className="absolute top-1/4 right-14 w-20 h-20 text-yellow-300/40 animate-[float_9s_ease-in-out_infinite]" />
-        <Atom className="absolute bottom-1/3 left-1/3 w-24 h-24 text-orange-400/35 animate-[float_11s_ease-in-out_infinite]" />
-        <GraduationCap className="absolute top-1/2 right-1/3 w-20 h-20 text-purple-400/35 animate-[float_12s_ease-in-out_infinite]" />
+          <BookOpen className="absolute top-32 left-12 w-20 h-20 text-white/30 animate-[float_8s_ease-in-out_infinite]" />
+          <Cpu className="absolute bottom-40 right-24 w-24 h-24 text-cyan-300/40 animate-[float_10s_ease-in-out_infinite]" />
+          <Lightbulb className="absolute top-1/4 right-14 w-20 h-20 text-yellow-300/40 animate-[float_9s_ease-in-out_infinite]" />
+          <Atom className="absolute bottom-1/3 left-1/3 w-24 h-24 text-orange-400/35 animate-[float_11s_ease-in-out_infinite]" />
+          <GraduationCap className="absolute top-1/2 right-1/3 w-20 h-20 text-purple-400/35 animate-[float_12s_ease-in-out_infinite]" />
 
-        {particles.map((p, i) => (
-          <div
-            key={i}
-            className={`absolute rounded-full animate-twinkle ${p.color}`}
-            style={{
-              width: p.size,
-              height: p.size,
-              top: `${p.top}%`,
-              left: `${p.left}%`,
-              opacity: p.opacity,
-              filter: `blur(${p.blur}px)`,
-              animationDuration: `${p.duration}s`,
-            }}
-          />
-        ))}
-      </div>
+          {particles.map((p, i) => (
+            <div
+              key={i}
+              className={`absolute rounded-full animate-twinkle ${p.color}`}
+              style={{
+                width: p.size,
+                height: p.size,
+                top: `${p.top}%`,
+                left: `${p.left}%`,
+                opacity: p.opacity,
+                filter: `blur(${p.blur}px)`,
+                animationDuration: `${p.duration}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Conteúdo */}
       <div className="container mx-auto px-6 relative z-10">

@@ -385,22 +385,17 @@
     [class*="shadow-"] {
       box-shadow: none !important;
     }
-
-    .backdrop-blur,
-    .backdrop-blur-sm,
-    .backdrop-blur-md,
-    .backdrop-blur-lg,
-    .backdrop-blur-xl,
-    .backdrop-blur-2xl,
-    .backdrop-blur-3xl {
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
   }
 
   .cv-auto {
     content-visibility: auto;
     contain-intrinsic-size: 1px 1000px;
+  }
+
+  .aos-disabled [data-aos] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
   }
 
 }

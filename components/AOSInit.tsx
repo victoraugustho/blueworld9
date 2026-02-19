@@ -15,8 +15,16 @@ export function AOSInit() {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (pathname === "/portal/login" || pathname === "/portal/cadastro") return;
-    if (shouldSkipAOS()) return;
+    const html = document.documentElement;
+    if (pathname === "/portal/login" || pathname === "/portal/cadastro") {
+      html.classList.add("aos-disabled");
+      return;
+    }
+    if (shouldSkipAOS()) {
+      html.classList.add("aos-disabled");
+      return;
+    }
+    html.classList.remove("aos-disabled");
 
     const run = async () => {
       const AOS = (await import("aos")).default;

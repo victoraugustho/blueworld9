@@ -64,7 +64,7 @@ const i18n = {
       passMin: "La contraseña debe tener al menos 6 caracteres",
       passMatch: "Las contraseñas no coinciden",
       cpfInvalid: "CPF inválido",
-      docInvalid: "Documento inválido",
+      docInvalid: "Documento inválido.",
     },
   },
 }

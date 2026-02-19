@@ -45,7 +45,11 @@ export function HeroSection() {
   }, [])
 
   const scrollToContact = () => {
-    document.getElementById("contato")?.scrollIntoView({ behavior: "smooth" })
+    const element = document.getElementById("contato")
+    if (element) {
+      const isMobile = window.matchMedia("(max-width: 768px)").matches
+      element.scrollIntoView({ behavior: isMobile ? "auto" : "smooth" })
+    }
   }
 
   const particles = useMemo(

@@ -40,7 +40,8 @@ export function SchoolsSection() {
   const scrollToContact = () => {
     const element = document.getElementById("contato")
     if (element) {
-      element.scrollIntoView({ behavior: "smooth" })
+      const isMobile = window.matchMedia("(max-width: 768px)").matches
+      element.scrollIntoView({ behavior: isMobile ? "auto" : "smooth" })
     }
   }
 

@@ -2,7 +2,7 @@
 
 import { Home, Globe, School, Info, Users, X, Menu } from "lucide-react"
 import Image from "next/image"
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -10,9 +10,6 @@ import { useRouter } from "next/navigation"
 
 export function GlassmorphismNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [showNav, setShowNav] = useState(true)
-  const lastScrollY = useRef(0)
-  const ticking = useRef(false)
   const pathname = usePathname()
 
 
@@ -32,7 +29,8 @@ export function GlassmorphismNav() {
       // Já está na página certa → faz scroll suave
       const element = document.getElementById("contato")
       if (element) {
-        element.scrollIntoView({ behavior: "smooth" })
+        const isMobile = window.matchMedia("(max-width: 768px)").matches
+        element.scrollIntoView({ behavior: isMobile ? "auto" : "smooth" })
       }
     } else {
       // Não está na home → redireciona para lá com hash
@@ -41,38 +39,12 @@ export function GlassmorphismNav() {
   }
 
   
-
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const mqMobile = window.matchMedia("(max-width: 768px)")
-    if (mqMobile.matches) return
-
-    const handleScroll = () => {
-      if (ticking.current) return
-      ticking.current = true
-      requestAnimationFrame(() => {
-        const currentScroll = window.scrollY
-        if (currentScroll > lastScrollY.current && currentScroll > 620) {
-          setShowNav(false)
-        } else {
-          setShowNav(true)
-        }
-        lastScrollY.current = currentScroll
-        ticking.current = false
-      })
-    }
-
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
-
   return (
     <header
       className={`
         fixed top-0 left-0 right-0 z-50 transition-transform duration-300
         px-4 sm:px-2 lg:px-8 pt-4 sm:pt-6
-        ${showNav ? "md:translate-y-0" : "md:-translate-y-full"}
+        md:translate-y-0
       `}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-2 lg:px-8 py-3 sm:py-4 rounded-xl lg:rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-xl sm:text-sm">

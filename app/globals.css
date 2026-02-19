@@ -366,6 +366,10 @@
   }
 
   @media (max-width: 768px) {
+    html {
+      scroll-behavior: auto;
+    }
+
     html.auth-page .animated-bg {
       display: none;
     }

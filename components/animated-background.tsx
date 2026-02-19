@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   Cpu,
@@ -16,6 +16,8 @@ import {
 
 interface AnimatedBackgroundProps {
   variant?: "about" | "solutions" | "benefits" | "projects" | "impact" | "default";
+  fixed?: boolean;
+  parallax?: boolean;
 }
 
 function seededRandom(seed: number) {
@@ -23,8 +25,90 @@ function seededRandom(seed: number) {
   return x - Math.floor(x);
 }
 
-function AnimatedBackgroundComponent({ variant = "default" }: AnimatedBackgroundProps) {
-  /* ÍCONES FIXOS POR VARIANTE */
+function useAnimationEnabled() {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    const mqMobile = window.matchMedia("(max-width: 768px)");
+    const mqReduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    const update = () => {
+      const saveData = (navigator as any)?.connection?.saveData === true;
+      setEnabled(!mqMobile.matches && !mqReduce.matches && !saveData);
+    };
+
+    update();
+
+    const onChange = () => update();
+    if ("addEventListener" in mqMobile) {
+      mqMobile.addEventListener("change", onChange);
+      mqReduce.addEventListener("change", onChange);
+    } else {
+      mqMobile.addListener(onChange);
+      mqReduce.addListener(onChange);
+    }
+
+    return () => {
+      if ("removeEventListener" in mqMobile) {
+        mqMobile.removeEventListener("change", onChange);
+        mqReduce.removeEventListener("change", onChange);
+      } else {
+        mqMobile.removeListener(onChange);
+        mqReduce.removeListener(onChange);
+      }
+    };
+  }, []);
+
+  return enabled;
+}
+
+function AnimatedBackgroundComponent({
+  variant = "default",
+  fixed = false,
+  parallax = false,
+}: AnimatedBackgroundProps) {
+  const enabled = useAnimationEnabled();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !parallax) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    let raf = 0;
+    const update = () => {
+      const y = window.scrollY || 0;
+      el.style.setProperty("--parallax-y", `${Math.round(y * 0.08)}px`);
+      raf = 0;
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [enabled, parallax]);
+
+  const containerClass = `${fixed ? "fixed" : "absolute"} inset-0 pointer-events-none overflow-hidden z-0`;
+  const containerStyle: React.CSSProperties | undefined = parallax
+    ? { transform: "translate3d(0,var(--parallax-y,0),0)", willChange: "transform" }
+    : undefined;
+
+  if (!enabled) {
+    return (
+      <div ref={containerRef} className={containerClass} style={containerStyle}>
+        <div className="absolute top-16 left-1/3 w-72 h-72 bg-cyan-400/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-10 right-6 w-80 h-80 bg-purple-500/10 rounded-full blur-[140px]" />
+      </div>
+    );
+  }
+
   const icons = useMemo(() => {
     const iconMap = {
       about: [BookOpen, Cpu, Lightbulb, Atom, GraduationCap, CircuitBoard],
@@ -33,23 +117,21 @@ function AnimatedBackgroundComponent({ variant = "default" }: AnimatedBackground
       projects: [CircuitBoard, Code, Cpu, Atom, Zap, Lightbulb],
       impact: [Users, GraduationCap, Target, BookOpen, Lightbulb, Atom],
       default: [BookOpen, Cpu, Lightbulb, Atom, GraduationCap, CircuitBoard],
-    };
+    } as const;
 
     return iconMap[variant] || iconMap.default;
   }, [variant]);
 
-  /* POSIÇÕES FIXAS PARA ÍCONES GRANDES */
   const iconPositions = useMemo(() => {
     return icons.map((_, i) => ({
-      size: 40 + (i % 3) * 25,  
+      size: 40 + (i % 3) * 25,
       top: 5 + seededRandom(i + 10) * 90,
       left: 5 + seededRandom(i + 20) * 90,
       delay: i * 0.8,
-      opacity: 0.18 + (i % 3) * 0.07, 
+      opacity: 0.18 + (i % 3) * 0.07,
     }));
   }, [icons]);
 
-  /* PARTICLES LAYER 1 */
   const particles1 = useMemo(() => {
     return [...Array(40)].map((_, i) => ({
       size: 1 + seededRandom(i + 30) * 3,
@@ -62,7 +144,6 @@ function AnimatedBackgroundComponent({ variant = "default" }: AnimatedBackground
     }));
   }, []);
 
-  /* PARTICLES LAYER 2 */
   const particles2 = useMemo(() => {
     return [...Array(40)].map((_, i) => ({
       size: 1 + seededRandom(i + 100) * 3,
@@ -73,7 +154,6 @@ function AnimatedBackgroundComponent({ variant = "default" }: AnimatedBackground
     }));
   }, []);
 
-  /* PARTICLES LAYER 3 */
   const particles3 = useMemo(() => {
     return [...Array(20)].map((_, i) => ({
       size: 2 + seededRandom(i + 200) * 4,
@@ -83,15 +163,13 @@ function AnimatedBackgroundComponent({ variant = "default" }: AnimatedBackground
       duration: 4 + seededRandom(i + 240) * 5,
     }));
   }, []);
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
 
-      {/* Background organic blobs (mantido igual) */}
+  return (
+    <div ref={containerRef} className={containerClass} style={containerStyle}>
       <div className="absolute top-20 left-1/3 w-96 h-96 bg-cyan-400/15 rounded-full blur-[120px] animate-[organicMove_12s_ease-in-out_infinite]" />
       <div className="absolute bottom-10 right-10 w-[500px] h-[500px] bg-purple-500/15 rounded-full blur-[140px] animate-[organicMove_14s_ease-in-out_infinite]" />
       <div className="absolute top-1/2 -left-20 w-[400px] h-[400px] bg-emerald-400/15 rounded-full blur-[110px] animate-[organicMove_10s_ease-in-out_infinite]" />
 
-      {/* ÍCONES FLOATING FIXOS */}
       {icons.map((Icon, i) => (
         <Icon
           key={i}
@@ -106,7 +184,6 @@ function AnimatedBackgroundComponent({ variant = "default" }: AnimatedBackground
         />
       ))}
 
-      {/* PARTICLES LAYER 1 */}
       {particles1.map((p, i) => (
         <div
           key={`p1-${i}`}
@@ -124,7 +201,6 @@ function AnimatedBackgroundComponent({ variant = "default" }: AnimatedBackground
         />
       ))}
 
-      {/* PARTICLES LAYER 2 */}
       {particles2.map((p, i) => (
         <div
           key={`p2-${i}`}
@@ -140,7 +216,6 @@ function AnimatedBackgroundComponent({ variant = "default" }: AnimatedBackground
         />
       ))}
 
-      {/* PARTICLES LAYER 3 */}
       {particles3.map((p, i) => (
         <div
           key={`p3-${i}`}

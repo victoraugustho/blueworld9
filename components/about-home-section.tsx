@@ -1,5 +1,4 @@
 import { Zap, Users, Target, Code, Rocket, Lightbulb, Award } from "lucide-react"
-import { AnimatedBackground } from "./animated-background"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { PrinciplesGallery } from "@/components/secundary/about-gallery"
@@ -9,7 +8,6 @@ import Link from "next/link"
 export function AboutHomeSection() {
   return (
     <section className="relative py-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden cv-auto">
-      <AnimatedBackground variant="about" />
       {/* HEADER */}
       <div className="container mx-auto px-6 relative z-10 max-w-300">
         <div data-aos="fade-down" className="text-center mb-16 space-y-4">

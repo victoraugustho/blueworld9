@@ -2,7 +2,6 @@ import { GraduationCap, Wrench, Heart, FileText, Sparkles } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Footer } from "@/components/footer"
-import { AnimatedBackground } from '@/components/animated-background'
 import { YoutubeHeroEmbed } from "@/components/subpage/youtube"
 import { SchoolsUnits } from "@/components/schools-units"
 
@@ -42,7 +41,7 @@ const features = [
 export default function ParaEscolasPage() {
   return (
     <main className="pt-20 bg-primary">
-      <section className="relative py-20 md:py-32"><AnimatedBackground />
+      <section className="relative py-20 md:py-32">
         
         <div className="container mx-auto px-4">
           <div  data-aos="fade-up" className="max-w-4xl mx-auto text-center mb-16">

@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { MapPin, Search, ExternalLink, School } from "lucide-react"
-import { AnimatedBackground } from "./animated-background"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 

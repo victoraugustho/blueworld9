@@ -1,12 +1,11 @@
 import { Target, Eye, Award } from "lucide-react"
 import { Footer } from "@/components/footer"
-import { AnimatedBackground } from "@/components/animated-background"
 import { SouthAmericaInteractiveMap } from "@/components/map-interativo"
 
 export default function SobrePage() {
   return (
     <main className="min-h-screen">
-      <section className="relative py-30 md:py-42 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950"><AnimatedBackground />
+      <section className="relative py-30 md:py-42 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <div data-aos="fade-up">

@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { ChevronLeft, ChevronRight, MapPin, Users, School, Globe, Heart, Star, Sparkles, Award } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { AnimatedBackground } from "@/components/animated-background"
 import { Footer } from "@/components/footer"
 import { VideoTestimonialsCarousel } from "@/components/subpage/depoiments"
 
@@ -78,7 +77,6 @@ export default function ImpactoPage() {
     <main className="min-h-screen">
       {/* Hero Section */}
       <section className="relative py-20 md:py-32 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-hidden">
-        <AnimatedBackground variant="impact" />
 
         <div className="container mx-auto px-4 relative z-10 pt-20">
           <div className="max-w-4xl mx-auto text-center mb-16">

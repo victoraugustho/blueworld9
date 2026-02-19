@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { MapPin, Search, ExternalLink, School } from "lucide-react"
-import { AnimatedBackground } from "./animated-background"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
@@ -159,7 +158,6 @@ export function SchoolsSectionUnits() {
       id="unidades"
       className="relative py-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden cv-auto"
     >
-      <AnimatedBackground variant="about" />
 
       <div className="container mx-auto px-6 relative z-10 max-w-300">
         {/* HEADER */}

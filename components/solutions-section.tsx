@@ -1,5 +1,4 @@
 import { Zap, Users, Lightbulb, Award, Code, Rocket, Sparkles, Trophy, SmilePlus, Radio } from "lucide-react"
-import { AnimatedBackground } from "./animated-background"
 import Image from "next/image"
 import { PrinciplesGallery } from "@/components/secundary/solutions-gallery"
 
@@ -7,7 +6,6 @@ export function SolutionsSection() {
 
   return (
     <section className="relative py-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden cv-auto">
-      <AnimatedBackground variant="solutions" />
       <div className="container mx-auto px-6 relative z-10 max-w-300">
         <div data-aos="fade-down" className="text-center mb-16 space-y-4">
           <div className="inline-block px-4 py-2 bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-400/50 rounded-full backdrop-blur">

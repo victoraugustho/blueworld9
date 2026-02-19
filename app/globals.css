@@ -351,6 +351,20 @@
     scroll-behavior: smooth;
   }
 
+  @media (max-width: 768px), (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    .hero-floating,
+    .animate-scroll-left,
+    .pulse-glow,
+    .shimmer,
+    .bounce-spin {
+      animation: none !important;
+    }
+  }
+
   .cv-auto {
     content-visibility: auto;
     contain-intrinsic-size: 1px 1000px;

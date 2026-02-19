@@ -1,6 +1,5 @@
 "use client"
 
-import { AnimatedBackground } from "@/components/animated-background"
 import Image from "next/image"
 import { Footer } from "@/components/footer"
 
@@ -67,7 +66,6 @@ export default function EquipePage() {
   return (
     <main className="min-h-screen">
       <section className="relative py-20 md:py-42 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden">
-        <AnimatedBackground variant="impact" />
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-6xl mx-auto">

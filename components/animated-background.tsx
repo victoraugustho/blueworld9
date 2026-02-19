@@ -25,32 +25,28 @@ function seededRandom(seed: number) {
   return x - Math.floor(x);
 }
 
-function useAnimationPrefs() {
-  const [state, setState] = useState({ enabled: false, isMobile: false });
+function useAnimationEnabled() {
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    const mqMobile = window.matchMedia("(max-width: 768px)");
     const mqReduce = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     const update = () => {
       const saveData = (navigator as any)?.connection?.saveData === true;
-      const isMobile = mqMobile.matches;
-      setState({ enabled: !isMobile && !mqReduce.matches && !saveData, isMobile });
+      setEnabled(!mqReduce.matches && !saveData);
     };
 
     update();
 
     const onChange = () => update();
-    mqMobile.addEventListener("change", onChange);
     mqReduce.addEventListener("change", onChange);
 
     return () => {
-      mqMobile.removeEventListener("change", onChange);
       mqReduce.removeEventListener("change", onChange);
     };
   }, []);
 
-  return state;
+  return enabled;
 }
 
 function AnimatedBackgroundComponent({
@@ -58,7 +54,7 @@ function AnimatedBackgroundComponent({
   fixed = false,
   parallax = false,
 }: AnimatedBackgroundProps) {
-  const { enabled, isMobile } = useAnimationPrefs();
+  const enabled = useAnimationEnabled();
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -150,10 +146,6 @@ function AnimatedBackgroundComponent({
       duration: 4 + seededRandom(i + 240) * 5,
     }));
   }, [enabled]);
-
-  if (isMobile) {
-    return null;
-  }
 
   if (!enabled) {
     return (

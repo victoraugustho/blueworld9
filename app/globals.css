@@ -351,7 +351,7 @@
     scroll-behavior: smooth;
   }
 
-  @media (max-width: 768px), (prefers-reduced-motion: reduce) {
+  @media (prefers-reduced-motion: reduce) {
     html {
       scroll-behavior: auto;
     }
@@ -366,24 +366,8 @@
   }
 
   @media (max-width: 768px) {
-    .animated-bg {
-      display: none !important;
-    }
-
     .public-shell {
       overflow: visible;
-    }
-
-    [class*="animate-"] {
-      animation: none !important;
-    }
-
-    [class*="blur-"] {
-      filter: none !important;
-    }
-
-    [class*="shadow-"] {
-      box-shadow: none !important;
     }
   }
 

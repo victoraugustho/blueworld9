@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { User, Lock, Eye, EyeOff, GraduationCap, Globe } from "lucide-react"
 import Link from "next/link"
 import { GlassmorphismNav } from "@/components/header"
+import { Footer } from "@/components/footer"
 
 type Country = "BR" | "UY" | "PY"
 
@@ -168,6 +169,7 @@ export default function PortalLoginPage() {
   }
 
   return (
+    <div>
     <div className="relative min-h-screen flex items-center justify-center p-4">
       <GlassmorphismNav />
 
@@ -297,6 +299,8 @@ export default function PortalLoginPage() {
           </form>
         </CardContent>
       </Card>
+    </div>
+    <Footer/>
     </div>
   )
 }

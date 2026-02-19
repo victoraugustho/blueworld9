@@ -16,6 +16,10 @@ export function AOSInit() {
 
   useEffect(() => {
     const html = document.documentElement;
+    if (pathname === "/portal/login" || pathname === "/portal/cadastro") {
+      html.classList.add("aos-disabled");
+      return;
+    }
     if (shouldSkipAOS()) {
       html.classList.add("aos-disabled");
       return;

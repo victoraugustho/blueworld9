@@ -366,6 +366,10 @@
   }
 
   @media (max-width: 768px) {
+    html.auth-page .animated-bg {
+      display: none;
+    }
+
     .public-shell {
       overflow: visible;
     }

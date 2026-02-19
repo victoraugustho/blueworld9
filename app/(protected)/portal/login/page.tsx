@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { User, Lock, Eye, EyeOff, GraduationCap, Globe } from "lucide-react"
 import Link from "next/link"
 import { GlassmorphismNav } from "@/components/header"
+import { AuthPageFlag } from "@/components/auth-page-flag"
 import { Footer } from "@/components/footer"
 
 type Country = "BR" | "UY" | "PY"
@@ -171,6 +172,7 @@ export default function PortalLoginPage() {
   return (
     <div>
     <div className="relative min-h-screen flex items-center justify-center p-4">
+      <AuthPageFlag />
       <GlassmorphismNav />
 
       <Card className="w-full max-w-md mt-30 relative z-10 bg-slate-900/80 backdrop-blur-xl border-cyan-500/20">

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { User, Mail, Phone, Lock, Eye, EyeOff, GraduationCap, CheckCircle, Globe } from "lucide-react"
 import Link from "next/link"
 import { GlassmorphismNav } from "@/components/header"
+import { AuthPageFlag } from "@/components/auth-page-flag"
 
 type Country = "BR" | "UY" | "PY"
 
@@ -212,7 +213,8 @@ export default function PortalCadastroPage() {
 
   if (success) {
     return (
-      <div className="pt-30 relative min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      <div data-auth-page className="pt-30 relative min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+        <AuthPageFlag />
         <GlassmorphismNav />
         <Card className="w-full max-w-md relative z-10 bg-slate-900/80 backdrop-blur-xl border-green-500/20">
           <CardContent className="pt-12 text-center space-y-4">
@@ -229,7 +231,8 @@ export default function PortalCadastroPage() {
   }
 
   return (
-    <div className="pt-30 relative min-h-screen flex items-center justify-center p-4">
+    <div data-auth-page className="pt-30 relative min-h-screen flex items-center justify-center p-4">
+      <AuthPageFlag />
       <GlassmorphismNav />
 
       <Card className="w-full max-w-md relative z-10 bg-slate-900/80 backdrop-blur-xl border-cyan-500/20 my-8">

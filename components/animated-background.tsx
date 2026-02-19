@@ -40,22 +40,12 @@ function useAnimationEnabled() {
     update();
 
     const onChange = () => update();
-    if ("addEventListener" in mqMobile) {
-      mqMobile.addEventListener("change", onChange);
-      mqReduce.addEventListener("change", onChange);
-    } else {
-      mqMobile.addListener(onChange);
-      mqReduce.addListener(onChange);
-    }
+    mqMobile.addEventListener("change", onChange);
+    mqReduce.addEventListener("change", onChange);
 
     return () => {
-      if ("removeEventListener" in mqMobile) {
-        mqMobile.removeEventListener("change", onChange);
-        mqReduce.removeEventListener("change", onChange);
-      } else {
-        mqMobile.removeListener(onChange);
-        mqReduce.removeListener(onChange);
-      }
+      mqMobile.removeEventListener("change", onChange);
+      mqReduce.removeEventListener("change", onChange);
     };
   }, []);
 

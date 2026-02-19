@@ -374,6 +374,11 @@
       display: none;
     }
 
+    .cv-auto {
+      content-visibility: visible;
+      contain-intrinsic-size: auto;
+    }
+
     .public-shell {
       overflow: visible;
     }

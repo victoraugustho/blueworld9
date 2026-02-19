@@ -58,7 +58,7 @@ export default function EquipePage() {
       role: "Desenvolvedor e Arquiteto de Sistemas",
       formacao: "Programador Full Stack Node.js, com especialização em soluções baseadas em Inteligência Artificial",
       bio: "Responsável pelo desenvolvimento, gerenciamento e inovação tecnológica da Blue World 9, atuando na criação de sistemas inteligentes, automações e soluções digitais de alta performance.",
-      image: "/webp/Augustho-att.webp",
+      image: "/webp/augustho-att.webp",
       color: "from-cyan-500 to-orange-600",
     },
   ]

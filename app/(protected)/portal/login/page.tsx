@@ -168,7 +168,7 @@ export default function PortalLoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4">
+    <div data-auth-page className="relative min-h-screen flex items-center justify-center p-4">
       <GlassmorphismNav />
 
       <Card className="w-full max-w-md mt-30 relative z-10 bg-slate-900/80 backdrop-blur-xl border-cyan-500/20">

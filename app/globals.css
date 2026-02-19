@@ -351,6 +351,32 @@
     scroll-behavior: smooth;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    .hero-floating,
+    .animate-scroll-left,
+    .pulse-glow,
+    .shimmer,
+    .bounce-spin {
+      animation: none !important;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .public-shell {
+      overflow: visible;
+    }
+  }
+
+  .aos-disabled [data-aos] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
   .cv-auto {
     content-visibility: auto;
     contain-intrinsic-size: 1px 1000px;

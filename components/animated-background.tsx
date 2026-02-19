@@ -90,16 +90,8 @@ function AnimatedBackgroundComponent({
     ? { transform: "translate3d(0,var(--parallax-y,0),0)", willChange: "transform" }
     : undefined;
 
-  if (!enabled) {
-    return (
-      <div ref={containerRef} className={containerClass} style={containerStyle}>
-        <div className="absolute top-16 left-1/3 w-72 h-72 bg-cyan-400/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-10 right-6 w-80 h-80 bg-purple-500/10 rounded-full blur-[140px]" />
-      </div>
-    );
-  }
-
   const icons = useMemo(() => {
+    if (!enabled) return [];
     const iconMap = {
       about: [BookOpen, Cpu, Lightbulb, Atom, GraduationCap, CircuitBoard],
       solutions: [Code, Cpu, Lightbulb, CircuitBoard, Zap, BookOpen],
@@ -110,9 +102,10 @@ function AnimatedBackgroundComponent({
     } as const;
 
     return iconMap[variant] || iconMap.default;
-  }, [variant]);
+  }, [variant, enabled]);
 
   const iconPositions = useMemo(() => {
+    if (!enabled) return [];
     return icons.map((_, i) => ({
       size: 40 + (i % 3) * 25,
       top: 5 + seededRandom(i + 10) * 90,
@@ -120,9 +113,10 @@ function AnimatedBackgroundComponent({
       delay: i * 0.8,
       opacity: 0.18 + (i % 3) * 0.07,
     }));
-  }, [icons]);
+  }, [icons, enabled]);
 
   const particles1 = useMemo(() => {
+    if (!enabled) return [];
     return [...Array(40)].map((_, i) => ({
       size: 1 + seededRandom(i + 30) * 3,
       top: seededRandom(i + 40) * 100,
@@ -132,9 +126,10 @@ function AnimatedBackgroundComponent({
       duration: 2 + seededRandom(i + 80) * 3,
       delay: seededRandom(i + 90) * 3,
     }));
-  }, []);
+  }, [enabled]);
 
   const particles2 = useMemo(() => {
+    if (!enabled) return [];
     return [...Array(40)].map((_, i) => ({
       size: 1 + seededRandom(i + 100) * 3,
       top: seededRandom(i + 110) * 100,
@@ -142,9 +137,10 @@ function AnimatedBackgroundComponent({
       blur: 1 + seededRandom(i + 130) * 3,
       duration: 3 + seededRandom(i + 140) * 4,
     }));
-  }, []);
+  }, [enabled]);
 
   const particles3 = useMemo(() => {
+    if (!enabled) return [];
     return [...Array(20)].map((_, i) => ({
       size: 2 + seededRandom(i + 200) * 4,
       top: seededRandom(i + 210) * 100,
@@ -152,7 +148,16 @@ function AnimatedBackgroundComponent({
       blur: 2 + seededRandom(i + 230) * 5,
       duration: 4 + seededRandom(i + 240) * 5,
     }));
-  }, []);
+  }, [enabled]);
+
+  if (!enabled) {
+    return (
+      <div ref={containerRef} className={containerClass} style={containerStyle}>
+        <div className="absolute top-16 left-1/3 w-72 h-72 bg-cyan-400/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-10 right-6 w-80 h-80 bg-purple-500/10 rounded-full blur-[140px]" />
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className={containerClass} style={containerStyle}>

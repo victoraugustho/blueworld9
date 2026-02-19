@@ -25,8 +25,8 @@ function seededRandom(seed: number) {
   return x - Math.floor(x);
 }
 
-function useAnimationEnabled() {
-  const [enabled, setEnabled] = useState(false);
+function useAnimationPrefs() {
+  const [state, setState] = useState({ enabled: false, isMobile: false });
 
   useEffect(() => {
     const mqMobile = window.matchMedia("(max-width: 768px)");
@@ -34,7 +34,8 @@ function useAnimationEnabled() {
 
     const update = () => {
       const saveData = (navigator as any)?.connection?.saveData === true;
-      setEnabled(!mqMobile.matches && !mqReduce.matches && !saveData);
+      const isMobile = mqMobile.matches;
+      setState({ enabled: !isMobile && !mqReduce.matches && !saveData, isMobile });
     };
 
     update();
@@ -49,7 +50,7 @@ function useAnimationEnabled() {
     };
   }, []);
 
-  return enabled;
+  return state;
 }
 
 function AnimatedBackgroundComponent({
@@ -57,7 +58,7 @@ function AnimatedBackgroundComponent({
   fixed = false,
   parallax = false,
 }: AnimatedBackgroundProps) {
-  const enabled = useAnimationEnabled();
+  const { enabled, isMobile } = useAnimationPrefs();
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -85,7 +86,7 @@ function AnimatedBackgroundComponent({
     };
   }, [enabled, parallax]);
 
-  const containerClass = `${fixed ? "fixed" : "absolute"} inset-0 pointer-events-none overflow-hidden z-0`;
+  const containerClass = `${fixed ? "fixed" : "absolute"} inset-0 pointer-events-none overflow-hidden z-0 animated-bg`;
   const containerStyle: React.CSSProperties | undefined = parallax
     ? { transform: "translate3d(0,var(--parallax-y,0),0)", willChange: "transform" }
     : undefined;
@@ -149,6 +150,10 @@ function AnimatedBackgroundComponent({
       duration: 4 + seededRandom(i + 240) * 5,
     }));
   }, [enabled]);
+
+  if (isMobile) {
+    return null;
+  }
 
   if (!enabled) {
     return (

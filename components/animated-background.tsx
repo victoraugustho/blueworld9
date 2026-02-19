@@ -29,19 +29,22 @@ function useAnimationEnabled() {
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
+    const mqMobile = window.matchMedia("(max-width: 768px)");
     const mqReduce = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     const update = () => {
       const saveData = (navigator as any)?.connection?.saveData === true;
-      setEnabled(!mqReduce.matches && !saveData);
+      setEnabled(!mqMobile.matches && !mqReduce.matches && !saveData);
     };
 
     update();
 
     const onChange = () => update();
+    mqMobile.addEventListener("change", onChange);
     mqReduce.addEventListener("change", onChange);
 
     return () => {
+      mqMobile.removeEventListener("change", onChange);
       mqReduce.removeEventListener("change", onChange);
     };
   }, []);

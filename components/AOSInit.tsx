@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 
 function shouldSkipAOS() {
   if (typeof window === "undefined") return true;
+  const mqMobile = window.matchMedia("(max-width: 768px)");
   const mqReduce = window.matchMedia("(prefers-reduced-motion: reduce)");
   const saveData = (navigator as any)?.connection?.saveData === true;
-  return mqReduce.matches || saveData;
+  return mqMobile.matches || mqReduce.matches || saveData;
 }
 
 export function AOSInit() {

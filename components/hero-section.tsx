@@ -16,9 +16,10 @@ export function HeroSection() {
   useEffect(() => {
     const targets = { schools: 20, students: 15000, projects: 100 }
     const duration = 2000
+    const mqMobile = window.matchMedia("(max-width: 768px)")
     const mqReduce = window.matchMedia("(prefers-reduced-motion: reduce)")
     const saveData = (navigator as any)?.connection?.saveData === true
-    const enableFx = !mqReduce.matches && !saveData
+    const enableFx = !mqMobile.matches && !mqReduce.matches && !saveData
     setFxEnabled(enableFx)
 
     if (!enableFx) {

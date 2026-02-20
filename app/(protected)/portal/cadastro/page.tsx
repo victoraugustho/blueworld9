@@ -19,25 +19,25 @@ const i18n = {
     name: "Nome Completo",
     email: "E-mail",
     phone: "Telefone",
-    country: "PaÃ­s",
+    country: "País",
     docCpf: "CPF",
     docCi: "Documento (CI)",
     password: "Senha",
     confirmPassword: "Confirmar Senha",
     submit: "Solicitar Cadastro",
     submitting: "Cadastrando...",
-    haveAccount: "JÃ¡ tem cadastro?",
-    login: "FaÃ§a login",
+    haveAccount: "Já tem cadastro?",
+    login: "Faça login",
     successTitle: "Cadastro Realizado!",
-    successText: "Seu cadastro foi enviado com sucesso. Aguarde a aprovaÃ§Ã£o da equipe Blue World 9.",
-    redirecting: "VocÃª serÃ¡ redirecionado para o login em instantes...",
+    successText: "Seu cadastro foi enviado com sucesso. Aguarde a aprovação da equipe Blue World 9.",
+    redirecting: "Você será redirecionado para o login em instantes...",
     errors: {
-      required: "Todos os campos sÃ£o obrigatÃ³rios",
-      email: "E-mail invÃ¡lido",
-      passMin: "Senha deve ter no mÃ­nimo 6 caracteres",
-      passMatch: "As senhas nÃ£o coincidem",
-      cpfInvalid: "CPF invÃ¡lido",
-      docInvalid: "Documento invÃ¡lido",
+      required: "Todos os campos são obrigatórios",
+      email: "E-mail inválido",
+      passMin: "Senha deve ter no mínimo 6 caracteres",
+      passMatch: "As senhas não coincidem",
+      cpfInvalid: "CPF inválido",
+      docInvalid: "Documento inválido",
     },
   },
   es: {
@@ -45,30 +45,29 @@ const i18n = {
     subtitle: "Complete sus datos para solicitar acceso al portal",
     name: "Nombre Completo",
     email: "Correo",
-    phone: "TelÃ©fono",
-    country: "PaÃ­s",
+    phone: "Teléfono",
+    country: "País",
     docCpf: "CPF",
     docCi: "Documento (CI)",
-    password: "ContraseÃ±a",
-    confirmPassword: "Confirmar ContraseÃ±a",
+    password: "Contraseña",
+    confirmPassword: "Confirmar Contraseña",
     submit: "Solicitar Registro",
     submitting: "Registrando...",
-    haveAccount: "Â¿Ya tienes cuenta?",
-    login: "Iniciar sesiÃ³n",
-    successTitle: "Â¡Registro enviado!",
-    successText: "Tu registro fue enviado. Espera la aprobaciÃ³n del equipo Blue World 9.",
-    redirecting: "SerÃ¡s redirigido al login en instantes...",
+    haveAccount: "¿Ya tienes cuenta?",
+    login: "Iniciar sesión",
+    successTitle: "¡Registro enviado!",
+    successText: "Tu registro fue enviado. Espera la aprobación del equipo Blue World 9.",
+    redirecting: "Serás redirigido al login en instantes...",
     errors: {
       required: "Todos los campos son obligatorios",
-      email: "Correo invÃ¡lido",
-      passMin: "La contraseÃ±a debe tener al menos 6 caracteres",
-      passMatch: "Las contraseÃ±as no coinciden",
-      cpfInvalid: "CPF invÃ¡lido",
-      docInvalid: "Documento invÃ¡lido",
+      email: "Correo inválido",
+      passMin: "La contraseña debe tener al menos 6 caracteres",
+      passMatch: "Las contraseñas no coinciden",
+      cpfInvalid: "CPF inválido",
+      docInvalid: "Documento inválido",
     },
   },
 }
-
 function onlyDigits(v: string) {
   return (v ?? "").replace(/\D/g, "")
 }
@@ -112,7 +111,7 @@ function validateCPF(cpf: string): boolean {
   return true
 }
 
-// CI UY/PY: tamanhos variam; regra mÃ­nima por enquanto
+// CI UY/PY: tamanhos variam; regra mínima por enquanto
 function validateCI(doc: string): boolean {
   const numbers = onlyDigits(doc)
   return numbers.length >= 6 && numbers.length <= 12
@@ -168,7 +167,7 @@ export default function PortalCadastroPage() {
       return
     }
 
-    // valida documento por paÃ­s
+    // valida documento por País
     if (country === "BR") {
       if (!validateCPF(formData.documentNumber)) {
         setError(t.errors.cpfInvalid)
@@ -245,7 +244,7 @@ export default function PortalCadastroPage() {
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* PaÃ­s */}
+            {/* País */}
             <div className="space-y-2">
               <Label className="text-slate-200">{t.country}</Label>
               <div className="relative">
@@ -255,7 +254,7 @@ export default function PortalCadastroPage() {
                   onChange={(e) => {
                     const c = e.target.value as Country
                     setCountry(c)
-                    // limpa doc quando muda paÃ­s
+                    // limpa doc quando muda País
                     setFormData((p) => ({ ...p, documentNumber: "" }))
                   }}
                   className="w-full h-10 rounded-md pl-10 pr-3 bg-slate-800/50 border border-slate-700 text-white"
@@ -275,7 +274,7 @@ export default function PortalCadastroPage() {
                 <Input
                   id="name"
                   type="text"
-                  placeholder={country === "BR" ? "JoÃ£o Silva" : "Juan PÃ©rez"}
+                  placeholder={country === "BR" ? "João Silva" : "Juan Pérez"}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="pl-10 bg-slate-800/50 border-slate-700 text-white"
@@ -349,7 +348,7 @@ export default function PortalCadastroPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder={locale === "pt-BR" ? "MÃ­nimo 6 caracteres" : "MÃ­nimo 6 caracteres"}
+                  placeholder={locale === "pt-BR" ? "Mínimo 6 caracteres" : "Mínimo 6 caracteres"}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="pl-10 pr-10 bg-slate-800/50 border-slate-700 text-white"
@@ -373,7 +372,7 @@ export default function PortalCadastroPage() {
                 <Input
                   id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  placeholder={locale === "pt-BR" ? "Digite a senha novamente" : "Repite la contraseÃ±a"}
+                  placeholder={locale === "pt-BR" ? "Digite a senha novamente" : "Repite la contraseña"}
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   className="pl-10 pr-10 bg-slate-800/50 border-slate-700 text-white"
@@ -417,3 +416,5 @@ export default function PortalCadastroPage() {
     </div>
   )
 }
+
+

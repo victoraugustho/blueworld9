@@ -16,42 +16,42 @@ type Country = "BR" | "UY" | "PY"
 const i18n = {
   "pt-BR": {
     title: "Portal do Professor",
-    subtitle: "Acesse sua √°rea exclusiva com documento e senha",
-    country: "Pa√≠s",
+    subtitle: "Acesse sua ·rea exclusiva com documento e senha",
+    country: "PaÌs",
     docCpf: "CPF",
     docCi: "Documento (CI)",
     password: "Senha",
     button: "Entrar no Portal",
     loading: "Entrando...",
-    noAccount: "Ainda n√£o tem cadastro?",
+    noAccount: "Ainda n„o tem cadastro?",
     signup: "Cadastre-se aqui",
     forgot: "Esqueci minha senha",
     errors: {
-      required: "Documento e senha s√£o obrigat√≥rios",
-      passMin: "Senha deve ter no m√≠nimo 6 caracteres",
-      cpfInvalid: "CPF inv√°lido",
-      docInvalid: "Documento inv√°lido",
-      notApproved: "Seu cadastro ainda n√£o foi aprovado. Aguarde a an√°lise.",
+      required: "Documento e senha s„o obrigatÛrios",
+      passMin: "Senha deve ter no mÌnimo 6 caracteres",
+      cpfInvalid: "CPF inv·lido",
+      docInvalid: "Documento inv·lido",
+      notApproved: "Seu cadastro ainda n„o foi aprovado. Aguarde a an·lise.",
     },
   },
   es: {
     title: "Portal del Profesor",
-    subtitle: "Accede con tu documento y contrase√±a",
-    country: "Pa√≠s",
+    subtitle: "Accede con tu documento y contraseÒa",
+    country: "PaÌs",
     docCpf: "CPF",
     docCi: "Documento (CI)",
-    password: "Contrase√±a",
+    password: "ContraseÒa",
     button: "Entrar al Portal",
     loading: "Ingresando...",
-    noAccount: "¬øA√∫n no tienes registro?",
-    signup: "Reg√≠strate aqu√≠",
-    forgot: "Olvid√© mi contrase√±a",
+    noAccount: "øA˙n no tienes registro?",
+    signup: "RegÌstrate aquÌ",
+    forgot: "OlvidÈ mi contraseÒa",
     errors: {
-      required: "Documento y contrase√±a son obligatorios",
-      passMin: "La contrase√±a debe tener al menos 6 caracteres",
-      cpfInvalid: "CPF inv√°lido",
-      docInvalid: "Documento inv√°lido",
-      notApproved: "Tu registro a√∫n no fue aprobado. Espera la revisi√≥n.",
+      required: "Documento y contraseÒa son obligatorios",
+      passMin: "La contraseÒa debe tener al menos 6 caracteres",
+      cpfInvalid: "CPF inv·lido",
+      docInvalid: "Documento inv·lido",
+      notApproved: "Tu registro a˙n no fue aprobado. Espera la revisiÛn.",
     },
   },
 } as const
@@ -184,7 +184,7 @@ export default function PortalLoginPage() {
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Pa√≠s */}
+            {/* PaÌs */}
             <div className="space-y-2">
               <Label className="text-slate-200">{t.country}</Label>
               <div className="relative">
@@ -239,7 +239,7 @@ export default function PortalLoginPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢"
+                  placeholder="ïïïïïïïï"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500"
@@ -296,3 +296,4 @@ export default function PortalLoginPage() {
     </div>
   )
 }
+

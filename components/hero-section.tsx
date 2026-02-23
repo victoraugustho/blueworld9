@@ -11,6 +11,7 @@ export function HeroSection() {
     students: 0,
     projects: 0,
   })
+  const mobileParticleLimit = 30
 
   useEffect(() => {
     const targets = { schools: 20, students: 15000, projects: 100 }
@@ -70,13 +71,15 @@ export function HeroSection() {
 
       {/* Efeitos */}
       <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden">
-        {[...Array(6)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-[2px] h-full bg-gradient-to-b from-transparent via-cyan-400/30 to-transparent animate-[flow_10s_linear_infinite]"
-            style={{ left: `${10 + i * 14}%`, animationDelay: `${i}s` }}
-          />
-        ))}
+        <div className="hidden md:block">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-[2px] h-full bg-gradient-to-b from-transparent via-cyan-400/30 to-transparent animate-[flow_10s_linear_infinite]"
+              style={{ left: `${10 + i * 14}%`, animationDelay: `${i}s` }}
+            />
+          ))}
+        </div>
 
         <div className="absolute top-20 left-1/3 w-96 h-96 bg-cyan-400/20 rounded-full blur-[120px] animate-[organicMove_14s_ease-in-out_infinite]" />
         <div className="absolute bottom-10 right-10 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[140px] animate-[organicMove_16s_ease-in-out_infinite]" />
@@ -90,7 +93,7 @@ export function HeroSection() {
         {particles.map((p, i) => (
           <div
             key={i}
-            className={`absolute rounded-full animate-twinkle ${p.color}`}
+            className={`absolute rounded-full animate-twinkle ${p.color} ${i >= mobileParticleLimit ? "hidden md:block" : ""}`}
             style={{
               width: p.size,
               height: p.size,

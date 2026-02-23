@@ -371,15 +371,17 @@
     }
   }
 
-  .aos-disabled [data-aos] {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
-  }
-
   .cv-auto {
     content-visibility: auto;
     contain-intrinsic-size: 1px 1000px;
   }
 
+}
+
+@media (max-width: 768px) {
+  [data-aos] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
 }

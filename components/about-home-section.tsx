@@ -8,8 +8,9 @@ import Link from "next/link"
 
 export function AboutHomeSection() {
   return (
-    <section className="relative py-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden cv-auto">
+    <section className="relative py-20 overflow-hidden cv-auto">
       <AnimatedBackground variant="about" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 sm:h-32 bg-gradient-to-b from-slate-950/90 via-slate-950/60 to-transparent" />
       {/* HEADER */}
       <div className="container mx-auto px-6 relative z-10 max-w-300">
         <div data-aos="fade-down" className="text-center mb-16 space-y-4">

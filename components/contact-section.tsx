@@ -91,7 +91,7 @@ export function ContactSection() {
   return (
     <section
       id="contato"
-      className="relative py-20 md:py-32 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-hidden cv-auto"
+      className="relative py-20 md:py-32 overflow-hidden cv-auto"
     >
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Floating Icons */}

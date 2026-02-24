@@ -149,6 +149,7 @@ export function HeroSection() {
               src="/webp/img-01.webp"
               alt="Tecnologia e Educação"
               fill
+              priority
               sizes="(max-width: 768px) 90vw, 45vw"
               className="object-contain relative hero-floating rounded-3xl"
             />

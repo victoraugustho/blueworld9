@@ -91,7 +91,7 @@ export function GlassmorphismNav() {
                 bg-gradient-to-r from-orange-500 to-rose-400
                 hover:from-emerald-400 hover:via-cyan-400 hover:to-blue-500
                 transition-all duration-800 hover:scale-[1.03] hover:border-2"
-                onClick={() => { window.location.href = `${process.env.NEXT_PUBLIC_PORTAL_DOMAIN}`}}
+                onClick={() => { window.location.href = `${process.env.NEXT_PUBLIC_PORTAL_DOMAIN || "https://portal.bw9global.com"}`}}
                 >
               <span className="relative z-10">Acessar Portal</span>
             </button>
@@ -136,7 +136,7 @@ export function GlassmorphismNav() {
                 hover:from-emerald-400 hover:via-cyan-400 hover:to-blue-500
                 transition-all duration-800 hover:scale-[1.03] md:text-yellow"
               onClick={() => {
-                window.location.href = `${process.env.NEXT_PUBLIC_PORTAL_DOMAIN}`
+                window.location.href = `${process.env.NEXT_PUBLIC_PORTAL_DOMAIN || "https://portal.bw9global.com"}`
               }}
             >
               <span className="relative z-10">Acessar Portal</span>

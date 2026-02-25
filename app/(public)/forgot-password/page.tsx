@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { LoginBackground } from "@/components/login-background"
 import { GraduationCap, KeyRound, MailCheck, Loader2 } from "lucide-react"
 
 type Country = "BR" | "UY" | "PY"
@@ -81,12 +82,14 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-slate-950">
-      <Card className="w-full max-w-lg bg-slate-900/40 border-white/10 backdrop-blur-xl">
-        <CardHeader>
-          <div className="flex items-center gap-2 text-white">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-white" />
+    <div className="relative min-h-screen overflow-hidden bg-slate-950">
+      <LoginBackground />
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
+        <Card className="w-full max-w-lg bg-slate-900/40 border-white/10 backdrop-blur-xl">
+          <CardHeader>
+            <div className="flex items-center gap-2 text-white">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                <GraduationCap className="w-5 h-5 text-white" />
             </div>
             <div>
               <CardTitle className="text-xl">{t.title}</CardTitle>
@@ -144,7 +147,7 @@ export default function ForgotPasswordPage() {
                   {t.tryAgain}
                 </Button>
 
-                <Link href="/portal/login" className="flex-1">
+                <Link href="/" className="flex-1">
                   <Button
                     type="button"
                     variant="outline"
@@ -209,7 +212,7 @@ export default function ForgotPasswordPage() {
                 )}
               </Button>
 
-              <Link href="/portal/login" className="block">
+              <Link href="/" className="block">
                 <Button
                   type="button"
                   variant="outline"
@@ -221,7 +224,8 @@ export default function ForgotPasswordPage() {
             </form>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   )
 }

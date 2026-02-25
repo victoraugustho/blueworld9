@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { LoginBackground } from "@/components/login-background"
 import { CheckCircle2, GraduationCap, KeyRound, Loader2, TriangleAlert } from "lucide-react"
 
 type Locale = "pt-BR" | "es"
@@ -88,8 +89,10 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-slate-950">
-      <Card className="w-full max-w-lg bg-slate-900/40 border-white/10 backdrop-blur-xl">
+    <div className="relative min-h-screen overflow-hidden bg-slate-950">
+      <LoginBackground />
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
+        <Card className="w-full max-w-lg bg-slate-900/40 border-white/10 backdrop-blur-xl">
         <CardHeader>
           <div className="flex items-center gap-2 text-white">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
@@ -139,7 +142,7 @@ export default function ResetPasswordPage() {
               </div>
 
               <div className="mt-4 flex gap-2">
-                <Link href="/portal/login" className="flex-1">
+                <Link href="/" className="flex-1">
                   <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90">
                     {t.goLogin}
                   </Button>
@@ -204,7 +207,7 @@ export default function ResetPasswordPage() {
                 )}
               </Button>
 
-              <Link href="/portal/login" className="block">
+              <Link href="/" className="block">
                 <Button
                   type="button"
                   variant="outline"
@@ -216,7 +219,8 @@ export default function ResetPasswordPage() {
             </form>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   )
 }

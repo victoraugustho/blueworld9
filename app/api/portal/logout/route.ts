@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       : { role: "guest" },
   })
 
-  const response = NextResponse.redirect(process.env.NEXT_PUBLIC_SITE_URL + "/portal/login")
+  const response = NextResponse.redirect(process.env.NEXT_PUBLIC_SITE_URL + "/")
   clearSessionCookie(response)
 
   return response

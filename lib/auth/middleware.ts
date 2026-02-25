@@ -5,7 +5,7 @@ export async function middleware(request: NextRequest) {
   const teacherId = request.cookies.get("teacher_id")?.value;
   const { pathname } = request.nextUrl;
 
-  const isAuthPage = pathname === "/portal/login" || pathname === "/portal/cadastro";
+  const isAuthPage = pathname === "/" || pathname === "/cadastro";
 
   if (isAuthPage && teacherId) {
     const url = request.nextUrl.clone();
@@ -16,7 +16,7 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith("/portal/dashboard")) {
     if (!teacherId) {
       const url = request.nextUrl.clone();
-      url.pathname = "/portal/login";
+      url.pathname = "/";
       return NextResponse.redirect(url);
     }
 
@@ -38,8 +38,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/portal/login",
-    "/portal/cadastro",
-    "/portal/dashboard/:path*",
+    "/",
+    "/cadastro",
+    "/dashboard/:path*",
   ],
 };

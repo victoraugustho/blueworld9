@@ -53,7 +53,7 @@ export async function getTeacherFromSession() {
 export async function requireTeacherPage() {
   const teacher = await getTeacherFromSession()
   if (!teacher || teacher.approved !== true || teacher.active === false) {
-    redirect("/portal/login")
+    redirect("/")
   }
   return teacher
 }

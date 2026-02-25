@@ -16,7 +16,7 @@ export default async function PerfilPage() {
     LIMIT 1
   `
   if (!teacher) {
-    redirect("/portal/login")
+    redirect("/")
   }
 
   const locale = (teacher.locale ?? "pt-BR") as "pt-BR" | "es"

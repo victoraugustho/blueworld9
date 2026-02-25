@@ -80,7 +80,7 @@ export default function ResetPasswordPage() {
 
       setDone(true)
       // opcional: redireciona sozinho após curto tempo
-      // setTimeout(() => router.push("/portal/login"), 1500)
+      // setTimeout(() => router.push("/"), 1500)
     } catch {
       setError(t.errors.generic)
     } finally {

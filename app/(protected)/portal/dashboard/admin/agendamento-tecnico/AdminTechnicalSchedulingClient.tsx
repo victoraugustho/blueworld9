@@ -172,7 +172,21 @@ export default function AdminTechnicalSchedulingClient({ locale }: { locale: Loc
           <CardDescription className="text-slate-400">{t.cardDescription}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div ref={targetRef} className="min-h-[48px] w-full flex flex-col items-start gap-2" />
+          <div className="flex flex-col items-start gap-3 w-full">
+            <div ref={targetRef} className="min-h-[48px] w-full flex flex-col items-start gap-2 [&>*]:block" />
+
+            <div className="w-full">
+              <Button
+                asChild
+                className="mt-1 bg-cyan-600 hover:bg-cyan-700 text-white inline-flex items-center gap-2"
+              >
+                <a href={APPOINTMENT_URL} target="_blank" rel="noreferrer">
+                  <ExternalLink className="w-4 h-4" />
+                  {t.directLink}
+                </a>
+              </Button>
+            </div>
+          </div>
 
           {loadingButton && <p className="text-xs text-slate-400">{t.loadingButton}</p>}
 
@@ -181,17 +195,9 @@ export default function AdminTechnicalSchedulingClient({ locale }: { locale: Loc
               {loadError}
             </div>
           )}
-
-          <Button asChild className="mt-1 bg-cyan-600 hover:bg-cyan-700 text-white inline-flex items-center gap-2">
-            <a href={APPOINTMENT_URL} target="_blank" rel="noreferrer">
-              <ExternalLink className="w-4 h-4" />
-              {t.directLink}
-            </a>
-          </Button>
         </CardContent>
       </Card>
     </div>
   )
 }
-
 

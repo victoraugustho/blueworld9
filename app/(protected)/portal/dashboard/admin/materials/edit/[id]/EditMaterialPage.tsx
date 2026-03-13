@@ -136,7 +136,7 @@ export default function EditMaterialPage({ params }: EditPageProps) {
                 setForm({ ...form, student_year: e.target.value ? Number(e.target.value) : null })
               }
             >
-              <option className="text-white bg-slate-700" value="">Sem ano</option>
+              <option className="text-white bg-slate-700" value="">Materiais complementares</option>
               <optgroup label="Idade (anos)">
                 {ageYears.map((y) => (
                   <option className="text-white bg-slate-700" key={`age-${y}`} value={100 + y}>

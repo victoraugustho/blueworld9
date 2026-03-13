@@ -150,7 +150,7 @@ export default function NewMaterialPage() {
                 value={form.student_year}
                 onChange={(e) => setForm({ ...form, student_year: e.target.value })}
               >
-                <option className="text-white" value="">Sem ano</option>
+                <option className="text-white" value="">Materiais complementares</option>
                 <optgroup label="Idade (anos)">
                   {ageYears.map((y) => (
                     <option className="text-white" key={`age-${y}`} value={String(100 + y)}>

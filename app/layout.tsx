@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   title: "Blue World 9 – Soluções Educacionais",
   description:
     "Educando o futuro através da tecnologia, robótica e educação socioemocional. Inovação, propósito e sustentabilidade.",
-  metadataBase: new URL("https://bw9global.com"),
+  metadataBase: new URL("https://portal.bw9global.com"),
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     title: "Blue World 9 – Soluções Educacionais",
     description:
       "Educando o futuro através da tecnologia, robótica e educação socioemocional. Inovação, propósito e sustentabilidade.",
-    url: "https://bw9global.com",
+    url: "https://portal.bw9global.com",
     siteName: "Blue World 9",
     images: [
       {

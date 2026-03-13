@@ -19,7 +19,7 @@ export default async function MateriaisPage({
     view: locale === "es" ? "Ver" : "Visualizar",
     noCategory: locale === "es" ? "Sin categoria" : "Sem Categoria",
     yearLabel: "Ano",
-    noYear: locale === "es" ? "Sin ano" : "Sem ano",
+    noYear: locale === "es" ? "Materiales complementarios" : "Materiais complementares",
     yearTitle: locale === "es" ? "Ano del Alumno" : "Ano do Aluno",
     ageLabel: "anos",
     highLabel: locale === "es" ? "Ensenanza Media" : "Ensino Medio",

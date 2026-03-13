@@ -18,6 +18,7 @@ import {
   UserRound,
   ChevronDown,
   CalendarDays,
+  Bug,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -32,11 +33,15 @@ export function PortalSidebar({
   isAdmin,
   locale,
   teacher,
+  canSeeBugReports = false,
+  systemVersion,
   logoSrc = "/webp/logo-branca-bw9.webp", // garanta que exista em /public ou altere
 }: {
   isAdmin: boolean
   locale: Locale
   teacher?: TeacherMini
+  canSeeBugReports?: boolean
+  systemVersion?: string
   logoSrc?: string
 }) {
   const pathname = usePathname()
@@ -59,10 +64,14 @@ export function PortalSidebar({
       agenda: locale === "es" ? "Agenda" : "Agenda",
       materiais: locale === "es" ? "Materiales" : "Materiais",
       notificacoes: locale === "es" ? "Notificaciones" : "Notifica\u00e7\u00f5es",
+      reportBug: locale === "es" ? "Reportar problema" : "Relatar problema",
       adminMaterials: locale === "es" ? "Materiales (Admin)" : "Materiais (Admin)",
       teachers: locale === "es" ? "Profesores" : "Professores",
       adminSchedules: locale === "es" ? "Horarios (Admin)" : "Hor\u00e1rios (Admin)",
+      adminAgenda: locale === "es" ? "Agenda de Coordinadores" : "Agenda de Coordenadores",
+      technicalScheduling: locale === "es" ? "Agendamiento Tecnico" : "Agendamento Tecnico",
       adminNotifications: locale === "es" ? "Notificaciones (Admin)" : "Notifica\u00e7\u00f5es (Admin)",
+      bugReports: locale === "es" ? "Reportes de bugs" : "Relatos de bug",
       logs: locale === "es" ? "Auditoria" : "Auditoria",
       ai: locale === "es" ? "IA" : "IA",
     },
@@ -81,15 +90,29 @@ export function PortalSidebar({
   )
 
   const adminMenu = useMemo(
-    () => [
-      { href: "/portal/dashboard/admin/materials", label: t.menu.adminMaterials, icon: ShieldCheck },
-      { href: "/portal/dashboard/admin/teachers", label: t.menu.teachers, icon: Users },
-      { href: "/portal/dashboard/admin/schedules", label: t.menu.adminSchedules, icon: CalendarDays },
-      { href: "/portal/dashboard/admin/notifications", label: t.menu.adminNotifications, icon: Bell },
-      { href: "/portal/dashboard/admin/logs", label: t.menu.logs, icon: ClipboardList },
-    ],
+    () => {
+      const items: { href: string; label: string; icon: any }[] = []
+
+      if (isAdmin) {
+        items.push(
+          { href: "/portal/dashboard/admin/materials", label: t.menu.adminMaterials, icon: ShieldCheck },
+          { href: "/portal/dashboard/admin/teachers", label: t.menu.teachers, icon: Users },
+          { href: "/portal/dashboard/admin/schedules", label: t.menu.adminSchedules, icon: CalendarDays },
+          { href: "/portal/dashboard/admin/agenda", label: t.menu.adminAgenda, icon: CalendarDays },
+          { href: "/portal/dashboard/admin/agendamento-tecnico", label: t.menu.technicalScheduling, icon: CalendarDays },
+          { href: "/portal/dashboard/admin/notifications", label: t.menu.adminNotifications, icon: Bell },
+          { href: "/portal/dashboard/admin/logs", label: t.menu.logs, icon: ClipboardList }
+        )
+      }
+
+      if (canSeeBugReports) {
+        items.push({ href: "/portal/dashboard/admin/bug-reports", label: t.menu.bugReports, icon: Bug })
+      }
+
+      return items
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [locale]
+    [locale, isAdmin, canSeeBugReports]
   )
 
   // ✅ corrige active do "In\u00edcio" (só ativo quando for exatamente /portal/dashboard)
@@ -296,7 +319,7 @@ export function PortalSidebar({
         </div>
 
         {/* MENU DO PROFESSOR */}
-        <nav className="flex flex-col gap-2 flex-1">
+        <nav className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto pr-1">
           {teacherMenu.map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
@@ -323,7 +346,7 @@ export function PortalSidebar({
           })}
 
           {/* SEÇÃO ADMIN */}
-          {isAdmin && (
+          {adminMenu.length > 0 && (
             <>
               <div className="my-4 border-t border-white/20" />
 
@@ -358,6 +381,18 @@ export function PortalSidebar({
             </>
           )}
         </nav>
+
+        <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between gap-3 text-xs text-white/60">
+          <Link
+            href="/portal/dashboard/relatar-problema"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 hover:text-white transition-colors"
+          >
+            <Bug className="w-4 h-4" />
+            {t.menu.reportBug}
+          </Link>
+          <span className="text-[10px] text-white/40">v{systemVersion ?? "dev"}</span>
+        </div>
       </aside>
 
       {/* Overlay mobile */}

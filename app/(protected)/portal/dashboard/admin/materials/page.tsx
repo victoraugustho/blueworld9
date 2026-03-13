@@ -63,14 +63,18 @@ function yearInfo(value: any) {
     }
   }
 
-  return { key: "none", label: "Sem ano", cls: "bg-slate-500/15 text-slate-300" }
+  return {
+    key: "none",
+    label: "Materiais complementares",
+    cls: "bg-slate-500/15 text-slate-300",
+  }
 }
 
 function yearLabelFromKey(key: string) {
   if (key.startsWith("age-")) return `${key.slice(4)} anos`
   if (key.startsWith("grade-")) return `Ano ${key.slice(6)}`
   if (key.startsWith("hs-")) return `Ensino Medio ${key.slice(3)}`
-  return "Sem ano"
+  return "Materiais complementares"
 }
 
 function normalizeText(value: any) {

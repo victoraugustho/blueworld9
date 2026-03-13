@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 type ProgressPayload = {
   currentTime: number
@@ -52,6 +52,7 @@ export default function YouTubePlayer({ videoId, title, onProgress, onEnded }: Y
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const onProgressRef = useRef(onProgress)
   const onEndedRef = useRef(onEnded)
+  const [coverVisible, setCoverVisible] = useState(true)
 
   useEffect(() => {
     onProgressRef.current = onProgress
@@ -62,6 +63,7 @@ export default function YouTubePlayer({ videoId, title, onProgress, onEnded }: Y
   }, [onEnded])
 
   useEffect(() => {
+    setCoverVisible(true)
     let mounted = true
 
     function clearTick() {
@@ -92,6 +94,7 @@ export default function YouTubePlayer({ videoId, title, onProgress, onEnded }: Y
     function handleStateChange(event: any) {
       const state = event?.data
       if (state === window.YT?.PlayerState?.PLAYING) {
+        setCoverVisible(false)
         startTick()
         return
       }
@@ -116,16 +119,37 @@ export default function YouTubePlayer({ videoId, title, onProgress, onEnded }: Y
         playerRef.current = null
       }
 
+      const origin = window.location?.origin
       playerRef.current = new window.YT.Player(containerRef.current, {
         videoId,
         width: "100%",
         height: "100%",
+        host: "https://www.youtube-nocookie.com",
         playerVars: {
+          controls: 1,
+          fs: 1,
+          disablekb: 1,
+          iv_load_policy: 3,
           rel: 0,
           modestbranding: 1,
           playsinline: 1,
+          origin,
         },
         events: {
+          onReady: () => {
+            if (mounted) setCoverVisible(true)
+            try {
+              const iframe = playerRef.current?.getIframe?.()
+              if (iframe) {
+                iframe.setAttribute("allowfullscreen", "true")
+                iframe.setAttribute("allowFullScreen", "true")
+                const currentAllow = iframe.getAttribute("allow") ?? ""
+                if (!currentAllow.includes("fullscreen")) {
+                  iframe.setAttribute("allow", `${currentAllow} fullscreen`.trim())
+                }
+              }
+            } catch {}
+          },
           onStateChange: handleStateChange,
         },
       })
@@ -142,8 +166,33 @@ export default function YouTubePlayer({ videoId, title, onProgress, onEnded }: Y
   }, [videoId])
 
   return (
-    <div className="relative w-full aspect-video mb-4 rounded-lg overflow-hidden bg-black/30">
+    <div
+      className="relative w-full aspect-video mb-4 rounded-lg overflow-hidden bg-black/30"
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <div ref={containerRef} className="absolute inset-0" aria-label={title} />
+      {coverVisible && (
+        <button
+          type="button"
+          onClick={() => {
+            if (playerRef.current?.playVideo) {
+              playerRef.current.playVideo()
+              setCoverVisible(false)
+            }
+          }}
+          className="absolute inset-0 z-20 flex items-center justify-center bg-gradient-to-br from-slate-950/70 via-slate-900/50 to-slate-950/70"
+          aria-label="Reproduzir vídeo"
+        >
+          <span className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 border border-white/20">
+            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+              <path d="M8 5v14l11-7-11-7z" fill="white" />
+            </svg>
+          </span>
+        </button>
+      )}
+      {/* overlays para reduzir cliques em links do player */}
+      <div className="absolute top-0 left-0 w-24 h-12 z-10" aria-hidden />
+      <div className="absolute top-0 right-0 w-24 h-12 z-10" aria-hidden />
     </div>
   )
 }

@@ -42,3 +42,5 @@ next-env.d.ts
 
 # Pastas de imagens
 /extras
+*.zip
+*.rar

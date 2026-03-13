@@ -63,6 +63,18 @@ export default function AdminSchedulesPage() {
     [teachers, selectedTeacherId]
   )
 
+  const scheduleDays = [1, 2, 3, 4, 5]
+  const schedulesByWeekday = useMemo(() => {
+    const map: Record<number, TeacherSchedule[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] }
+    for (const schedule of schedules) {
+      if (map[schedule.weekday]) map[schedule.weekday].push(schedule)
+    }
+    for (const day of scheduleDays) {
+      map[day].sort((a, b) => timeLabel(a.start_time).localeCompare(timeLabel(b.start_time)))
+    }
+    return map
+  }, [schedules])
+
   const timezoneOptions = useMemo(() => {
     if (!selectedTeacher) return []
     return TIMEZONE_OPTIONS[selectedTeacher.country] ?? []
@@ -328,7 +340,7 @@ export default function AdminSchedulesPage() {
 
           <Card className="bg-slate-900/30 border border-white/10">
             <CardHeader>
-              <CardTitle className="text-white text-base">{"Hor\u00e1rios cadastrados"}</CardTitle>
+              <CardTitle className="text-white text-base">{"Hor\u00e1rios do professor"}</CardTitle>
             </CardHeader>
             <CardContent>
               {loadingSchedules && <p className="text-slate-400">{"Carregando..."}</p>}
@@ -336,50 +348,69 @@ export default function AdminSchedulesPage() {
                 <p className="text-slate-400">{"Nenhum hor\u00e1rio cadastrado."}</p>
               )}
 
-              <div className="space-y-3">
-                {schedules.map((s) => (
-                  <div
-                    key={s.id}
-                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-white truncate">{s.class_label}</div>
-                      <div className="text-xs text-white/70">
-                        {weekdayLabel(s.weekday)}{" \u2022 "}
-                        {timeLabel(s.start_time)} - {timeLabel(s.end_time)}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                {scheduleDays.map((day) => {
+                  const list = schedulesByWeekday[day] ?? []
+                  return (
+                    <div key={day} className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                      <div className="px-3 py-2 border-b border-white/10 text-xs font-semibold text-white/80">
+                        {weekdayLabel(day)}
                       </div>
-                      <div className="text-xs text-white/50">{getTimezoneLabel(s.timezone)}</div>
-                    </div>
+                      <div className="p-3 space-y-3">
+                        {list.length === 0 && (
+                          <p className="text-xs text-slate-400">{"Sem hor\u00e1rios"}</p>
+                        )}
+                        {list.map((schedule) => (
+                          <div
+                            key={schedule.id}
+                            className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-3"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-white truncate max-w-[14rem] sm:max-w-none">
+                                {schedule.class_label}
+                              </p>
+                              <span className="text-[11px] font-semibold text-cyan-100 bg-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                                {timeLabel(schedule.start_time)} - {timeLabel(schedule.end_time)}
+                              </span>
+                              <span
+                                className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                                  schedule.active
+                                    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                                    : "bg-rose-500/15 text-rose-300 border-rose-500/30"
+                                }`}
+                              >
+                                {schedule.active ? "Ativo" : "Inativo"}
+                              </span>
+                            </div>
 
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-[11px] px-2 py-1 rounded-full border ${
-                          s.active
-                            ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                            : "bg-rose-500/15 text-rose-300 border-rose-500/30"
-                        }`}
-                      >
-                        {s.active ? "Ativo" : "Inativo"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => startEdit(s)}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-200"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                        {"Editar"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(s.id)}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-200"
-                      >
-                        <Trash className="w-3.5 h-3.5" />
-                        {"Excluir"}
-                      </button>
+                            <div className="text-xs text-white/50">
+                              {getTimezoneLabel(schedule.timezone)}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startEdit(schedule)}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-200"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                {"Editar"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(schedule.id)}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-200"
+                              >
+                                <Trash className="w-3.5 h-3.5" />
+                                {"Excluir"}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </CardContent>
           </Card>

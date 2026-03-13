@@ -87,3 +87,16 @@ export interface TeacherReminder {
   created_at?: string
   updated_at?: string
 }
+
+export interface BugReport {
+  id: string
+  teacher_id: string
+  title: string
+  description: string
+  page_url?: string | null
+  user_agent?: string | null
+  created_at?: string
+
+  teacher_name?: string
+  teacher_email?: string
+}

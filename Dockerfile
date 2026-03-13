@@ -11,6 +11,7 @@ RUN npm ci
 FROM node:22-alpine AS builder
 WORKDIR /app
 
+# Keep secrets (e.g. OPENAI_API_KEY) out of build args; inject at runtime only.
 # Copy deps stage snapshot (includes package files and node_modules when present)
 COPY --from=deps /app/ ./
 COPY . .

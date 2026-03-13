@@ -12,6 +12,7 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_N8N_WEBHOOK_URL=${NEXT_PUBLIC_N8N_WEBHOOK_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     networks:
       - blueworld9-network
 

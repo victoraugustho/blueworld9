@@ -1,11 +1,11 @@
 # Stage 1: build
 FROM node:22-alpine AS builder
-RUN apk add --no-cache libc6-compat
+RUN ["apk", "add", "--no-cache", "libc6-compat"]
 WORKDIR /app
 
 # Install dependencies
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN ["npm", "ci"]
 
 # Keep secrets (e.g. OPENAI_API_KEY) out of build args; inject at runtime only.
 COPY . .
@@ -14,7 +14,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build app
-RUN npm run build
+RUN ["node", "./node_modules/next/dist/bin/next", "build"]
 
 # Stage 2: production
 FROM node:22-alpine AS runner

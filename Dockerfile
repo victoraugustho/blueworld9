@@ -1,31 +1,22 @@
-# Stage 1: dependencies
-FROM node:22-alpine AS deps
+# Stage 1: build
+FROM node:22-alpine AS builder
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install dependencies based on lockfile
+# Install dependencies
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# Stage 2: build
-FROM node:22-alpine AS builder
-WORKDIR /app
-
 # Keep secrets (e.g. OPENAI_API_KEY) out of build args; inject at runtime only.
-# Copy deps stage snapshot (includes package files and node_modules when present)
-COPY --from=deps /app/ ./
 COPY . .
 
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Fallback for environments where node_modules is missing in deps snapshot
-RUN if [ ! -d node_modules ]; then npm ci; fi
-
 # Build app
 RUN npm run build
 
-# Stage 3: production
+# Stage 2: production
 FROM node:22-alpine AS runner
 WORKDIR /app
 

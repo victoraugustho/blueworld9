@@ -1,63 +1,39 @@
-"use client"
-
 import { Button } from "@/components/ui/button"
-import { useEffect, useMemo, useState } from "react"
 import { BookOpen, Cpu, Lightbulb, Atom, GraduationCap } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 
-export function HeroSection() {
-  const [counts, setCounts] = useState({
-    schools: 0,
-    students: 0,
-    projects: 0,
-  })
-  const mobileParticleLimit = 30
+const mobileParticleLimit = 30
 
-  useEffect(() => {
-    const targets = { schools: 20, students: 15000, projects: 100 }
-    const duration = 2000
-    const start = performance.now()
+function seededRandom(seed: number) {
+  const x = Math.sin(seed) * 10000
+  return x - Math.floor(x)
+}
 
-    function animate(now: number) {
-      const progress = Math.min((now - start) / duration, 1)
+const particles = Array.from({ length: 80 }).map((_, i) => {
+  const randA = seededRandom(i + 1)
+  const randB = seededRandom(i + 101)
+  const randC = seededRandom(i + 201)
 
-      setCounts({
-        schools: Math.floor(targets.schools * progress),
-        students: Math.floor(targets.students * progress),
-        projects: Math.floor(targets.projects * progress),
-      })
-
-      if (progress < 1) requestAnimationFrame(animate)
-    }
-
-    requestAnimationFrame(animate)
-  }, [])
-
-  const scrollToContact = () => {
-    document.getElementById("contato")?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  const particles = useMemo(
-    () =>
-      Array.from({ length: 80 }).map(() => ({
-        size: 1 + Math.random() * 4,
-        top: Math.random() * 100,
-        left: Math.random() * 100,
-        opacity: 0.2 + Math.random() * 0.6,
-        blur: Math.random() * 4,
-        duration: 3 + Math.random() * 5,
-        color: Math.random() > 0.66
-          ? "bg-white/60"
-          : Math.random() > 0.33
+  return {
+    size: 1 + randA * 4,
+    top: randB * 100,
+    left: randC * 100,
+    opacity: 0.2 + seededRandom(i + 301) * 0.6,
+    blur: seededRandom(i + 401) * 4,
+    duration: 3 + seededRandom(i + 501) * 5,
+    color:
+      seededRandom(i + 601) > 0.66
+        ? "bg-white/60"
+        : seededRandom(i + 701) > 0.33
           ? "bg-cyan-200/40"
           : "bg-purple-300/40",
-      })),
-    []
-  )
+  }
+})
 
+export function HeroSection() {
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden pt-32 pb-20">
-      {/* Background */}
       <div className="absolute inset-0 z-0">
         <Image
           src="/webp/bg-v5.webp"
@@ -69,7 +45,6 @@ export function HeroSection() {
         />
       </div>
 
-      {/* Efeitos */}
       <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden">
         <div className="hidden md:block">
           {[...Array(6)].map((_, i) => (
@@ -107,7 +82,6 @@ export function HeroSection() {
         ))}
       </div>
 
-      {/* Conteúdo */}
       <div className="container mx-auto px-6 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div className="space-y-8">
@@ -127,18 +101,18 @@ export function HeroSection() {
               <Button
                 size="lg"
                 className="bg-orange-500 hover:bg-orange-600 text-white text-lg px-8 hover:scale-[1.05]"
-                onClick={scrollToContact}
+                asChild
               >
-                Leve a Blue World 9 para sua escola
+                <Link href="/#contato">Leve a Blue World 9 para sua escola</Link>
               </Button>
 
               <Button
                 size="lg"
                 variant="outline"
                 className="border-white bg-white/10 hover:bg-cyan-500 hover:border-cyan-500 text-white text-lg px-8 backdrop-blur hover:scale-[1.05]"
-                onClick={scrollToContact}
+                asChild
               >
-                Solicite uma apresentação
+                <Link href="/#contato">Solicite uma apresentação</Link>
               </Button>
             </div>
           </div>
@@ -158,19 +132,17 @@ export function HeroSection() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mt-20 pt-10 border-t border-white/20 text-glow text-center">
           <div>
-            <div className="text-5xl font-bold text-white">+{counts.schools}</div>
+            <div className="text-5xl font-bold text-white">+20</div>
             <p className="text-white/80 text-sm">Escolas</p>
           </div>
 
           <div>
-            <div className="text-5xl font-bold text-white">
-              +{counts.students.toLocaleString()}
-            </div>
+            <div className="text-5xl font-bold text-white">+{(15000).toLocaleString()}</div>
             <p className="text-white/80 text-sm">Alunos</p>
           </div>
 
           <div>
-            <div className="text-5xl font-bold text-white">+{counts.projects}</div>
+            <div className="text-5xl font-bold text-white">+100</div>
             <p className="text-white/80 text-sm">Projetos Maker</p>
           </div>
         </div>

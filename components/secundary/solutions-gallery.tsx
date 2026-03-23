@@ -1,13 +1,16 @@
-"use client"
-
-import { useEffect, useState } from "react"
 import {
-  ChevronLeft, Target, Zap, Users, Lightbulb, Award, Code, Rocket, Sparkles, Trophy, SmilePlus, Radio, ChevronRight
+  Target,
+  Zap,
+  Users,
+  Lightbulb,
+  Award,
+  Code,
+  Rocket,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import Image from "next/image"
 
 const iconMap = { Code, Users, Target, Zap, Lightbulb, Award, Rocket }
+
 type Principle = {
   icon: keyof typeof iconMap
   title: string
@@ -21,6 +24,7 @@ type Principle = {
   hoverIconBg: string
   shadowColor: string
 }
+
 const principles: Principle[] = [
   {
     icon: "Code",
@@ -107,7 +111,7 @@ function PrincipleCard({ principle }: { principle: Principle }) {
 
   return (
     <div
-    data-aos="fade-up"
+      data-aos="fade-up"
       className={`
         flex flex-col h-full
         relative overflow-hidden rounded-2xl
@@ -130,6 +134,7 @@ function PrincipleCard({ principle }: { principle: Principle }) {
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent" />
         </div>
       )}
+
       <div className="p-6 flex flex-col flex-1">
         <div
           className={`mb-4 p-3 ${principle.iconBg} rounded-lg w-fit ${principle.hoverIconBg} transition-all`}
@@ -148,22 +153,8 @@ function PrincipleCard({ principle }: { principle: Principle }) {
     </div>
   )
 }
+
 export function PrinciplesGallery() {
-  const [index, setIndex] = useState(0)
-
-  const next = () =>
-    setIndex((prev) => (prev + 1) % principles.length)
-
-  const prev = () =>
-    setIndex((prev) =>
-      prev === 0 ? principles.length - 1 : prev - 1
-    )
-
-  useEffect(() => {
-    const interval = setInterval(next, 5000)
-    return () => clearInterval(interval)
-  }, [])
-
   return (
     <>
       <div className="hidden md:grid grid-cols-3 gap-8 items-stretch">
@@ -172,30 +163,13 @@ export function PrinciplesGallery() {
         ))}
       </div>
 
-      <div className="md:hidden relative max-w-sm mx-auto">
-        <div className="overflow-hidden">
-          <div
-            className="flex transition-transform duration-700 ease-[cubic-bezier(0.4,0,0.2,1)]"
-            style={{ transform: `translateX(-${index * 100}%)` }}
-          >
-            {principles.map((p, i) => (
-              <div
-                key={i}
-                className="w-full flex-shrink-0 px-3 flex justify-center"
-              >
-                <PrincipleCard principle={p} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex justify-center gap-6 mt-6">
-          <Button className="hover:bg-purple-600" size="icon" variant="outline" onClick={prev}>
-            <ChevronLeft />
-          </Button>
-          <Button className="hover:bg-purple-600" size="icon" variant="outline" onClick={next}>
-            <ChevronRight />
-          </Button>
+      <div className="md:hidden overflow-x-auto pb-2">
+        <div className="flex gap-4 snap-x snap-mandatory">
+          {principles.map((p, i) => (
+            <div key={i} className="min-w-[85%] snap-center">
+              <PrincipleCard principle={p} />
+            </div>
+          ))}
         </div>
       </div>
     </>

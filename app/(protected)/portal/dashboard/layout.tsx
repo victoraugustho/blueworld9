@@ -1,21 +1,21 @@
 import { ReactNode } from "react"
 import { PortalSidebar } from "@/components/portal/PortalSidebar"
-import { BUG_REPORTS_OWNER_ID } from "@/lib/bug-reports"
 import { requireTeacherPage } from "@/lib/auth/server"
+import { isRestrictedAdminUser } from "@/lib/auth/restricted-admin"
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const teacher = await requireTeacherPage()
   const isAdmin = teacher.is_admin === true || teacher.role === "admin"
+  const canAccessRestrictedAdminAreas = isAdmin && isRestrictedAdminUser(teacher.id)
   const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
-  const canSeeBugReports = teacher.id === BUG_REPORTS_OWNER_ID
   const systemVersion = process.env.SYSTEM_VERSION ?? "dev"
 
   return (
     <div className="min-h-screen">
       <PortalSidebar
         isAdmin={isAdmin}
+        canAccessRestrictedAdminAreas={canAccessRestrictedAdminAreas}
         locale={locale}
-        canSeeBugReports={canSeeBugReports}
         systemVersion={systemVersion}
         teacher={{
           name: teacher.name,

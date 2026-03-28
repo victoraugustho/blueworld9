@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
+import { ensureCoordinationTasksSchema } from "@/lib/coordination"
 
 type TaskStatus = "todo" | "doing" | "done"
 type TaskPriority = "low" | "medium" | "high"
@@ -23,33 +24,6 @@ function normalizeDueDate(value: unknown) {
   return raw
 }
 
-async function ensureCoordinationTasksTable() {
-  await db`
-    CREATE TABLE IF NOT EXISTS public.coordination_tasks (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      title TEXT NOT NULL,
-      description TEXT,
-      status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'doing', 'done')),
-      priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
-      due_date DATE,
-      created_by UUID REFERENCES public.teachers(id) ON DELETE SET NULL,
-      updated_by UUID REFERENCES public.teachers(id) ON DELETE SET NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `
-
-  await db`
-    CREATE INDEX IF NOT EXISTS coordination_tasks_status_idx
-    ON public.coordination_tasks(status)
-  `
-
-  await db`
-    CREATE INDEX IF NOT EXISTS coordination_tasks_due_date_idx
-    ON public.coordination_tasks(due_date)
-  `
-}
-
 async function findTask(id: string) {
   const [row] = await db`
     SELECT id
@@ -64,7 +38,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
 
-  await ensureCoordinationTasksTable()
+  await ensureCoordinationTasksSchema()
 
   const { id: rawId } = await params
   const id = String(rawId ?? "").trim()
@@ -132,7 +106,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
 
-  await ensureCoordinationTasksTable()
+  await ensureCoordinationTasksSchema()
 
   const { id: rawId } = await params
   const id = String(rawId ?? "").trim()

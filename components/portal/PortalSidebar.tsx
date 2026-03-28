@@ -19,6 +19,7 @@ import {
   ChevronDown,
   CalendarDays,
   Bug,
+  GraduationCap,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -31,16 +32,16 @@ type TeacherMini = {
 
 export function PortalSidebar({
   isAdmin,
+  canAccessRestrictedAdminAreas,
   locale,
   teacher,
-  canSeeBugReports = false,
   systemVersion,
   logoSrc = "/webp/logo-branca-bw9.webp", // garanta que exista em /public ou altere
 }: {
   isAdmin: boolean
+  canAccessRestrictedAdminAreas: boolean
   locale: Locale
   teacher?: TeacherMini
-  canSeeBugReports?: boolean
   systemVersion?: string
   logoSrc?: string
 }) {
@@ -48,8 +49,11 @@ export function PortalSidebar({
   const [open, setOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
+  const [avatarError, setAvatarError] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [unreadLoading, setUnreadLoading] = useState(false)
+  const [pendingRelationsCount, setPendingRelationsCount] = useState(0)
+  const [pendingRelationsLoading, setPendingRelationsLoading] = useState(false)
 
   const sidebarRef = useRef<HTMLElement | null>(null)
   const profileRef = useRef<HTMLDivElement | null>(null)
@@ -66,12 +70,14 @@ export function PortalSidebar({
       notificacoes: locale === "es" ? "Notificaciones" : "Notifica\u00e7\u00f5es",
       reportBug: locale === "es" ? "Reportar problema" : "Relatar problema",
       adminMaterials: locale === "es" ? "Materiales (Admin)" : "Materiais (Admin)",
+      adminBlog: locale === "es" ? "Blog (Admin)" : "Blog (Admin)",
+      adminTurmas: locale === "es" ? "Categorias/Turmas" : "Categorias/Turmas",
       teachers: locale === "es" ? "Profesores" : "Professores",
       adminSchedules: locale === "es" ? "Horarios (Admin)" : "Hor\u00e1rios (Admin)",
       adminAgenda: locale === "es" ? "Agenda de Coordinadores" : "Agenda de Coordenadores",
       technicalScheduling: locale === "es" ? "Agendamiento Tecnico" : "Agendamento Tecnico",
       adminNotifications: locale === "es" ? "Notificaciones (Admin)" : "Notifica\u00e7\u00f5es (Admin)",
-      bugReports: locale === "es" ? "Reportes de bugs" : "Relatos de bug",
+      bugReports: locale === "es" ? "Relaciones" : "Rela\u00e7\u00f5es",
       logs: locale === "es" ? "Auditoria" : "Auditoria",
       ai: locale === "es" ? "IA" : "IA",
     },
@@ -96,6 +102,7 @@ export function PortalSidebar({
       if (isAdmin) {
         items.push(
           { href: "/portal/dashboard/admin/materials", label: t.menu.adminMaterials, icon: ShieldCheck },
+          { href: "/portal/dashboard/admin/turmas", label: t.menu.adminTurmas, icon: GraduationCap },
           { href: "/portal/dashboard/admin/teachers", label: t.menu.teachers, icon: Users },
           { href: "/portal/dashboard/admin/schedules", label: t.menu.adminSchedules, icon: CalendarDays },
           { href: "/portal/dashboard/admin/agenda", label: t.menu.adminAgenda, icon: CalendarDays },
@@ -103,16 +110,21 @@ export function PortalSidebar({
           { href: "/portal/dashboard/admin/notifications", label: t.menu.adminNotifications, icon: Bell },
           { href: "/portal/dashboard/admin/logs", label: t.menu.logs, icon: ClipboardList }
         )
-      }
 
-      if (canSeeBugReports) {
-        items.push({ href: "/portal/dashboard/admin/bug-reports", label: t.menu.bugReports, icon: Bug })
+        if (canAccessRestrictedAdminAreas) {
+          items.splice(1, 0, { href: "/portal/dashboard/admin/blog", label: t.menu.adminBlog, icon: FileText })
+          items.splice(items.length - 1, 0, {
+            href: "/portal/dashboard/admin/bug-reports",
+            label: t.menu.bugReports,
+            icon: Bug,
+          })
+        }
       }
 
       return items
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [locale, isAdmin, canSeeBugReports]
+    [locale, isAdmin, canAccessRestrictedAdminAreas]
   )
 
   // ✅ corrige active do "In\u00edcio" (só ativo quando for exatamente /portal/dashboard)
@@ -152,6 +164,10 @@ export function PortalSidebar({
   }, [pathname])
 
   useEffect(() => {
+    setAvatarError(false)
+  }, [teacher?.avatarUrl])
+
+  useEffect(() => {
     let active = true
     async function loadUnread() {
       setUnreadLoading(true)
@@ -172,6 +188,37 @@ export function PortalSidebar({
       active = false
     }
   }, [pathname])
+
+  useEffect(() => {
+    let active = true
+    let intervalId: ReturnType<typeof setInterval> | null = null
+
+    async function loadPendingRelations() {
+      if (!isAdmin || !canAccessRestrictedAdminAreas) {
+        setPendingRelationsCount(0)
+        return
+      }
+
+      setPendingRelationsLoading(true)
+      try {
+        const res = await fetch("/api/admin/bug-reports?summary=1", { cache: "no-store" })
+        const data = await res.json().catch(() => null)
+        if (!active) return
+        setPendingRelationsCount(Number(data?.pending ?? 0))
+      } catch {
+        if (!active) return
+        setPendingRelationsCount(0)
+      } finally {
+        if (active) setPendingRelationsLoading(false)
+      }
+    }
+    loadPendingRelations()
+    intervalId = setInterval(loadPendingRelations, 30000)
+    return () => {
+      active = false
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [isAdmin, canAccessRestrictedAdminAreas, pathname])
 
   const displayName = teacher?.name?.trim() || (locale === "es" ? "Profesor" : "Professor")
   const initials = displayName
@@ -239,10 +286,10 @@ export function PortalSidebar({
             <Link
               href="/portal/dashboard/notificacoes"
               onClick={() => setOpen(false)}
-              className="relative w-10 h-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 flex items-center justify-center transition-colors"
+              className="relative w-9 h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 flex items-center justify-center transition-colors"
               aria-label={t.menu.notificacoes}
             >
-              <Bell className="w-5 h-5" />
+              <Bell className="w-4 h-4" />
               {unreadCount > 0 && !unreadLoading && (
                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-semibold flex items-center justify-center">
                   {unreadCount > 99 ? "99+" : unreadCount}
@@ -255,19 +302,19 @@ export function PortalSidebar({
             <button
               type="button"
               onClick={() => setProfileOpen((v) => !v)}
-              className="flex items-center gap-2 rounded-xl px-2 py-1.5 
+              className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 
               hover:bg-white/10 transition-colors border border-white/10"
               aria-label="Perfil"
             >
               {/* Avatar */}
-              <div className="relative w-9 h-9 rounded-full overflow-hidden border border-white/15 bg-white/10 flex items-center justify-center">
-                {teacher?.avatarUrl ? (
-                  <Image
-                    src={teacher.avatarUrl} // ✅ sem query string
+              <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/15 bg-white/10 flex items-center justify-center">
+                {teacher?.avatarUrl && !avatarError ? (
+                  <img
+                    src={teacher.avatarUrl}
                     alt={displayName}
-                    fill
-                    sizes="36px"
-                    className="object-cover"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    onError={() => setAvatarError(true)}
                   />
                 ) : (
                   <span className="text-xs font-semibold text-white/80">{initials || "BW"}</span>
@@ -330,7 +377,7 @@ export function PortalSidebar({
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className={`
-                  flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium
+                  flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium
                   transition-all duration-300
                   ${
                     active
@@ -339,7 +386,7 @@ export function PortalSidebar({
                   }
                 `}
               >
-                <Icon className="w-5 h-5" />
+                <Icon className="w-4 h-4" />
                 {item.label}
               </Link>
             )
@@ -357,6 +404,10 @@ export function PortalSidebar({
               {adminMenu.map((item) => {
                 const Icon = item.icon
                 const active = isActive(item.href)
+                const hasPendingRelations =
+                  item.href === "/portal/dashboard/admin/bug-reports" &&
+                  pendingRelationsCount > 0 &&
+                  !pendingRelationsLoading
 
                 return (
                   <Link
@@ -364,7 +415,7 @@ export function PortalSidebar({
                     href={item.href}
                     onClick={() => setOpen(false)}
                     className={`
-                      flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium
+                      flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium
                       transition-all duration-300
                       ${
                         active
@@ -373,8 +424,15 @@ export function PortalSidebar({
                       }
                     `}
                   >
-                    <Icon className="w-5 h-5" />
-                    {item.label}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </div>
+                    {hasPendingRelations && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-semibold">
+                        {pendingRelationsCount > 99 ? "99+" : pendingRelationsCount}
+                      </span>
+                    )}
                   </Link>
                 )
               })}

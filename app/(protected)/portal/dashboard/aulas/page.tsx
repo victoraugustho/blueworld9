@@ -1,24 +1,34 @@
 import { db } from "@/lib/db"
 import { requireTeacherPage } from "@/lib/auth/server"
+import { ensureTurmasSchema } from "@/lib/turmas"
 import AulasCategories from "./AulasCategories"
 
 export default async function AulasPage() {
   const teacher = await requireTeacherPage()
   const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
 
+  await ensureTurmasSchema()
+
   const t = {
-    title: locale === "es" ? "Clases en Video" : "Aulas em Vídeo",
-    noCategory: locale === "es" ? "Sin categoría" : "Sem Categoria",
-    invalidUrl: locale === "es" ? "URL inválida o no es de YouTube." : "URL inválida ou não é do YouTube.",
-    empty: locale === "es" ? "No hay videos disponibles." : "Nenhuma aula em vídeo disponível.",
+    title: locale === "es" ? "Clases en Video" : "Aulas em Video",
+    noCategory: locale === "es" ? "Sin turma" : "Sem Turma",
+    invalidUrl: locale === "es" ? "URL invalida o no es de YouTube." : "URL invalida ou nao e do YouTube.",
+    empty: locale === "es" ? "No hay videos disponibles." : "Nenhuma aula em video disponivel.",
     previous: locale === "es" ? "Anterior" : "Anterior",
-    next: locale === "es" ? "Siguiente" : "Próxima",
+    next: locale === "es" ? "Siguiente" : "Proxima",
     lesson: locale === "es" ? "Clase" : "Aula",
     of: locale === "es" ? "de" : "de",
     watched: locale === "es" ? "Visto" : "Assistido",
+    videoNotes: locale === "es" ? "Observaciones del video" : "Observacoes da aula",
+    lessonList: locale === "es" ? "Lista de clases" : "Lista de aulas",
   }
 
   const rows = await db`
+    WITH teacher_turmas AS (
+      SELECT category_id
+      FROM teacher_categories
+      WHERE teacher_id = ${teacher.id}
+    )
     SELECT m.*, c.name AS category_name, p.progress_percent, p.watched_at
     FROM materials m
     LEFT JOIN categories c ON m.category_id = c.id
@@ -26,6 +36,32 @@ export default async function AulasPage() {
       ON p.material_id = m.id AND p.teacher_id = ${teacher.id}
     WHERE m.file_type = 'video'
       AND m.language = ${locale}
+      AND (
+        m.category_id IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM teacher_turmas tt
+          WHERE tt.category_id = m.category_id
+        )
+      )
+      AND (
+        m.student_year IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM teacher_student_years tys
+          WHERE tys.teacher_id = ${teacher.id}
+            AND tys.student_year = m.student_year
+        )
+      )
+      AND (
+        COALESCE(m.access_scope, 'all') = 'all'
+        OR EXISTS (
+          SELECT 1
+          FROM material_teacher_access mta
+          WHERE mta.material_id = m.id
+            AND mta.teacher_id = ${teacher.id}
+        )
+      )
     ORDER BY c.name ASC NULLS LAST, m.created_at ASC
   `
 
@@ -44,6 +80,7 @@ export default async function AulasPage() {
         id: String(video.id),
         title: video.title,
         description: video.description,
+        video_notes: video.video_notes,
         file_url: video.file_url,
         progress_percent: Number(video.progress_percent ?? 0),
         watched:
@@ -68,6 +105,8 @@ export default async function AulasPage() {
             lesson: t.lesson,
             of: t.of,
             watched: t.watched,
+            videoNotes: t.videoNotes,
+            lessonList: t.lessonList,
           }}
         />
       )}

@@ -21,6 +21,7 @@ import {
   Video,
 } from "lucide-react"
 import { TIMEZONE_OPTIONS, getDefaultTimezone, getTimezoneLabel } from "@/lib/timezones"
+import { getTurmaYearLabel } from "@/lib/turma-years"
 
 type Country = Teacher["country"]
 
@@ -447,6 +448,42 @@ export default function TeacherInfoClient({ teacherId }: { teacherId: string }) 
                 <span className="text-xs text-white/70 bg-white/10 border border-white/10 rounded-full px-3 py-1">
                   {countryLabel(teacher.country)}
                 </span>
+              </div>
+
+              <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
+                <p className="text-white/60 text-xs mb-2">Categorias vinculadas</p>
+                {(teacher.categories ?? []).length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {(teacher.categories ?? []).map((category) => (
+                      <span
+                        key={category.id}
+                        className="text-xs rounded-full px-2.5 py-1 bg-cyan-500/15 text-cyan-200 border border-cyan-500/30"
+                      >
+                        {category.name}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-400 text-sm">Nenhuma categoria vinculada.</p>
+                )}
+              </div>
+
+              <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
+                <p className="text-white/60 text-xs mb-2">Turmas (Ano) vinculadas</p>
+                {(teacher.student_years ?? []).length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {(teacher.student_years ?? []).map((studentYear) => (
+                      <span
+                        key={studentYear}
+                        className="text-xs rounded-full px-2.5 py-1 bg-amber-500/15 text-amber-200 border border-amber-500/30"
+                      >
+                        {getTurmaYearLabel(Number(studentYear))}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-400 text-sm">Nenhuma turma (ano) vinculada.</p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">

@@ -2,24 +2,40 @@ export interface Category {
   id: number
   name: string
   created_at?: string
+  material_count?: number
+  teacher_count?: number
+  teacher_ids?: string[]
+  teacher_names?: string[]
+}
+
+export interface TurmaYear {
+  student_year: number
+  label: string
+  group: "age" | "grade" | "high"
+  group_label?: string
+  material_count?: number
+  teacher_count?: number
+  teacher_ids?: string[]
+  teacher_names?: string[]
 }
 
 export type MaterialLanguage = "pt-BR" | "es"
+export type MaterialAccessScope = "all" | "specific"
 
 export interface Material {
   id: string
   title: string
   description: string
+  video_notes?: string | null
   file_url: string
   file_type: "video" | "document"
   category_id: number | null
   created_at?: string
-
-  // ✅ novo
   language: MaterialLanguage
   student_year?: number | null
-
-  // campos adicionais da query
+  access_scope?: MaterialAccessScope
+  teacher_ids?: string[]
+  teacher_names?: string[]
   category_name?: string
 }
 
@@ -32,23 +48,21 @@ export interface Teacher {
   name: string
   email: string
   phone: string
-
-  // ✅ novo modelo de documento
   country: TeacherCountry
   locale: TeacherLocale
   document_type: TeacherDocumentType
   document_number: string
-
-  // ⚠️ legado (opcional; pode existir no banco)
   cpf?: string | null
-
   approved: boolean
   active?: boolean
   created_at?: string
   updated_at?: string
-
-  // Se você ainda usa role no front, mantém opcional
   role?: string | null
+  category_ids?: number[]
+  categories?: Category[]
+  turma_count?: number
+  student_years?: number[]
+  turma_year_count?: number
 }
 
 export interface TeacherSchedule {
@@ -93,10 +107,10 @@ export interface BugReport {
   teacher_id: string
   title: string
   description: string
+  status?: "pending" | "resolving" | "resolved"
   page_url?: string | null
   user_agent?: string | null
   created_at?: string
-
   teacher_name?: string
   teacher_email?: string
 }

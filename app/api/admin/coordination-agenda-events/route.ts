@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
+import { ensureCoordinationAgendaEventsSchema } from "@/lib/coordination"
 
 function isValidTime(value: string) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
@@ -35,34 +36,6 @@ function addDays(value: Date, days: number) {
   const d = new Date(value)
   d.setDate(d.getDate() + days)
   return d
-}
-
-async function ensureCoordinationAgendaEventsTable() {
-  await db`
-    CREATE TABLE IF NOT EXISTS public.coordination_agenda_events (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      title TEXT NOT NULL,
-      event_date DATE NOT NULL,
-      start_time TIME NOT NULL,
-      end_time TIME NOT NULL,
-      timezone TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
-      active BOOLEAN NOT NULL DEFAULT TRUE,
-      created_by UUID REFERENCES public.teachers(id) ON DELETE SET NULL,
-      updated_by UUID REFERENCES public.teachers(id) ON DELETE SET NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `
-
-  await db`
-    CREATE INDEX IF NOT EXISTS coordination_agenda_events_date_idx
-    ON public.coordination_agenda_events(event_date, start_time)
-  `
-
-  await db`
-    CREATE INDEX IF NOT EXISTS coordination_agenda_events_active_idx
-    ON public.coordination_agenda_events(active)
-  `
 }
 
 async function seedDefaultVariableEvents() {
@@ -118,7 +91,7 @@ export async function GET(req: NextRequest) {
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
 
-  await ensureCoordinationAgendaEventsTable()
+  await ensureCoordinationAgendaEventsSchema()
   await seedDefaultVariableEvents()
 
   const { searchParams } = new URL(req.url)
@@ -167,7 +140,7 @@ export async function POST(req: NextRequest) {
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
 
-  await ensureCoordinationAgendaEventsTable()
+  await ensureCoordinationAgendaEventsSchema()
 
   const body = await req.json()
   const title = String(body.title ?? "").trim()

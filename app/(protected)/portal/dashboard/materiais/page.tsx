@@ -1,5 +1,6 @@
 import { db } from "@/lib/db"
 import { requireTeacherPage } from "@/lib/auth/server"
+import { ensureTurmasSchema } from "@/lib/turmas"
 import { FileText, Eye } from "lucide-react"
 import Link from "next/link"
 
@@ -13,6 +14,8 @@ export default async function MateriaisPage({
   const teacher = await requireTeacherPage()
   const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
 
+  await ensureTurmasSchema()
+
   const t = {
     title: locale === "es" ? "Materiales de Apoyo" : "Materiais de Apoio",
     empty: locale === "es" ? "No hay materiales disponibles." : "Nenhum material disponivel.",
@@ -20,17 +23,48 @@ export default async function MateriaisPage({
     noCategory: locale === "es" ? "Sin categoria" : "Sem Categoria",
     yearLabel: "Ano",
     noYear: locale === "es" ? "Materiales complementarios" : "Materiais complementares",
-    yearTitle: locale === "es" ? "Ano del Alumno" : "Ano do Aluno",
+    yearTitle: locale === "es" ? "Ano de la Turma" : "Ano da Turma",
     ageLabel: "anos",
     highLabel: locale === "es" ? "Ensenanza Media" : "Ensino Medio",
   }
 
   const materiais = await db`
+    WITH teacher_turmas AS (
+      SELECT category_id
+      FROM teacher_categories
+      WHERE teacher_id = ${teacher.id}
+    )
     SELECT m.*, c.name AS category_name
     FROM materials m
     LEFT JOIN categories c ON m.category_id = c.id
     WHERE m.file_type = 'document'
       AND m.language = ${locale}
+      AND (
+        m.category_id IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM teacher_turmas tt
+          WHERE tt.category_id = m.category_id
+        )
+      )
+      AND (
+        m.student_year IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM teacher_student_years tys
+          WHERE tys.teacher_id = ${teacher.id}
+            AND tys.student_year = m.student_year
+        )
+      )
+      AND (
+        COALESCE(m.access_scope, 'all') = 'all'
+        OR EXISTS (
+          SELECT 1
+          FROM material_teacher_access mta
+          WHERE mta.material_id = m.id
+            AND mta.teacher_id = ${teacher.id}
+        )
+      )
     ORDER BY c.name ASC NULLS LAST, m.created_at DESC
   `
 

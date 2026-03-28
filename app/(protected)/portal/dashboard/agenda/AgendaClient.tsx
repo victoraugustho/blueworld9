@@ -264,13 +264,6 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     return groups
   }, [logs])
 
-  useEffect(() => {
-    if (Object.keys(openClasses).length > 0) return
-    const keys = Object.keys(groupedLogs)
-    if (keys.length === 0) return
-    setOpenClasses({ [keys.sort((a, b) => a.localeCompare(b))[0]]: true })
-  }, [groupedLogs, openClasses])
-
   const schedulesByWeekday = useMemo(() => {
     const map: Record<number, TeacherSchedule[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] }
     for (const schedule of schedules) {
@@ -599,81 +592,86 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
             {Object.keys(groupedLogs)
               .sort((a, b) => a.localeCompare(b))
               .map((classLabel) => (
-              <section key={classLabel} className="space-y-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+                <section key={classLabel} className="space-y-3">
                   <button
                     type="button"
                     onClick={() => toggleClass(classLabel)}
-                    className="flex items-center gap-2 text-left"
+                    aria-expanded={openClasses[classLabel] === true}
+                    className="group w-full rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 hover:border-cyan-400/40 transition px-3 py-2"
                   >
-                    <h3 className="text-sm font-semibold text-white">{classLabel}</h3>
-                    <span className="text-[11px] text-white/60 border border-white/10 rounded-full px-2 py-0.5">
-                      {groupedLogs[classLabel].length} {t.lessons}
-                    </span>
-                    {openClasses[classLabel] ? (
-                      <ChevronUp className="w-4 h-4 text-white/70" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-white/70" />
-                    )}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-white/15 bg-slate-900/50 text-cyan-300">
+                          {openClasses[classLabel] ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </span>
+                        <h3 className="text-sm font-semibold text-white truncate">{classLabel}</h3>
+                        <span className="text-[11px] text-white/60 border border-white/10 rounded-full px-2 py-0.5 whitespace-nowrap">
+                          {groupedLogs[classLabel].length} {t.lessons}
+                        </span>
+                      </div>
+                      <span className="text-xs font-medium text-cyan-200/90 whitespace-nowrap">
+                        {openClasses[classLabel] ? t.collapse : t.expand}
+                      </span>
+                    </div>
                   </button>
-                  <span className="text-xs text-white/50">
-                    {openClasses[classLabel] ? t.collapse : t.expand}
-                  </span>
-                </div>
 
-                {openClasses[classLabel] && (
-                <div className="space-y-3">
-                  {groupedLogs[classLabel].map((log) => (
-                    <div key={log.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-white">{`${t.lesson} ${log.lesson_number}`}</p>
-                            <p className="text-xs text-white/60">{formatDate(log.lesson_date, locale)}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => startView(log)}
-                              className="inline-flex items-center gap-1 text-xs rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-200 px-2 py-1"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              {t.view}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => startEdit(log)}
-                              className="inline-flex items-center gap-1 text-xs rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-200 px-2 py-1"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              {t.edit}
-                            </button>
+                  {openClasses[classLabel] && (
+                    <div className="space-y-3">
+                      {groupedLogs[classLabel].map((log) => (
+                        <div key={log.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-white">{`${t.lesson} ${log.lesson_number}`}</p>
+                                <p className="text-xs text-white/60">{formatDate(log.lesson_date, locale)}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => startView(log)}
+                                  className="inline-flex items-center gap-1 text-xs rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-200 px-2 py-1"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  {t.view}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => startEdit(log)}
+                                  className="inline-flex items-center gap-1 text-xs rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-200 px-2 py-1"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                  {t.edit}
+                                </button>
+                              </div>
+                            </div>
+
+                            {log.notes && (
+                              <div>
+                                <p className="text-[11px] text-white/50">{t.notes}</p>
+                                <p className="text-sm text-white/80 whitespace-pre-wrap">
+                                  {previewText(log.notes)}
+                                </p>
+                              </div>
+                            )}
+                            {log.observations && (
+                              <div>
+                                <p className="text-[11px] text-white/50">{t.observations}</p>
+                                <p className="text-sm text-white/60 whitespace-pre-wrap">
+                                  {previewText(log.observations)}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </div>
-
-                        {log.notes && (
-                          <div>
-                            <p className="text-[11px] text-white/50">{t.notes}</p>
-                            <p className="text-sm text-white/80 whitespace-pre-wrap">
-                              {previewText(log.notes)}
-                            </p>
-                          </div>
-                        )}
-                        {log.observations && (
-                          <div>
-                            <p className="text-[11px] text-white/50">{t.observations}</p>
-                            <p className="text-sm text-white/60 whitespace-pre-wrap">
-                              {previewText(log.observations)}
-                            </p>
-                          </div>
-                        )}
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                )}
-              </section>
-            ))}
+                  )}
+                </section>
+              ))}
           </div>
         </CardContent>
       </Card>
@@ -1111,6 +1109,5 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     </div>
   )
 }
-
 
 

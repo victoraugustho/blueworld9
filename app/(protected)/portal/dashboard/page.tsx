@@ -41,6 +41,24 @@ type ScheduleRow = {
   timezone: string
 }
 
+type BlogPostRow = {
+  id: string
+  title: string
+  slug: string
+  excerpt: string | null
+  published_at: string
+  cover_url: string | null
+  author_name: string | null
+  categories: Array<{ id: number; name: string; slug: string }>
+}
+
+type BlogCategoryFilterRow = {
+  id: number
+  name: string
+  slug: string
+  post_count: number
+}
+
 const WEEKDAY_SHORT: Record<string, number> = {
   Mon: 1,
   Tue: 2,
@@ -103,9 +121,18 @@ function findNextSchedule(schedules: ScheduleRow[], fallbackTimezone: string) {
   return { schedule: best.schedule, offset: best.offset }
 }
 
-export default async function PortalDashboardPage() {
+type PageProps = {
+  searchParams?: Promise<{ blog_category?: string | string[] }> | { blog_category?: string | string[] }
+}
+
+export default async function PortalDashboardPage({ searchParams }: PageProps) {
   const teacher = await requireTeacherPage()
   const locale: Locale = teacher.locale === "es" ? "es" : "pt-BR"
+  const resolvedSearch = await searchParams
+  const categoryRaw = Array.isArray(resolvedSearch?.blog_category)
+    ? resolvedSearch?.blog_category[0]
+    : resolvedSearch?.blog_category
+  const blogCategory = String(categoryRaw ?? "").trim()
 
   const t = {
     title: locale === "es" ? "Panel del Profesor" : "Painel do Professor",
@@ -129,6 +156,21 @@ export default async function PortalDashboardPage() {
       locale === "es" ? "Sin horarios cadastrados." : "Sem horários cadastrados.",
     today: locale === "es" ? "Hoy" : "Hoje",
     tomorrow: locale === "es" ? "Mañana" : "Amanhã",
+    blogSection: locale === "es" ? "Blog" : "Blog",
+    blogSubtitle:
+      locale === "es"
+        ? "Publicaciones recientes para mantenerte actualizado."
+        : "Publicações recentes para você se manter atualizado.",
+    blogEmpty: locale === "es" ? "Sin posts publicados por ahora." : "Nenhum post publicado no momento.",
+    readMore: locale === "es" ? "Leer más" : "Leia mais",
+    recentPosts: locale === "es" ? "Recientes" : "Recentes",
+    featuredPost: locale === "es" ? "Post destacado" : "Post em destaque",
+    categoriesLabel: locale === "es" ? "Categorias" : "Categorias",
+    allCategories: locale === "es" ? "Todas las categorias" : "Todas as categorias",
+    filteredBy: locale === "es" ? "Filtrado por" : "Filtrado por",
+    authorLabel: locale === "es" ? "Autor" : "Autor",
+    unknownAuthor: locale === "es" ? "Autor no informado" : "Autor nao informado",
+    publishedAt: locale === "es" ? "Publicado em" : "Publicado em",
   }
 
   const schedules: ScheduleRow[] = await db`
@@ -202,6 +244,80 @@ export default async function PortalDashboardPage() {
 
   const fallbackTimezone = getDefaultTimezone(teacher.country)
   const nextSchedule = findNextSchedule(schedules, fallbackTimezone)
+
+  let blogPosts: BlogPostRow[] = []
+  let blogCategories: BlogCategoryFilterRow[] = []
+  try {
+    const filters: any[] = [
+      db`p.deleted_at IS NULL`,
+      db`p.status = 'published'`,
+      db`p.published_at IS NOT NULL`,
+      db`p.published_at <= NOW()`,
+    ]
+    if (blogCategory) {
+      filters.push(
+        db`EXISTS (
+          SELECT 1
+          FROM blog_post_categories bpc
+          JOIN blog_categories bc ON bc.id = bpc.category_id
+          WHERE bpc.post_id = p.id
+            AND bc.slug = ${blogCategory}
+        )`
+      )
+    }
+
+    const where =
+      filters.length > 0
+        ? db`WHERE ${filters.reduce((acc, cur, idx) => (idx === 0 ? cur : db`${acc} AND ${cur}`))}`
+        : db``
+
+    blogPosts = await db`
+      SELECT
+        p.id,
+        p.title,
+        p.slug,
+        p.excerpt,
+        p.published_at,
+        cover.public_url AS cover_url,
+        author.name AS author_name,
+        COALESCE(
+          (SELECT JSONB_AGG(JSONB_BUILD_OBJECT('id', c.id, 'name', c.name, 'slug', c.slug) ORDER BY c.name)
+           FROM blog_post_categories pc
+           JOIN blog_categories c ON c.id = pc.category_id
+           WHERE pc.post_id = p.id),
+          '[]'::jsonb
+        ) AS categories
+      FROM blog_posts p
+      LEFT JOIN blog_assets cover ON cover.id = p.cover_asset_id
+      LEFT JOIN teachers author ON author.id = p.author_id
+      ${where}
+      ORDER BY p.published_at DESC
+      LIMIT 7
+    `
+
+    blogCategories = await db`
+      SELECT
+        c.id,
+        c.name,
+        c.slug,
+        COUNT(*)::int AS post_count
+      FROM blog_categories c
+      JOIN blog_post_categories bpc ON bpc.category_id = c.id
+      JOIN blog_posts p ON p.id = bpc.post_id
+      WHERE p.deleted_at IS NULL
+        AND p.status = 'published'
+        AND p.published_at IS NOT NULL
+        AND p.published_at <= NOW()
+      GROUP BY c.id, c.name, c.slug
+      ORDER BY c.name ASC
+    `
+  } catch {
+    blogPosts = []
+    blogCategories = []
+  }
+
+  const featuredPost = blogPosts[0] ?? null
+  const recentPosts = blogPosts.slice(featuredPost ? 1 : 0)
 
   const weekdayLabels = locale === "es"
     ? ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
@@ -381,6 +497,122 @@ export default async function PortalDashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Blog */}
+        <Card id="blog-section" className="bg-slate-900/40 border border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white text-base flex items-center gap-2">
+              <FileText className="w-4 h-4 text-cyan-300" />
+              {t.blogSection}
+            </CardTitle>
+            <p className="text-sm text-slate-300">{t.blogSubtitle}</p>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+              <details className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white">
+                <summary className="cursor-pointer">{t.categoriesLabel}</summary>
+                <div className="mt-2 flex flex-col gap-1">
+                  <Link
+                    href="/portal/dashboard#blog-section"
+                    scroll={false}
+                    className={blogCategory ? "text-slate-200 hover:text-white" : "text-cyan-300 font-semibold"}
+                  >
+                    {t.allCategories}
+                  </Link>
+                  {blogCategories.map((category) => (
+                    <Link
+                      key={category.id}
+                      href={`/portal/dashboard?blog_category=${encodeURIComponent(category.slug)}#blog-section`}
+                      scroll={false}
+                      className={
+                        blogCategory === category.slug
+                          ? "text-cyan-300 font-semibold"
+                          : "text-slate-200 hover:text-white"
+                      }
+                    >
+                      {category.name} ({category.post_count})
+                    </Link>
+                  ))}
+                </div>
+              </details>
+              {blogCategory ? (
+                <p className="text-xs text-slate-300">
+                  {t.filteredBy}: <span className="text-white">{blogCategory}</span>
+                </p>
+              ) : null}
+            </div>
+
+            {!featuredPost ? (
+              <p className="text-slate-400 text-sm">{t.blogEmpty}</p>
+            ) : (
+              <div className="space-y-5">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-cyan-300 mb-2">{t.featuredPost}</p>
+                  <article className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                    {featuredPost.cover_url ? (
+                      <img src={featuredPost.cover_url} alt={featuredPost.title} className="w-full h-56 object-cover" />
+                    ) : null}
+                    <div className="p-4 space-y-2">
+                      <h3 className="text-white text-lg font-semibold">{featuredPost.title}</h3>
+                      <p className="text-xs text-slate-300">
+                        {t.authorLabel}: <span className="text-white">{featuredPost.author_name || t.unknownAuthor}</span> • {t.publishedAt}:{" "}
+                        <span className="text-white">{formatDateTime(featuredPost.published_at, locale)}</span>
+                      </p>
+                      {Array.isArray(featuredPost.categories) && featuredPost.categories.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {featuredPost.categories.map((category) => (
+                            <span key={category.id} className="text-[11px] px-2 py-0.5 rounded-full bg-cyan-600/20 border border-cyan-400/40 text-cyan-100">
+                              {category.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      {featuredPost.excerpt ? <p className="text-sm text-slate-300 line-clamp-3">{featuredPost.excerpt}</p> : null}
+                      <Link href={`/portal/dashboard/blog/${featuredPost.slug}`} className="text-cyan-300 text-sm hover:text-cyan-200">
+                        {t.readMore}
+                      </Link>
+                    </div>
+                  </article>
+                </div>
+
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-cyan-300 mb-2">{t.recentPosts}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {recentPosts.map((post) => (
+                      <article key={post.id} className="rounded-xl border border-white/10 bg-white/5 overflow-hidden flex flex-col">
+                        {post.cover_url ? <img src={post.cover_url} alt={post.title} className="w-full h-36 object-cover" /> : null}
+                        <div className="p-4 space-y-2 flex-1 flex flex-col">
+                          <h3 className="text-white text-base font-semibold line-clamp-2">{post.title}</h3>
+                          <p className="text-xs text-slate-300">
+                            {post.author_name || t.unknownAuthor} • {formatDateTime(post.published_at, locale)}
+                          </p>
+                          {Array.isArray(post.categories) && post.categories.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {post.categories.slice(0, 3).map((category) => (
+                                <span key={category.id} className="text-[11px] px-2 py-0.5 rounded-full bg-cyan-600/20 border border-cyan-400/40 text-cyan-100">
+                                  {category.name}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                          {post.excerpt ? <p className="text-sm text-slate-300 line-clamp-3">{post.excerpt}</p> : <p className="text-sm text-slate-400">...</p>}
+                          <div className="mt-auto pt-2">
+                            <Link href={`/portal/dashboard/blog/${post.slug}`} className="text-cyan-300 text-sm hover:text-cyan-200">
+                              {t.readMore}
+                            </Link>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                    {recentPosts.length === 0 ? (
+                      <p className="text-slate-400 text-sm">{t.blogEmpty}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </main>
     </div>
   )

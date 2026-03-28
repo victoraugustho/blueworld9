@@ -1,2 +1,0 @@
-export const BUG_REPORTS_OWNER_ID =
-  process.env.BUG_REPORTS_OWNER_ID ?? "883d3009-715f-41af-9e51-37ba3a9109f6"

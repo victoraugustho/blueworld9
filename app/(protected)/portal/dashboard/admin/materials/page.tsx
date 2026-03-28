@@ -36,6 +36,22 @@ function typeBadge(type: MaterialType) {
     : { label: "Documento", cls: "bg-indigo-500/15 text-indigo-300" }
 }
 
+function accessBadge(material: MaterialView) {
+  const ids = Array.isArray(material.teacher_ids) ? material.teacher_ids : []
+  if (material.access_scope === "specific") {
+    const label = ids.length === 1 ? "1 professor selecionado" : `${ids.length} professores selecionados`
+    return {
+      label,
+      cls: "bg-amber-500/15 text-amber-300",
+    }
+  }
+
+  return {
+    label: "Todos os professores",
+    cls: "bg-emerald-500/15 text-emerald-300",
+  }
+}
+
 function yearInfo(value: any) {
   if (typeof value === "number") {
     if (value >= 103 && value <= 105) {
@@ -136,6 +152,9 @@ export default function AdminMaterialsPage() {
           ...m,
           language: m.language === "es" ? "es" : "pt-BR",
           file_type: m.file_type === "video" ? "video" : "document",
+          access_scope: m.access_scope === "specific" ? "specific" : "all",
+          teacher_ids: Array.isArray(m.teacher_ids) ? m.teacher_ids : [],
+          teacher_names: Array.isArray(m.teacher_names) ? m.teacher_names : [],
           yearKey: y.key,
           yearLabel: y.label,
           yearCls: y.cls,
@@ -184,7 +203,15 @@ export default function AdminMaterialsPage() {
     return filteredByLangType.filter((m) => {
       if (filterYear !== "all" && m.yearKey !== filterYear) return false
       if (!q) return true
-      const hay = [m.title, m.description, m.category_name, m.file_url, m.id]
+      const hay = [
+        m.title,
+        m.description,
+        m.category_name,
+        m.file_url,
+        m.id,
+        ...(m.teacher_names ?? []),
+        m.access_scope === "specific" ? "especifico selecionado" : "todos professores",
+      ]
         .map(normalizeText)
         .join(" ")
       return hay.includes(q)
@@ -199,9 +226,14 @@ export default function AdminMaterialsPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Gerenciar Materiais</h1>
 
-        <Link href="/portal/dashboard/admin/materials/new">
-          <Button className="bg-cyan-600 hover:bg-cyan-700">Novo Material</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/portal/dashboard/admin/turmas">
+            <Button className="bg-white/10 hover:bg-white/15 border border-white/10">Turmas</Button>
+          </Link>
+          <Link href="/portal/dashboard/admin/materials/new">
+            <Button className="bg-cyan-600 hover:bg-cyan-700">Novo Material</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="mb-6 flex flex-col gap-4">
@@ -210,7 +242,7 @@ export default function AdminMaterialsPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Pesquisar por titulo, categoria, descricao ou URL..."
+              placeholder="Pesquisar por titulo, categoria, turma, descricao, URL ou professor..."
               className="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
             />
           </div>
@@ -264,7 +296,7 @@ export default function AdminMaterialsPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <span className="text-xs text-slate-400 w-full">Ano</span>
+          <span className="text-xs text-slate-400 w-full">Turma (Ano)</span>
           <button
             type="button"
             onClick={() => setFilterYear("all")}
@@ -328,6 +360,7 @@ export default function AdminMaterialsPage() {
                   {list.map((m) => {
                     const badge = languageBadge(m.language)
                     const tBadge = typeBadge(m.file_type)
+                    const aBadge = accessBadge(m)
 
                     return (
                       <Card key={m.id} className="bg-slate-800/20 border-slate-700 backdrop-blur">
@@ -350,7 +383,19 @@ export default function AdminMaterialsPage() {
                             <span className={`inline-block px-3 py-1 rounded-full text-xs ${m.yearCls}`}>
                               {m.yearLabel}
                             </span>
+
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs ${aBadge.cls}`}>
+                              {aBadge.label}
+                            </span>
                           </div>
+
+                          {m.access_scope === "specific" && (
+                            <p className="text-xs text-slate-400 mb-4">
+                              {(m.teacher_names ?? []).length > 0
+                                ? `Professores: ${(m.teacher_names ?? []).join(", ")}`
+                                : "Nenhum professor listado."}
+                            </p>
+                          )}
 
                           <div className="flex justify-between">
                             <Link href={`/portal/dashboard/admin/materials/edit/${m.id}`}>

@@ -1,4 +1,4 @@
-import Link from "next/link"
+﻿import Link from "next/link"
 import { notFound } from "next/navigation"
 import { db } from "@/lib/db"
 import { requireTeacherPage } from "@/lib/auth/server"
@@ -11,6 +11,8 @@ type BlogPostDetails = {
   title: string
   slug: string
   excerpt: string | null
+  post_type: "article" | "instagram"
+  instagram_url: string | null
   content_html: string | null
   language: string
   published_at: string
@@ -26,12 +28,33 @@ function formatDate(value: string, locale: "pt-BR" | "es") {
   }
 }
 
+function instagramEmbedUrl(value: string | null | undefined) {
+  const raw = String(value ?? "").trim()
+  if (!raw) return null
+
+  try {
+    const parsed = new URL(raw)
+    const host = parsed.hostname.toLowerCase()
+    if (!(host === "instagram.com" || host === "www.instagram.com" || host.endsWith(".instagram.com"))) return null
+    const parts = parsed.pathname.split("/").filter(Boolean)
+    const kind = parts[0]?.toLowerCase() === "share" ? String(parts[1] ?? "").toLowerCase() : String(parts[0] ?? "").toLowerCase()
+    const code = parts[0]?.toLowerCase() === "share" ? String(parts[2] ?? "").trim() : String(parts[1] ?? "").trim()
+    if (!code) return null
+    if (!["p", "reel", "tv"].includes(kind)) return null
+    return `https://www.instagram.com/${kind}/${code}/embed`
+  } catch {
+    return null
+  }
+}
+
 async function loadPostBySlug(slug: string, preferredLanguage: "pt-BR" | "es") {
   const [preferred] = await db`
     SELECT
       p.title,
       p.slug,
       p.excerpt,
+      p.post_type,
+      p.instagram_url,
       p.content_html,
       p.language,
       p.published_at,
@@ -57,6 +80,8 @@ async function loadPostBySlug(slug: string, preferredLanguage: "pt-BR" | "es") {
       p.title,
       p.slug,
       p.excerpt,
+      p.post_type,
+      p.instagram_url,
       p.content_html,
       p.language,
       p.published_at,
@@ -93,6 +118,8 @@ export default async function DashboardBlogPostPage({ params }: Params) {
 
   if (!post) notFound()
 
+  const instagramEmbed = post.post_type === "instagram" ? instagramEmbedUrl(post.instagram_url) : null
+
   return (
     <div className="p-4 md:p-6 text-white space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -123,8 +150,20 @@ export default async function DashboardBlogPostPage({ params }: Params) {
 
           {post.excerpt ? <p className="text-slate-200">{post.excerpt}</p> : null}
 
+          {instagramEmbed ? (
+            <div className="rounded-xl overflow-hidden border border-white/10 bg-black/40 aspect-[9/16] w-full max-w-[420px] mx-auto">
+              <iframe
+                src={instagramEmbed}
+                title={`instagram-post-${post.slug}`}
+                className="w-full h-full"
+                loading="lazy"
+                allowFullScreen
+              />
+            </div>
+          ) : null}
+
           <article
-            className="space-y-3 leading-relaxed text-slate-100 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:text-xl [&_h3]:font-semibold [&_h4]:text-lg [&_h4]:font-semibold [&_p]:text-slate-100 [&_p]:mb-3 [&_img]:rounded-lg [&_img]:border [&_img]:border-white/10 [&_img]:my-4 [&_img]:w-full [&_img]:max-h-[460px] [&_img]:object-contain [&_img]:bg-slate-900/30 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400 [&_blockquote]:pl-4 [&_blockquote]:italic [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_hr]:border-white/15 [&_iframe]:my-4 [&_iframe]:w-full [&_iframe]:max-w-[760px] [&_iframe]:h-[420px] [&_iframe]:max-h-[55vh] [&_iframe]:mx-auto [&_iframe]:rounded-lg [&_iframe]:border [&_iframe]:border-white/10 [&_video]:my-4 [&_video]:w-full [&_video]:max-w-[760px] [&_video]:max-h-[55vh] [&_video]:mx-auto [&_video]:rounded-lg [&_video]:border [&_video]:border-white/10 [&_video]:bg-slate-900/30 [&_.blog-embed]:max-w-[760px] [&_.blog-embed]:mx-auto"
+            className="space-y-3 leading-relaxed text-slate-100 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:text-xl [&_h3]:font-semibold [&_h4]:text-lg [&_h4]:font-semibold [&_p]:text-slate-100 [&_p]:mb-3 [&_img]:rounded-lg [&_img]:border [&_img]:border-white/10 [&_img]:my-4 [&_img]:w-full [&_img]:max-h-[460px] [&_img]:object-contain [&_img]:bg-slate-900/30 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400 [&_blockquote]:pl-4 [&_blockquote]:italic [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_hr]:border-white/15 [&_iframe]:my-4 [&_iframe]:w-full [&_iframe]:max-w-[760px] [&_iframe]:h-[420px] [&_iframe]:max-h-[55vh] [&_iframe]:mx-auto [&_iframe]:rounded-lg [&_iframe]:border [&_iframe]:border-white/10 [&_video]:my-4 [&_video]:w-full [&_video]:max-w-[760px] [&_video]:max-h-[55vh] [&_video]:mx-auto [&_video]:rounded-lg [&_video]:border [&_video]:border-white/10 [&_video]:bg-slate-900/30 [&_.blog-embed]:max-w-[760px] [&_.blog-embed]:mx-auto [&_.blog-embed-instagram]:aspect-[9/16] [&_.blog-embed-instagram]:w-full [&_.blog-embed-instagram]:max-w-[420px] [&_.blog-embed-instagram]:overflow-hidden [&_.blog-embed-instagram]:rounded-lg [&_.blog-embed-instagram]:border [&_.blog-embed-instagram]:border-white/10 [&_.blog-embed-instagram]:bg-black/40 [&_.blog-embed-instagram]:mx-auto [&_.blog-embed-instagram_iframe]:h-full [&_.blog-embed-instagram_iframe]:max-h-none"
             dangerouslySetInnerHTML={{ __html: post.content_html || "" }}
           />
         </CardContent>
@@ -132,3 +171,5 @@ export default async function DashboardBlogPostPage({ params }: Params) {
     </div>
   )
 }
+
+

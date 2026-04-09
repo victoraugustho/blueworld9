@@ -2,10 +2,12 @@ import { db } from "@/lib/db"
 import { ensureRuntimeSchema } from "@/lib/runtime-schema"
 export const BLOG_LANGUAGES = ["pt-BR", "es"] as const
 export const BLOG_STATUSES = ["draft", "review", "scheduled", "published", "archived"] as const
+export const BLOG_POST_TYPES = ["article", "instagram"] as const
 export const BLOG_ASSET_USAGE_TYPES = ["cover", "inline", "gallery", "seo"] as const
 
 export type BlogLanguage = (typeof BLOG_LANGUAGES)[number]
 export type BlogStatus = (typeof BLOG_STATUSES)[number]
+export type BlogPostType = (typeof BLOG_POST_TYPES)[number]
 export type BlogAssetUsageType = (typeof BLOG_ASSET_USAGE_TYPES)[number]
 
 type AnyRecord = Record<string, any>
@@ -29,6 +31,23 @@ function safeUrl(value: unknown) {
   if (!raw) return null
   if (raw.startsWith("/") || raw.startsWith("http://") || raw.startsWith("https://")) return raw
   return null
+}
+
+function instagramEmbedUrl(value: unknown) {
+  const normalized = normalizeInstagramUrl(value)
+  if (!normalized) return null
+
+  try {
+    const parsed = new URL(normalized)
+    const parts = parsed.pathname.split("/").filter(Boolean)
+    const kind = String(parts[0] ?? "").toLowerCase()
+    const code = String(parts[1] ?? "").trim()
+    if (!code) return null
+    if (!["p", "reel", "tv"].includes(kind)) return null
+    return `https://www.instagram.com/${kind}/${code}/embed`
+  } catch {
+    return null
+  }
 }
 
 function renderInlineNodes(children: unknown) {
@@ -183,6 +202,11 @@ function renderEmbed(block: AnyRecord) {
     return `<div class="blog-embed"><iframe src="${escapeHtml(url)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>`
   }
 
+  const igEmbed = instagramEmbedUrl(url)
+  if (igEmbed) {
+    return `<div class="blog-embed blog-embed-instagram"><iframe src="${escapeHtml(igEmbed)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>`
+  }
+
   return `<p><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a></p>`
 }
 
@@ -196,6 +220,45 @@ export function normalizeBlogStatus(value: unknown): BlogStatus {
   if (value === "published") return "published"
   if (value === "archived") return "archived"
   return "draft"
+}
+
+export function normalizeBlogPostType(value: unknown): BlogPostType {
+  return value === "instagram" ? "instagram" : "article"
+}
+
+export function normalizeInstagramUrl(value: unknown) {
+  const raw = String(value ?? "").trim()
+  if (!raw) return null
+
+  const candidate = raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`
+
+  try {
+    const parsed = new URL(candidate)
+    const host = parsed.hostname.toLowerCase()
+    const isInstagramHost = host === "instagram.com" || host === "www.instagram.com" || host.endsWith(".instagram.com")
+    if (!isInstagramHost) return null
+
+    const parts = parsed.pathname.split("/").filter(Boolean)
+    let kind = ""
+    let code = ""
+
+    if (parts[0]?.toLowerCase() === "share") {
+      kind = String(parts[1] ?? "").toLowerCase()
+      code = String(parts[2] ?? "").trim()
+    } else {
+      kind = String(parts[0] ?? "").toLowerCase()
+      code = String(parts[1] ?? "").trim()
+    }
+
+    if (!["p", "reel", "tv"].includes(kind) || !code) return null
+
+    parsed.pathname = `/${kind}/${code}/`
+    parsed.search = ""
+    parsed.hash = ""
+    return parsed.toString()
+  } catch {
+    return null
+  }
 }
 
 export function normalizeBlogContent(value: unknown): BlogContent {
@@ -524,7 +587,7 @@ export function parsePagination(input: URLSearchParams, defaults?: { pageSize?: 
 }
 
 export async function ensureBlogSchema() {
-  await ensureRuntimeSchema("schema:blog:v1", async () => {
+  await ensureRuntimeSchema("schema:blog:v2", async () => {
   await db`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`
 
   await db`
@@ -725,6 +788,38 @@ export async function ensureBlogSchema() {
     ALTER TABLE public.blog_posts
       ADD COLUMN IF NOT EXISTS cover_asset_id UUID REFERENCES public.blog_assets(id) ON DELETE SET NULL,
       ADD COLUMN IF NOT EXISTS seo_image_asset_id UUID REFERENCES public.blog_assets(id) ON DELETE SET NULL
+  `
+
+  await db`
+    ALTER TABLE public.blog_posts
+      ADD COLUMN IF NOT EXISTS post_type TEXT,
+      ADD COLUMN IF NOT EXISTS instagram_url TEXT
+  `
+
+  await db`
+    UPDATE public.blog_posts
+    SET post_type = 'article'
+    WHERE post_type IS NULL
+  `
+
+  await db`
+    ALTER TABLE public.blog_posts
+      ALTER COLUMN post_type SET DEFAULT 'article',
+      ALTER COLUMN post_type SET NOT NULL
+  `
+
+  await db`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'blog_posts_post_type_check'
+      ) THEN
+        ALTER TABLE public.blog_posts
+          ADD CONSTRAINT blog_posts_post_type_check
+          CHECK (post_type IN ('article', 'instagram'));
+      END IF;
+    END
+    $$;
   `
 
   await db`

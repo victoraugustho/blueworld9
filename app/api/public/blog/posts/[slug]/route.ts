@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import {
   BLOG_LANGUAGES,
@@ -41,6 +41,8 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       p.title,
       p.slug,
       p.excerpt,
+      p.post_type,
+      p.instagram_url,
       p.content_json,
       p.content_html,
       p.language,
@@ -89,6 +91,8 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     title: row.title,
     slug: row.slug,
     excerpt: row.excerpt,
+    post_type: row.post_type === "instagram" ? "instagram" : "article",
+    instagram_url: row.instagram_url ?? null,
     content_html: format === "html" ? html : null,
     content_json: format === "json" ? content : null,
     language: row.language,
@@ -104,3 +108,4 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     tags: Array.isArray(row.tags) ? row.tags : [],
   })
 }
+

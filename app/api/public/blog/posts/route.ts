@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { BLOG_LANGUAGES, ensureBlogSchema, normalizeBlogLanguage, parsePagination } from "@/lib/blog"
 
@@ -79,6 +79,8 @@ export async function GET(req: NextRequest) {
       p.title,
       p.slug,
       p.excerpt,
+      p.post_type,
+      p.instagram_url,
       p.language,
       p.published_at,
       p.read_time_minutes,
@@ -111,6 +113,8 @@ export async function GET(req: NextRequest) {
     title: item.title,
     slug: item.slug,
     excerpt: item.excerpt,
+    post_type: item.post_type === "instagram" ? "instagram" : "article",
+    instagram_url: item.instagram_url ?? null,
     language: item.language,
     published_at: item.published_at,
     read_time_minutes: item.read_time_minutes,
@@ -132,3 +136,4 @@ export async function GET(req: NextRequest) {
     total: Number(countRow?.total ?? 0),
   })
 }
+

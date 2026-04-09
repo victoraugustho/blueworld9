@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
 import { getDefaultTimezone } from "@/lib/timezones"
+import { ensureGradebookSchema, isUuid } from "@/lib/gradebook"
 
 function isValidDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -29,23 +30,47 @@ export async function GET(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
 
+  await ensureGradebookSchema()
+
   const { searchParams } = new URL(req.url)
+  const classId = String(searchParams.get("classId") ?? "").trim()
+  const scheduleId = String(searchParams.get("scheduleId") ?? "").trim()
   const classLabel = searchParams.get("class")?.trim() || null
 
-  const rows = classLabel
-    ? await db`
-        SELECT *
-        FROM teacher_lesson_logs
-        WHERE teacher_id = ${auth.teacherId}
-          AND class_label = ${classLabel}
-        ORDER BY class_label ASC, lesson_number DESC, lesson_date DESC
-      `
-    : await db`
-        SELECT *
-        FROM teacher_lesson_logs
-        WHERE teacher_id = ${auth.teacherId}
-        ORDER BY class_label ASC, lesson_number DESC, lesson_date DESC
-      `
+  let rows: any[] = []
+
+  if (classId && isUuid(classId)) {
+    rows = await db`
+      SELECT *
+      FROM teacher_lesson_logs
+      WHERE teacher_id = ${auth.teacherId}
+        AND class_id = ${classId}
+      ORDER BY class_label ASC, lesson_number DESC, lesson_date DESC
+    `
+  } else if (scheduleId && isUuid(scheduleId)) {
+    rows = await db`
+      SELECT *
+      FROM teacher_lesson_logs
+      WHERE teacher_id = ${auth.teacherId}
+        AND schedule_id = ${scheduleId}
+      ORDER BY class_label ASC, lesson_number DESC, lesson_date DESC
+    `
+  } else if (classLabel) {
+    rows = await db`
+      SELECT *
+      FROM teacher_lesson_logs
+      WHERE teacher_id = ${auth.teacherId}
+        AND class_label = ${classLabel}
+      ORDER BY class_label ASC, lesson_number DESC, lesson_date DESC
+    `
+  } else {
+    rows = await db`
+      SELECT *
+      FROM teacher_lesson_logs
+      WHERE teacher_id = ${auth.teacherId}
+      ORDER BY class_label ASC, lesson_number DESC, lesson_date DESC
+    `
+  }
 
   return NextResponse.json(rows)
 }
@@ -54,15 +79,19 @@ export async function POST(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
 
+  await ensureGradebookSchema()
+
   const body = await req.json()
   const schedule_id_raw = String(body.schedule_id ?? "").trim()
-  const schedule_id = schedule_id_raw ? schedule_id_raw : null
+  const schedule_id = schedule_id_raw && isUuid(schedule_id_raw) ? schedule_id_raw : null
+  const class_id_raw = String(body.class_id ?? "").trim()
+  let class_id = class_id_raw && isUuid(class_id_raw) ? class_id_raw : null
   let class_label = String(body.class_label ?? "").trim()
   let timezone: string | null = null
 
   if (schedule_id) {
     const [schedule] = await db`
-      SELECT id, class_label, timezone
+      SELECT id, class_id, class_label, timezone
       FROM teacher_schedules
       WHERE id = ${schedule_id}
         AND teacher_id = ${auth.teacherId}
@@ -70,22 +99,44 @@ export async function POST(req: NextRequest) {
     `
 
     if (!schedule) {
-      return NextResponse.json({ error: "Agendamento inválido" }, { status: 400 })
+      return NextResponse.json({ error: "Agendamento invalido" }, { status: 400 })
     }
 
-    class_label = schedule.class_label
+    class_label = String(schedule.class_label ?? "").trim()
     timezone = schedule.timezone
+
+    if (schedule.class_id) {
+      class_id = String(schedule.class_id)
+    }
+  }
+
+  if (class_id) {
+    const [classRow] = await db`
+      SELECT id, name
+      FROM teacher_classes
+      WHERE id = ${class_id}
+        AND teacher_id = ${auth.teacherId}
+      LIMIT 1
+    `
+
+    if (!classRow) {
+      return NextResponse.json({ error: "Turma invalida" }, { status: 400 })
+    }
+
+    if (!class_label) {
+      class_label = String(classRow.name ?? "").trim()
+    }
   }
 
   if (!class_label) {
-    return NextResponse.json({ error: "Turma obrigatória" }, { status: 400 })
+    return NextResponse.json({ error: "Turma obrigatoria" }, { status: 400 })
   }
 
   const lesson_date_raw = String(body.lesson_date ?? "").trim()
   let lesson_date = ""
   if (lesson_date_raw) {
     if (!isValidDate(lesson_date_raw)) {
-      return NextResponse.json({ error: "Data inválida" }, { status: 400 })
+      return NextResponse.json({ error: "Data invalida" }, { status: 400 })
     }
     lesson_date = lesson_date_raw
   } else {
@@ -101,21 +152,67 @@ export async function POST(req: NextRequest) {
   await db.begin(async (tx) => {
     const sql = (tx as any).sql ?? tx
 
-    const [last] = await sql`
-      SELECT lesson_number
-      FROM teacher_lesson_logs
-      WHERE teacher_id = ${auth.teacherId}
-        AND class_label = ${class_label}
-      ORDER BY lesson_number DESC
-      LIMIT 1
-      FOR UPDATE
-    `
+    let lastRows: any[] = []
 
+    if (class_id) {
+      lastRows = await sql`
+        SELECT lesson_number
+        FROM teacher_lesson_logs
+        WHERE teacher_id = ${auth.teacherId}
+          AND class_id = ${class_id}
+        ORDER BY lesson_number DESC
+        LIMIT 1
+        FOR UPDATE
+      `
+    } else if (schedule_id) {
+      lastRows = await sql`
+        SELECT lesson_number
+        FROM teacher_lesson_logs
+        WHERE teacher_id = ${auth.teacherId}
+          AND schedule_id = ${schedule_id}
+          AND class_id IS NULL
+        ORDER BY lesson_number DESC
+        LIMIT 1
+        FOR UPDATE
+      `
+    } else {
+      lastRows = await sql`
+        SELECT lesson_number
+        FROM teacher_lesson_logs
+        WHERE teacher_id = ${auth.teacherId}
+          AND class_label = ${class_label}
+          AND class_id IS NULL
+          AND schedule_id IS NULL
+        ORDER BY lesson_number DESC
+        LIMIT 1
+        FOR UPDATE
+      `
+    }
+
+    const last = lastRows[0]
     const nextNumber = Number(last?.lesson_number ?? 0) + 1
 
     const [row] = await sql`
-      INSERT INTO teacher_lesson_logs (teacher_id, schedule_id, class_label, lesson_number, lesson_date, notes, observations)
-      VALUES (${auth.teacherId}, ${schedule_id}, ${class_label}, ${nextNumber}, ${lesson_date}, ${notes}, ${observations})
+      INSERT INTO teacher_lesson_logs (
+        teacher_id,
+        schedule_id,
+        class_id,
+        class_label,
+        lesson_number,
+        lesson_date,
+        notes,
+        observations
+      )
+      VALUES (
+        ${auth.teacherId},
+        ${schedule_id},
+        ${class_id},
+        ${class_label},
+        ${nextNumber},
+        ${lesson_date},
+        ${notes},
+        ${observations}
+      )
       RETURNING *
     `
 
@@ -134,6 +231,7 @@ export async function POST(req: NextRequest) {
     },
     target: { type: "lesson_log", id: created?.id },
     metadata: {
+      class_id,
       class_label,
       lesson_number: created?.lesson_number,
       lesson_date,

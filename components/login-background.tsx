@@ -8,16 +8,21 @@ function seededRandom(seed: number) {
   return x - Math.floor(x)
 }
 
+function round(value: number, decimals = 4) {
+  const factor = 10 ** decimals
+  return Math.round(value * factor) / factor
+}
+
 function LoginBackgroundComponent() {
   const dots = useMemo(() => {
     return [...Array(26)].map((_, i) => ({
-      size: 1 + seededRandom(i + 10) * 2.2,
-      top: seededRandom(i + 20) * 100,
-      left: seededRandom(i + 30) * 100,
-      opacity: 0.1 + seededRandom(i + 40) * 0.22,
-      blur: seededRandom(i + 50) * 2,
-      duration: 5 + seededRandom(i + 60) * 6,
-      delay: seededRandom(i + 70) * 5,
+      size: round(1 + seededRandom(i + 10) * 2.2, 4),
+      top: round(seededRandom(i + 20) * 100, 4),
+      left: round(seededRandom(i + 30) * 100, 4),
+      opacity: round(0.1 + seededRandom(i + 40) * 0.22, 6),
+      blur: round(seededRandom(i + 50) * 2, 6),
+      duration: round(5 + seededRandom(i + 60) * 6, 5),
+      delay: round(seededRandom(i + 70) * 5, 5),
     }))
   }, [])
 
@@ -29,11 +34,11 @@ function LoginBackgroundComponent() {
   const iconPositions = useMemo(() => {
     return icons.map((_, i) => ({
       size: 44 + (i % 3) * 18,
-      top: 8 + seededRandom(i + 120) * 84,
-      left: 8 + seededRandom(i + 180) * 84,
-      delay: i * 1.1,
-      duration: 8 + (i % 4) * 2,
-      opacity: 0.22 + (i % 3) * 0.08,
+      top: round(8 + seededRandom(i + 120) * 84, 4),
+      left: round(8 + seededRandom(i + 180) * 84, 4),
+      delay: round(i * 1.1, 4),
+      duration: round(8 + (i % 4) * 2, 4),
+      opacity: round(0.22 + (i % 3) * 0.08, 4),
     }))
   }, [icons])
 

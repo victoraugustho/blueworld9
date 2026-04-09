@@ -23,6 +23,11 @@ function seededRandom(seed: number) {
   return x - Math.floor(x);
 }
 
+function round(value: number, decimals = 4) {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
 function AnimatedBackgroundComponent({ variant = "default" }: AnimatedBackgroundProps) {
   /* ÍCONES FIXOS POR VARIANTE */
   const icons = useMemo(() => {
@@ -42,45 +47,45 @@ function AnimatedBackgroundComponent({ variant = "default" }: AnimatedBackground
   const iconPositions = useMemo(() => {
     return icons.map((_, i) => ({
       size: 40 + (i % 3) * 25,  
-      top: 5 + seededRandom(i + 10) * 90,
-      left: 5 + seededRandom(i + 20) * 90,
-      delay: i * 0.8,
-      opacity: 0.18 + (i % 3) * 0.07, 
+      top: round(5 + seededRandom(i + 10) * 90, 4),
+      left: round(5 + seededRandom(i + 20) * 90, 4),
+      delay: round(i * 0.8, 4),
+      opacity: round(0.18 + (i % 3) * 0.07, 4), 
     }));
   }, [icons]);
 
   /* PARTICLES LAYER 1 */
   const particles1 = useMemo(() => {
     return [...Array(40)].map((_, i) => ({
-      size: 1 + seededRandom(i + 30) * 3,
-      top: seededRandom(i + 40) * 100,
-      left: seededRandom(i + 50) * 100,
-      opacity: 0.2 + seededRandom(i + 60) * 0.4,
-      blur: seededRandom(i + 70) * 2,
-      duration: 2 + seededRandom(i + 80) * 3,
-      delay: seededRandom(i + 90) * 3,
+      size: round(1 + seededRandom(i + 30) * 3, 4),
+      top: round(seededRandom(i + 40) * 100, 4),
+      left: round(seededRandom(i + 50) * 100, 4),
+      opacity: round(0.2 + seededRandom(i + 60) * 0.4, 6),
+      blur: round(seededRandom(i + 70) * 2, 6),
+      duration: round(2 + seededRandom(i + 80) * 3, 5),
+      delay: round(seededRandom(i + 90) * 3, 5),
     }));
   }, []);
 
   /* PARTICLES LAYER 2 */
   const particles2 = useMemo(() => {
     return [...Array(40)].map((_, i) => ({
-      size: 1 + seededRandom(i + 100) * 3,
-      top: seededRandom(i + 110) * 100,
-      left: seededRandom(i + 120) * 100,
-      blur: 1 + seededRandom(i + 130) * 3,
-      duration: 3 + seededRandom(i + 140) * 4,
+      size: round(1 + seededRandom(i + 100) * 3, 4),
+      top: round(seededRandom(i + 110) * 100, 4),
+      left: round(seededRandom(i + 120) * 100, 4),
+      blur: round(1 + seededRandom(i + 130) * 3, 6),
+      duration: round(3 + seededRandom(i + 140) * 4, 5),
     }));
   }, []);
 
   /* PARTICLES LAYER 3 */
   const particles3 = useMemo(() => {
     return [...Array(20)].map((_, i) => ({
-      size: 2 + seededRandom(i + 200) * 4,
-      top: seededRandom(i + 210) * 100,
-      left: seededRandom(i + 220) * 100,
-      blur: 2 + seededRandom(i + 230) * 5,
-      duration: 4 + seededRandom(i + 240) * 5,
+      size: round(2 + seededRandom(i + 200) * 4, 4),
+      top: round(seededRandom(i + 210) * 100, 4),
+      left: round(seededRandom(i + 220) * 100, 4),
+      blur: round(2 + seededRandom(i + 230) * 5, 6),
+      duration: round(4 + seededRandom(i + 240) * 5, 5),
     }));
   }, []);
   return (

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireRestrictedAdminApi } from "@/lib/auth/restricted-admin-server"
 import { writeAuditLog } from "@/lib/audit"
@@ -104,6 +104,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       title = ${String(post.title ?? "")},
       slug = ${String(post.slug ?? "")},
       excerpt = ${post.excerpt ?? null},
+      post_type = ${String(post.post_type ?? "article")},
+      instagram_url = ${post.instagram_url ?? null},
       content_json = ${restoredContentJson}::jsonb,
       content_html = ${post.content_html ?? null},
       content_text = ${post.content_text ?? null},
@@ -141,4 +143,6 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const restored = await loadPostForAdmin(postId)
   return NextResponse.json({ success: true, post: restored })
 }
+
+
 

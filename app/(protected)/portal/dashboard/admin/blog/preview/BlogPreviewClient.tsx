@@ -11,6 +11,8 @@ type PreviewData = {
   excerpt?: string
   language?: "pt-BR" | "es"
   status?: "draft" | "review" | "scheduled" | "published" | "archived"
+  post_type?: "article" | "instagram"
+  instagram_url?: string | null
   scheduled_at?: string | null
   cover_asset_id?: string | null
   cover_image_url?: string | null
@@ -67,6 +69,25 @@ function youtubeEmbedUrl(raw: string) {
   }
 
   return null
+}
+
+function instagramEmbedUrl(raw: string) {
+  const url = safeString(raw)
+  if (!url) return null
+
+  try {
+    const parsed = new URL(url)
+    const host = parsed.hostname.toLowerCase()
+    if (!(host === "instagram.com" || host === "www.instagram.com" || host.endsWith(".instagram.com"))) return null
+    const parts = parsed.pathname.split("/").filter(Boolean)
+    const kind = parts[0]?.toLowerCase() === "share" ? String(parts[1] ?? "").toLowerCase() : String(parts[0] ?? "").toLowerCase()
+    const code = parts[0]?.toLowerCase() === "share" ? String(parts[2] ?? "").trim() : String(parts[1] ?? "").trim()
+    if (!code) return null
+    if (!["p", "reel", "tv"].includes(kind)) return null
+    return `https://www.instagram.com/${kind}/${code}/embed`
+  } catch {
+    return null
+  }
 }
 
 function formatDateTime(value?: string | null) {
@@ -134,6 +155,11 @@ export default function BlogPreviewClient() {
     return data?.content_json?.blocks ?? []
   }, [data])
 
+  const previewInstagramEmbed = useMemo(() => {
+    if (data?.post_type !== "instagram") return null
+    return instagramEmbedUrl(safeString(data.instagram_url))
+  }, [data])
+
   if (loading) {
     return <div className="p-6 text-white">Carregando preview...</div>
   }
@@ -170,6 +196,7 @@ export default function BlogPreviewClient() {
 
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300 flex flex-wrap gap-x-5 gap-y-1">
           <span>Status: {safeString(data.status) || "draft"}</span>
+          <span>Tipo: {data.post_type === "instagram" ? "Instagram" : "Artigo"}</span>
           <span>Idioma: {safeString(data.language) || "pt-BR"}</span>
           {formatDateTime(data.scheduled_at) && <span>Agendado: {formatDateTime(data.scheduled_at)}</span>}
           {formatDateTime(data.generated_at) && <span>Gerado em: {formatDateTime(data.generated_at)}</span>}
@@ -202,6 +229,18 @@ export default function BlogPreviewClient() {
             className="w-full max-h-[420px] object-cover rounded-2xl border border-white/10"
           />
         )}
+
+        {previewInstagramEmbed ? (
+          <div className="rounded-xl overflow-hidden border border-white/10 bg-black/40 aspect-[9/16] w-full max-w-[420px] mx-auto">
+            <iframe
+              src={previewInstagramEmbed}
+              title={`instagram-preview-${safeString(data.slug) || "post"}`}
+              className="w-full h-full"
+              loading="lazy"
+              allowFullScreen
+            />
+          </div>
+        ) : null}
 
         <article className="rounded-2xl border border-white/10 bg-slate-900/50 p-5 md:p-7 space-y-5 leading-relaxed">
           {blocks.length === 0 && <p className="text-slate-400">Sem blocos para exibir.</p>}
@@ -312,6 +351,21 @@ export default function BlogPreviewClient() {
                 )
               }
 
+              const igEmbed = instagramEmbedUrl(url)
+              if (igEmbed) {
+                return (
+                  <div key={index} className="rounded-xl overflow-hidden border border-white/10 bg-black/40 aspect-[9/16] w-full max-w-[420px] mx-auto">
+                    <iframe
+                      src={igEmbed}
+                      title={`instagram-embed-${index}`}
+                      className="w-full h-full"
+                      loading="lazy"
+                      allowFullScreen
+                    />
+                  </div>
+                )
+              }
+
               return (
                 <p key={index}>
                   <a href={url} target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">
@@ -332,4 +386,6 @@ export default function BlogPreviewClient() {
     </div>
   )
 }
+
+
 

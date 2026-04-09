@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -16,6 +16,8 @@ type BlogPostRow = {
   excerpt?: string | null
   language: BlogLanguage
   status: BlogStatus
+  post_type?: "article" | "instagram"
+  instagram_url?: string | null
   author_name?: string | null
   author_email?: string | null
   author_avatar_url?: string | null
@@ -251,9 +253,14 @@ export default function BlogPostsListClient() {
 
                 <div className="p-4 space-y-3 flex-1 flex flex-col">
                   <div className="flex items-center justify-between gap-2">
-                    <span className={`text-xs border rounded-full px-2 py-1 ${STATUS_BADGE_CLASS[post.status]}`}>
-                      {STATUS_LABEL[post.status]}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs border rounded-full px-2 py-1 ${STATUS_BADGE_CLASS[post.status]}`}>
+                        {STATUS_LABEL[post.status]}
+                      </span>
+                      <span className="text-xs border rounded-full px-2 py-1 bg-indigo-500/20 text-indigo-200 border-indigo-400/40">
+                        {post.post_type === "instagram" ? "Instagram" : "Artigo"}
+                      </span>
+                    </div>
                     <span className="text-[11px] text-slate-400">{post.language}</span>
                   </div>
 
@@ -291,9 +298,20 @@ export default function BlogPostsListClient() {
                   </div>
 
                   <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-                    <Link href={`/portal/dashboard/admin/blog/${post.id}`} className="text-cyan-300 text-sm hover:text-cyan-200">
-                      Leia mais
-                    </Link>
+                    {post.post_type === "instagram" && post.instagram_url ? (
+                      <a
+                        href={post.instagram_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-cyan-300 text-sm hover:text-cyan-200"
+                      >
+                        Ver no Instagram
+                      </a>
+                    ) : (
+                      <Link href={`/portal/dashboard/admin/blog/${post.id}`} className="text-cyan-300 text-sm hover:text-cyan-200">
+                        Leia mais
+                      </Link>
+                    )}
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/portal/dashboard/admin/blog/${post.id}`}
@@ -324,3 +342,5 @@ export default function BlogPostsListClient() {
     </div>
   )
 }
+
+

@@ -67,6 +67,7 @@ export function PortalSidebar({
       aulas: locale === "es" ? "Clases" : "Aulas",
       agenda: locale === "es" ? "Agenda" : "Agenda",
       materiais: locale === "es" ? "Materiales" : "Materiais",
+      notas: locale === "es" ? "Notas" : "Notas",
       notificacoes: locale === "es" ? "Notificaciones" : "Notifica\u00e7\u00f5es",
       reportBug: locale === "es" ? "Reportar problema" : "Relatar problema",
       adminMaterials: locale === "es" ? "Materiales (Admin)" : "Materiais (Admin)",
@@ -89,6 +90,7 @@ export function PortalSidebar({
       { href: "/portal/dashboard/aulas", label: t.menu.aulas, icon: BookOpen },
       { href: "/portal/dashboard/agenda", label: t.menu.agenda, icon: CalendarDays },
       { href: "/portal/dashboard/materiais", label: t.menu.materiais, icon: FileText },
+      { href: "/portal/dashboard/notas", label: t.menu.notas, icon: GraduationCap },
       { href: "/portal/dashboard/ia", label: t.menu.ai, icon: Sparkles },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -60,12 +60,76 @@ type LessonClass = {
   next_lesson: number
 }
 
+type GradebookStudent = {
+  student_id: string
+  full_name: string
+  active: boolean
+  entries_count: number
+  presence_count: number
+  absence_count: number
+  attendance_percent?: number | null
+  b1_final_grade?: number | null
+  b2_final_grade?: number | null
+  b3_final_grade?: number | null
+  b4_final_grade?: number | null
+}
+
+type GradebookClassBimester = {
+  bimester: number
+  students_with_final: number
+  total_students: number
+  closed: boolean
+  locked_at?: string | null
+}
+
+type GradebookClass = {
+  id: string
+  name: string
+  student_year?: number | null
+  school_year: number
+  active: boolean
+  student_count: number
+  active_student_count: number
+  lesson_count: number
+  last_lesson_date?: string | null
+  last_lesson_number?: number | null
+  students: GradebookStudent[]
+  bimesters: GradebookClassBimester[]
+}
+
+type GradebookRecentLesson = {
+  id: string
+  class_id: string
+  class_name: string
+  bimester: number
+  lesson_number: number
+  lesson_date?: string | null
+  notes?: string | null
+  entries_count: number
+  absences_count: number
+}
+
+type GradebookOverview = {
+  school_year: number
+  class_count: number
+  active_class_count: number
+  student_count: number
+  active_student_count: number
+  lesson_count: number
+}
+
 type TeacherInsights = {
   logs: AuditLog[]
   videoSummary: VideoSummary
   recentProgress: VideoProgress[]
   lessonSummary: LessonSummary
   lessonClasses: LessonClass[]
+  gradebook?: {
+    school_year: number
+    overview: GradebookOverview
+    classes: GradebookClass[]
+    recent_lessons: GradebookRecentLesson[]
+  }
 }
 
 const scheduleDays = [1, 2, 3, 4, 5]
@@ -137,6 +201,16 @@ function maskPhone(phone?: string) {
   return `(${ddd}) ${mid}-${end}`
 }
 
+function formatScore(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "-"
+  return Number(value).toFixed(2).replace(".", ",")
+}
+
+function formatPercent(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "-"
+  return `${Number(value).toFixed(1).replace(".", ",")}%`
+}
+
 export default function TeacherInfoClient({ teacherId }: { teacherId: string }) {
   const [teacher, setTeacher] = useState<Teacher | null>(null)
   const [schedules, setSchedules] = useState<TeacherSchedule[]>([])
@@ -146,6 +220,7 @@ export default function TeacherInfoClient({ teacherId }: { teacherId: string }) 
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState("")
   const [openClasses, setOpenClasses] = useState<Record<string, boolean>>({})
+  const [openGradebookClasses, setOpenGradebookClasses] = useState<Record<string, boolean>>({})
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
   const [scheduleSaving, setScheduleSaving] = useState(false)
   const [scheduleError, setScheduleError] = useState("")
@@ -370,6 +445,25 @@ export default function TeacherInfoClient({ teacherId }: { teacherId: string }) 
   function toggleClass(label: string) {
     setOpenClasses((prev) => ({ ...prev, [label]: !prev[label] }))
   }
+
+  function toggleGradebookClass(classId: string) {
+    setOpenGradebookClasses((prev) => ({ ...prev, [classId]: !prev[classId] }))
+  }
+
+  useEffect(() => {
+    const gradebookClasses = insights?.gradebook?.classes ?? []
+    if (gradebookClasses.length === 0) {
+      setOpenGradebookClasses({})
+      return
+    }
+    setOpenGradebookClasses((prev) => {
+      const next: Record<string, boolean> = {}
+      for (const item of gradebookClasses) {
+        next[item.id] = prev[item.id] ?? false
+      }
+      return next
+    })
+  }, [insights?.gradebook?.classes])
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 text-white space-y-8">
@@ -769,6 +863,194 @@ export default function TeacherInfoClient({ teacherId }: { teacherId: string }) 
                   </div>
                 )
               })}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-900/30 border border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white text-base flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-cyan-300" />
+                Notas, turmas e alunos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!insights && <p className="text-slate-400">Carregando informaÃ§Ãµes...</p>}
+              {insights && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                      <p className="text-xs text-white/60">Ano letivo</p>
+                      <p className="text-white mt-1 text-base font-semibold">
+                        {insights.gradebook?.overview?.school_year ?? "-"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                      <p className="text-xs text-white/60">Turmas</p>
+                      <p className="text-white mt-1 text-base font-semibold">
+                        {insights.gradebook?.overview?.class_count ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                      <p className="text-xs text-white/60">Turmas ativas</p>
+                      <p className="text-white mt-1 text-base font-semibold">
+                        {insights.gradebook?.overview?.active_class_count ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                      <p className="text-xs text-white/60">Alunos</p>
+                      <p className="text-white mt-1 text-base font-semibold">
+                        {insights.gradebook?.overview?.student_count ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                      <p className="text-xs text-white/60">Aulas lancadas</p>
+                      <p className="text-white mt-1 text-base font-semibold">
+                        {insights.gradebook?.overview?.lesson_count ?? 0}
+                      </p>
+                    </div>
+                  </div>
+
+                  {insights.gradebook?.classes?.length ? (
+                    <div className="space-y-3">
+                      {insights.gradebook.classes.map((item) => {
+                        const isOpen = openGradebookClasses[item.id] === true
+                        const studentYearLabel =
+                          item.student_year === null || item.student_year === undefined
+                            ? "Sem turma (ano)"
+                            : getTurmaYearLabel(Number(item.student_year))
+                        return (
+                          <div key={item.id} className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => toggleGradebookClass(item.id)}
+                              className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-white truncate">{item.name}</p>
+                                <p className="text-xs text-white/60">
+                                  {studentYearLabel} | {item.school_year}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] text-white/80 bg-white/10 border border-white/15 px-2 py-0.5 rounded-full">
+                                  {item.active_student_count}/{item.student_count} alunos ativos
+                                </span>
+                                <span className="text-[11px] text-cyan-100 bg-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                                  {item.lesson_count} aulas
+                                </span>
+                                {isOpen ? (
+                                  <ChevronUp className="w-4 h-4 text-white/70" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-white/70" />
+                                )}
+                              </div>
+                            </button>
+
+                            <div className="px-4 pb-3">
+                              <div className="flex flex-wrap gap-2">
+                                {item.bimesters.map((bim) => (
+                                  <span
+                                    key={`${item.id}-${bim.bimester}`}
+                                    className={`text-[11px] px-2 py-1 rounded-full border ${
+                                      bim.closed
+                                        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                                        : "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                                    }`}
+                                  >
+                                    B{bim.bimester}: {bim.students_with_final}/{bim.total_students} finais{" "}
+                                    {bim.closed ? "(fechado)" : "(aberto)"}
+                                  </span>
+                                ))}
+                              </div>
+                              {item.last_lesson_date && (
+                                <p className="text-[11px] text-white/50 mt-2">
+                                  Ultima aula: {formatDate(item.last_lesson_date)}{" "}
+                                  {item.last_lesson_number ? `| Aula ${item.last_lesson_number}` : ""}
+                                </p>
+                              )}
+                            </div>
+
+                            {isOpen && (
+                              <div className="border-t border-white/10 p-3">
+                                {item.students.length === 0 ? (
+                                  <p className="text-slate-400 text-sm">Sem alunos nesta turma.</p>
+                                ) : (
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-[760px] w-full text-sm">
+                                      <thead>
+                                        <tr className="text-white/60 text-xs border-b border-white/10">
+                                          <th className="text-left py-2 pr-2 font-medium">Aluno</th>
+                                          <th className="text-right py-2 px-2 font-medium">Pres.</th>
+                                          <th className="text-right py-2 px-2 font-medium">Falt.</th>
+                                          <th className="text-right py-2 px-2 font-medium">Freq.</th>
+                                          <th className="text-right py-2 px-2 font-medium">B1</th>
+                                          <th className="text-right py-2 px-2 font-medium">B2</th>
+                                          <th className="text-right py-2 px-2 font-medium">B3</th>
+                                          <th className="text-right py-2 pl-2 font-medium">B4</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {item.students.map((student) => (
+                                          <tr key={student.student_id} className="border-b border-white/5 text-white/80">
+                                            <td className="py-2 pr-2">
+                                              <div className="flex items-center gap-2">
+                                                <span className="truncate">{student.full_name}</span>
+                                                {!student.active && (
+                                                  <span className="text-[10px] text-rose-300 border border-rose-500/30 bg-rose-500/10 rounded-full px-1.5 py-0.5">
+                                                    Inativo
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="py-2 px-2 text-right">{student.presence_count}</td>
+                                            <td className="py-2 px-2 text-right">{student.absence_count}</td>
+                                            <td className="py-2 px-2 text-right">{formatPercent(student.attendance_percent)}</td>
+                                            <td className="py-2 px-2 text-right">{formatScore(student.b1_final_grade)}</td>
+                                            <td className="py-2 px-2 text-right">{formatScore(student.b2_final_grade)}</td>
+                                            <td className="py-2 px-2 text-right">{formatScore(student.b3_final_grade)}</td>
+                                            <td className="py-2 pl-2 text-right">{formatScore(student.b4_final_grade)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-slate-400 text-sm">Nenhuma turma de notas encontrada para este professor.</p>
+                  )}
+
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <h4 className="text-sm font-semibold text-white mb-3">Aulas recentes (lancamentos)</h4>
+                    {insights.gradebook?.recent_lessons?.length ? (
+                      <div className="space-y-2">
+                        {insights.gradebook.recent_lessons.map((lesson) => (
+                          <div
+                            key={lesson.id}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-slate-900/40 px-3 py-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm text-white truncate">
+                                {lesson.class_name} | B{lesson.bimester} | Aula {lesson.lesson_number}
+                              </p>
+                              <p className="text-xs text-white/60">
+                                {formatDate(lesson.lesson_date)} | {lesson.entries_count} lancamentos | {lesson.absences_count} faltas
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-slate-400 text-sm">Nenhum lancamento de notas registrado.</p>
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 

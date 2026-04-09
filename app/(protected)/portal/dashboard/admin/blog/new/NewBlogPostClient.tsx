@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 
 type BlogStatus = "draft" | "review" | "scheduled" | "published" | "archived"
 type BlogLanguage = "pt-BR" | "es"
+type BlogPostType = "article" | "instagram"
 type BlockType = "heading" | "paragraph" | "image" | "embed" | "list" | "quote" | "divider"
 
 type BlogCategory = { id: number; name: string }
@@ -29,6 +30,8 @@ type BlogPost = {
   excerpt?: string | null
   language: BlogLanguage
   status: BlogStatus
+  post_type?: BlogPostType
+  instagram_url?: string | null
   content_json: any
   category_ids?: number[]
   tag_ids?: number[]
@@ -76,6 +79,41 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .replace(/-{2,}/g, "-")
+}
+
+function normalizeInstagramUrl(value: string) {
+  const raw = String(value ?? "").trim()
+  if (!raw) return null
+
+  const candidate = raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`
+
+  try {
+    const parsed = new URL(candidate)
+    const host = parsed.hostname.toLowerCase()
+    const isInstagramHost = host === "instagram.com" || host === "www.instagram.com" || host.endsWith(".instagram.com")
+    if (!isInstagramHost) return null
+
+    const parts = parsed.pathname.split("/").filter(Boolean)
+    let kind = ""
+    let code = ""
+
+    if (parts[0]?.toLowerCase() === "share") {
+      kind = String(parts[1] ?? "").toLowerCase()
+      code = String(parts[2] ?? "").trim()
+    } else {
+      kind = String(parts[0] ?? "").toLowerCase()
+      code = String(parts[1] ?? "").trim()
+    }
+
+    if (!["p", "reel", "tv"].includes(kind) || !code) return null
+
+    parsed.pathname = `/${kind}/${code}/`
+    parsed.search = ""
+    parsed.hash = ""
+    return parsed.toString()
+  } catch {
+    return null
+  }
 }
 
 function toIso(local: string) {
@@ -255,6 +293,8 @@ export default function NewBlogPostClient({ postId }: { postId?: string } = {}) 
   const [excerpt, setExcerpt] = useState("")
   const [language, setLanguage] = useState<BlogLanguage>("pt-BR")
   const [status, setStatus] = useState<BlogStatus>("draft")
+  const [postType, setPostType] = useState<BlogPostType>("article")
+  const [instagramUrl, setInstagramUrl] = useState("")
   const [scheduledLocal, setScheduledLocal] = useState("")
 
   const [categoryIds, setCategoryIds] = useState<number[]>([])
@@ -274,6 +314,8 @@ export default function NewBlogPostClient({ postId }: { postId?: string } = {}) 
     setExcerpt(String(postData?.excerpt ?? ""))
     setLanguage((postData?.language as BlogLanguage) || "pt-BR")
     setStatus((postData?.status as BlogStatus) || "draft")
+    setPostType((postData?.post_type as BlogPostType) === "instagram" ? "instagram" : "article")
+    setInstagramUrl(String(postData?.instagram_url ?? ""))
     setScheduledLocal(toDateTimeLocal(postData?.scheduled_at))
     setCategoryIds(
       Array.isArray(postData?.category_ids)
@@ -536,13 +578,31 @@ export default function NewBlogPostClient({ postId }: { postId?: string } = {}) 
       return null
     }
 
-    const content_json = blocksToContent(blocks)
-    if (!Array.isArray(content_json.blocks) || content_json.blocks.length === 0) {
-      alert("Adicione blocos com conteudo")
-      return null
+    let content_json: any = { version: 1, blocks: [] }
+    let normalizedInstagramUrl: string | null = null
+
+    if (postType === "instagram") {
+      normalizedInstagramUrl = normalizeInstagramUrl(instagramUrl)
+      if (!normalizedInstagramUrl) {
+        alert("Informe um link valido do Instagram")
+        return null
+      }
+
+      const description = excerpt.trim()
+      const blocksList: any[] = [{ type: "embed", provider: "generic", url: normalizedInstagramUrl }]
+      if (description) {
+        blocksList.unshift({ type: "paragraph", children: [{ text: description }] })
+      }
+      content_json = { version: 1, blocks: blocksList }
+    } else {
+      content_json = blocksToContent(blocks)
+      if (!Array.isArray(content_json.blocks) || content_json.blocks.length === 0) {
+        alert("Adicione blocos com conteudo")
+        return null
+      }
     }
 
-    return { titleValue, content_json }
+    return { titleValue, content_json, normalizedInstagramUrl }
   }
 
   function buildPayload(targetStatus: BlogStatus) {
@@ -561,6 +621,8 @@ export default function NewBlogPostClient({ postId }: { postId?: string } = {}) 
       excerpt: excerpt.trim() || null,
       language,
       status: targetStatus,
+      post_type: postType,
+      instagram_url: postType === "instagram" ? base.normalizedInstagramUrl : null,
       scheduled_at,
       category_ids: categoryIds,
       tag_ids: tagIds,
@@ -630,6 +692,8 @@ export default function NewBlogPostClient({ postId }: { postId?: string } = {}) 
       excerpt: excerpt.trim(),
       language,
       status,
+      post_type: postType,
+      instagram_url: postType === "instagram" ? normalizeInstagramUrl(instagramUrl) : null,
       scheduled_at: toIso(scheduledLocal),
       cover_asset_id: coverAssetId || null,
       cover_image_url: coverImageUrl,
@@ -651,8 +715,8 @@ export default function NewBlogPostClient({ postId }: { postId?: string } = {}) 
     <div className="p-4 md:p-6 text-white space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">{isEditMode ? "Editar Post (Editor de Blocos)" : "Novo Post (Editor de Blocos)"}</h1>
-          <p className="text-sm text-slate-300">Titulo, subtitulo, texto, imagem e video no estilo blocos.</p>
+          <h1 className="text-2xl font-bold">{isEditMode ? "Editar Post" : "Novo Post"}</h1>
+          <p className="text-sm text-slate-300">{postType === "instagram" ? "Modo Instagram: link + descricao com card clicavel." : "Modo artigo: titulo, subtitulo, texto, imagem e video no editor de blocos."}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Link href="/portal/dashboard/admin/blog">
@@ -687,9 +751,36 @@ export default function NewBlogPostClient({ postId }: { postId?: string } = {}) 
           </div>
 
           <div>
-            <Label className="text-white">Resumo</Label>
+            <Label className="text-white">Resumo / descricao</Label>
             <Textarea className="mt-1 bg-slate-800/60 border-slate-700 text-white" rows={3} value={excerpt} onChange={(e) => setExcerpt(e.target.value)} />
           </div>
+
+          <div>
+            <Label className="text-white">Tipo de Post</Label>
+            <select
+              className="mt-1 w-full rounded-md bg-slate-800 border border-slate-700 text-white px-3 py-2"
+              value={postType}
+              onChange={(e) => setPostType(e.target.value as BlogPostType)}
+            >
+              <option value="article">Artigo</option>
+              <option value="instagram">Instagram</option>
+            </select>
+          </div>
+
+          {postType === "instagram" ? (
+            <div>
+              <Label className="text-white">Link do Instagram</Label>
+              <Input
+                className="mt-1 bg-slate-800/60 border-slate-700 text-white"
+                value={instagramUrl}
+                onChange={(e) => setInstagramUrl(e.target.value)}
+                placeholder="https://www.instagram.com/p/... ou /reel/..."
+              />
+              <p className="mt-2 text-xs text-slate-400">
+                Esse post sera exibido como card clicavel para abrir no Instagram.
+              </p>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             <div>
@@ -898,6 +989,12 @@ export default function NewBlogPostClient({ postId }: { postId?: string } = {}) 
           <CardTitle className="text-white text-base">Editor de Blocos</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {postType === "instagram" ? (
+            <p className="text-sm text-slate-300">
+              No modo Instagram, o post usa o link informado e a descricao. Os blocos ficam desativados.
+            </p>
+          ) : (
+            <>
           <div className="flex flex-wrap gap-2">
             <Button className="bg-cyan-600 hover:bg-cyan-700" onClick={() => addBlock("heading")}>+ Titulo/Subtitulo</Button>
             <Button className="bg-cyan-600 hover:bg-cyan-700" onClick={() => addBlock("paragraph")}>+ Texto</Button>
@@ -1011,8 +1108,19 @@ export default function NewBlogPostClient({ postId }: { postId?: string } = {}) 
               </div>
             )
           })}
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
   )
 }
+
+
+
+
+
+
+
+
+

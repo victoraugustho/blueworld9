@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
+import { ensureGradebookSchema, isUuid } from "@/lib/gradebook"
 
 function isValidTime(value: string) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
@@ -15,6 +16,8 @@ function timeToMinutes(value: string) {
 export async function GET(req: NextRequest) {
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
+
+  await ensureGradebookSchema()
 
   const { searchParams } = new URL(req.url)
   const teacherId = searchParams.get("teacherId")
@@ -44,16 +47,40 @@ export async function POST(req: NextRequest) {
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
 
+  await ensureGradebookSchema()
+
   const body = await req.json()
   const teacher_id = String(body.teacher_id ?? "").trim()
-  const class_label = String(body.class_label ?? "").trim()
+  const class_id_raw = String(body.class_id ?? "").trim()
+  const class_id = class_id_raw && isUuid(class_id_raw) ? class_id_raw : null
+  let class_label = String(body.class_label ?? "").trim()
   const weekday = Number(body.weekday)
   const start_time = String(body.start_time ?? "").trim()
   const end_time = String(body.end_time ?? "").trim()
   const timezone = String(body.timezone ?? "").trim()
   const active = body.active !== undefined ? !!body.active : true
 
-  if (!teacher_id || !class_label || !timezone) {
+  if (!teacher_id || !timezone) {
+    return NextResponse.json({ error: "Dados incompletos" }, { status: 400 })
+  }
+
+  if (class_id) {
+    const [classRow] = await db`
+      SELECT id, name
+      FROM teacher_classes
+      WHERE id = ${class_id}
+        AND teacher_id = ${teacher_id}
+      LIMIT 1
+    `
+    if (!classRow) {
+      return NextResponse.json({ error: "Turma invalida" }, { status: 400 })
+    }
+    if (!class_label) {
+      class_label = String(classRow.name ?? "").trim()
+    }
+  }
+
+  if (!class_label) {
     return NextResponse.json({ error: "Dados incompletos" }, { status: 400 })
   }
 
@@ -70,8 +97,8 @@ export async function POST(req: NextRequest) {
   }
 
   const [created] = await db`
-    INSERT INTO teacher_schedules (teacher_id, class_label, weekday, start_time, end_time, timezone, active)
-    VALUES (${teacher_id}, ${class_label}, ${weekday}, ${start_time}, ${end_time}, ${timezone}, ${active})
+    INSERT INTO teacher_schedules (teacher_id, class_id, class_label, weekday, start_time, end_time, timezone, active)
+    VALUES (${teacher_id}, ${class_id}, ${class_label}, ${weekday}, ${start_time}, ${end_time}, ${timezone}, ${active})
     RETURNING *
   `
 
@@ -86,7 +113,7 @@ export async function POST(req: NextRequest) {
       sessionId: admin.sessionId,
     },
     target: { type: "teacher_schedule", id: created?.id },
-    metadata: { teacher_id, class_label, weekday, start_time, end_time, timezone, active },
+    metadata: { teacher_id, class_id, class_label, weekday, start_time, end_time, timezone, active },
   })
 
   return NextResponse.json(created)

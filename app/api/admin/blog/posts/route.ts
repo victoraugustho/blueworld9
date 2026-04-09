@@ -1,13 +1,16 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireRestrictedAdminApi } from "@/lib/auth/restricted-admin-server"
 import { writeAuditLog } from "@/lib/audit"
 import {
   BLOG_LANGUAGES,
+  BLOG_POST_TYPES,
   BLOG_STATUSES,
   createBlogRevision,
   ensureBlogSchema,
   normalizeBlogLanguage,
+  normalizeBlogPostType,
+  normalizeInstagramUrl,
   normalizeBlogStatus,
   parsePagination,
   slugify,
@@ -25,6 +28,14 @@ import {
   replacePostRelations,
 } from "@/lib/blog-post-service"
 
+function buildInstagramContent(instagramUrl: string, excerpt: string | null) {
+  const blocks: any[] = [{ type: "embed", provider: "generic", url: instagramUrl }]
+  if (excerpt) {
+    blocks.unshift({ type: "paragraph", children: [{ text: excerpt }] })
+  }
+  return { version: 1, blocks }
+}
+
 export async function GET(req: NextRequest) {
   const admin = await requireRestrictedAdminApi()
   if (!admin.ok) return admin.response
@@ -37,6 +48,7 @@ export async function GET(req: NextRequest) {
   const q = String(search.get("q") ?? "").trim()
   const status = String(search.get("status") ?? "").trim()
   const language = String(search.get("language") ?? "").trim()
+  const postType = String(search.get("post_type") ?? "").trim()
   const categoryId = Number(search.get("category_id") ?? "")
   const tagId = Number(search.get("tag_id") ?? "")
   const authorId = String(search.get("author_id") ?? "").trim()
@@ -49,6 +61,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Idioma invalido" }, { status: 400 })
   }
 
+  if (postType && postType !== "all" && !BLOG_POST_TYPES.includes(postType as any)) {
+    return NextResponse.json({ error: "Tipo de post invalido" }, { status: 400 })
+  }
+
   const filters: any[] = [db`p.deleted_at IS NULL`]
 
   if (status && status !== "all") {
@@ -57,6 +73,10 @@ export async function GET(req: NextRequest) {
 
   if (language && language !== "all") {
     filters.push(db`p.language = ${language}`)
+  }
+
+  if (postType && postType !== "all") {
+    filters.push(db`p.post_type = ${postType}`)
   }
 
   if (Number.isInteger(categoryId) && categoryId > 0) {
@@ -101,6 +121,8 @@ export async function GET(req: NextRequest) {
       p.excerpt,
       p.language,
       p.status,
+      p.post_type,
+      p.instagram_url,
       p.author_id,
       p.cover_asset_id,
       p.seo_image_asset_id,
@@ -157,9 +179,11 @@ export async function POST(req: NextRequest) {
   const excerpt = String(body.excerpt ?? "").trim() || null
   const language = normalizeBlogLanguage(body.language)
   const status = normalizeBlogStatus(body.status)
+  const post_type = normalizeBlogPostType(body.post_type)
   const seo_title = String(body.seo_title ?? "").trim() || null
   const seo_description = String(body.seo_description ?? "").trim() || null
   const canonical_url = String(body.canonical_url ?? "").trim() || null
+  const instagram_url = post_type === "instagram" ? normalizeInstagramUrl(body.instagram_url) : null
   const noindex = body.noindex === true
   const author_id = admin.teacherId
   const cover_asset_id = normalizeUuidOrNull(body.cover_asset_id)
@@ -182,6 +206,10 @@ export async function POST(req: NextRequest) {
 
   if (!slug) {
     return NextResponse.json({ error: "Slug invalido" }, { status: 400 })
+  }
+
+  if (post_type === "instagram" && !instagram_url) {
+    return NextResponse.json({ error: "Link do Instagram invalido" }, { status: 400 })
   }
 
   if (status === "scheduled" && !scheduled_at) {
@@ -216,7 +244,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Existe tag invalida na selecao" }, { status: 400 })
   }
 
-  const prepared = await prepareBlogContent(body.content_json, cover_asset_id, seo_image_asset_id)
+  const contentInput =
+    post_type === "instagram"
+      ? buildInstagramContent(instagram_url as string, excerpt)
+      : body.content_json
+  const prepared = await prepareBlogContent(contentInput, cover_asset_id, seo_image_asset_id)
   const content_json_payload = JSON.stringify(prepared.content_json)
 
   if (!(await ensureAssetIdsExist(prepared.referencedAssetIds))) {
@@ -228,6 +260,8 @@ export async function POST(req: NextRequest) {
       title,
       slug,
       excerpt,
+      post_type,
+      instagram_url,
       content_json,
       content_html,
       content_text,
@@ -251,6 +285,8 @@ export async function POST(req: NextRequest) {
       ${title},
       ${slug},
       ${excerpt},
+      ${post_type},
+      ${instagram_url},
       ${content_json_payload}::jsonb,
       ${prepared.content_html},
       ${prepared.content_text},
@@ -291,6 +327,8 @@ export async function POST(req: NextRequest) {
       title,
       slug,
       status,
+      post_type,
+      instagram_url,
       language,
       category_count: category_ids.length,
       tag_count: tag_ids.length,
@@ -300,11 +338,4 @@ export async function POST(req: NextRequest) {
   const post = await loadPostForAdmin(created.id)
   return NextResponse.json({ success: true, post })
 }
-
-
-
-
-
-
-
 

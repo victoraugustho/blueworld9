@@ -1,4 +1,4 @@
-export interface Category {
+﻿export interface Category {
   id: number
   name: string
   created_at?: string
@@ -68,6 +68,7 @@ export interface Teacher {
 export interface TeacherSchedule {
   id: string
   teacher_id: string
+  class_id?: string | null
   class_label: string
   weekday: number
   start_time: string
@@ -82,6 +83,7 @@ export interface TeacherLessonLog {
   id: string
   teacher_id: string
   schedule_id?: string | null
+  class_id?: string | null
   class_label: string
   lesson_number: number
   lesson_date: string
@@ -96,10 +98,77 @@ export interface TeacherReminder {
   teacher_id: string
   content: string
   done: boolean
+  class_id?: string | null
+  schedule_id?: string | null
   class_label?: string | null
   lesson_number?: number | null
   created_at?: string
   updated_at?: string
+}
+
+export interface TeacherClass {
+  id: string
+  teacher_id: string
+  name: string
+  student_year?: number | null
+  school_year: number
+  active: boolean
+  student_count?: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface TeacherClassStudent {
+  id: string
+  class_id: string
+  full_name: string
+  enrollment_code?: string | null
+  active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export type AttendanceStatus = "present" | "absent"
+
+export interface TeacherGradeLesson {
+  id: string
+  teacher_id: string
+  class_id: string
+  school_year: number
+  bimester: number
+  lesson_number: number
+  lesson_date: string
+  notes?: string | null
+  entries_count?: number
+  absences_count?: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface TeacherGradeLessonEntry {
+  student_id: string
+  full_name: string
+  enrollment_code?: string | null
+  active: boolean
+  attendance: AttendanceStatus
+  c1?: number | null
+  c2?: number | null
+  c3?: number | null
+  c4?: number | null
+  comment?: string | null
+}
+
+export interface TeacherBimesterGradeEntry {
+  student_id: string
+  full_name: string
+  enrollment_code?: string | null
+  active: boolean
+  has_exam: boolean
+  exam_score?: number | null
+  c5_score?: number | null
+  manual_final_score?: number | null
+  notes?: string | null
+  updated_at?: string | null
 }
 
 export interface BugReport {

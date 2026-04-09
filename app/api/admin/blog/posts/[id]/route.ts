@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireRestrictedAdminApi } from "@/lib/auth/restricted-admin-server"
 import { writeAuditLog } from "@/lib/audit"
@@ -6,6 +6,8 @@ import {
   createBlogRevision,
   ensureBlogSchema,
   normalizeBlogLanguage,
+  normalizeBlogPostType,
+  normalizeInstagramUrl,
   normalizeBlogStatus,
   slugify,
   syncPostAssetUsage,
@@ -27,6 +29,14 @@ type Ctx = { params: Promise<{ id: string }> | { id: string } }
 function parseBoolean(value: unknown, fallback: boolean) {
   if (value === undefined) return fallback
   return value === true
+}
+
+function buildInstagramContent(instagramUrl: string, excerpt: string | null) {
+  const blocks: any[] = [{ type: "embed", provider: "generic", url: instagramUrl }]
+  if (excerpt) {
+    blocks.unshift({ type: "paragraph", children: [{ text: excerpt }] })
+  }
+  return { version: 1, blocks }
 }
 
 export async function GET(_req: NextRequest, ctx: Ctx) {
@@ -81,6 +91,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     body.language !== undefined ? normalizeBlogLanguage(body.language) : normalizeBlogLanguage(current.language)
   const status =
     body.status !== undefined ? normalizeBlogStatus(body.status) : normalizeBlogStatus(current.status)
+  const post_type =
+    body.post_type !== undefined ? normalizeBlogPostType(body.post_type) : normalizeBlogPostType(current.post_type)
 
   const seo_title =
     body.seo_title !== undefined ? String(body.seo_title ?? "").trim() || null : current.seo_title
@@ -104,6 +116,11 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     body.seo_image_asset_id !== undefined
       ? normalizeUuidOrNull(body.seo_image_asset_id)
       : normalizeUuidOrNull(current.seo_image_asset_id)
+
+  const instagram_url =
+    post_type === "instagram"
+      ? normalizeInstagramUrl(body.instagram_url !== undefined ? body.instagram_url : current.instagram_url)
+      : null
 
   const nextIds =
     body.category_ids !== undefined || body.tag_ids !== undefined
@@ -138,6 +155,10 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "Slug invalido" }, { status: 400 })
   }
 
+  if (post_type === "instagram" && !instagram_url) {
+    return NextResponse.json({ error: "Link do Instagram invalido" }, { status: 400 })
+  }
+
   if (status === "scheduled" && !scheduled_at) {
     return NextResponse.json({ error: "scheduled_at obrigatorio para status scheduled" }, { status: 400 })
   }
@@ -170,7 +191,13 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "Existe tag invalida na selecao" }, { status: 400 })
   }
 
-  const contentInput = body.content_json !== undefined ? body.content_json : current.content_json
+  const contentInput =
+    post_type === "instagram"
+      ? buildInstagramContent(instagram_url as string, excerpt)
+      : body.content_json !== undefined
+        ? body.content_json
+        : current.content_json
+
   const prepared = await prepareBlogContent(contentInput, cover_asset_id, seo_image_asset_id)
   const content_json_payload = JSON.stringify(prepared.content_json)
 
@@ -184,6 +211,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       title = ${title},
       slug = ${slug},
       excerpt = ${excerpt},
+      post_type = ${post_type},
+      instagram_url = ${instagram_url},
       content_json = ${content_json_payload}::jsonb,
       content_html = ${prepared.content_html},
       content_text = ${prepared.content_text},
@@ -226,6 +255,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       title,
       slug,
       status,
+      post_type,
+      instagram_url,
       language,
       category_count: category_ids.length,
       tag_count: tag_ids.length,
@@ -281,8 +312,4 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
 
   return NextResponse.json({ success: true })
 }
-
-
-
-
 

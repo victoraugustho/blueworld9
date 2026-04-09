@@ -12,6 +12,8 @@ import {
   Eye,
   Pencil,
   RefreshCcw,
+  Sunrise,
+  Sunset,
   Trash2,
 } from "lucide-react"
 import type { TeacherLessonLog, TeacherReminder, TeacherSchedule } from "@/app/types/portal"
@@ -21,9 +23,18 @@ type Locale = "pt-BR" | "es"
 
 type LessonForm = {
   schedule_id: string
+  class_id: string
   class_label: string
   notes: string
   observations: string
+}
+
+type ClassOption = {
+  key: string
+  label: string
+  class_id: string | null
+  schedule_id: string | null
+  class_label: string | null
 }
 
 function timeLabel(value: string) {
@@ -77,6 +88,32 @@ function isTruncated(value: string | null | undefined, max = 140) {
   return clean.length > max
 }
 
+function timeToMinutes(value: string) {
+  const [hRaw, mRaw] = String(value ?? "").split(":")
+  const h = Number(hRaw ?? 0)
+  const m = Number(mRaw ?? 0)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0
+  return Math.max(0, h * 60 + m)
+}
+
+function getScheduleScopeKey(schedule: TeacherSchedule) {
+  if (schedule.class_id) return `class:${schedule.class_id}`
+  return `schedule:${schedule.id}`
+}
+
+function getLogScopeKey(log: TeacherLessonLog) {
+  if (log.class_id) return `class:${log.class_id}`
+  if (log.schedule_id) return `schedule:${log.schedule_id}`
+  return `label:${log.class_label}`
+}
+
+function getReminderScopeKey(reminder: TeacherReminder) {
+  if (reminder.class_id) return `class:${reminder.class_id}`
+  if (reminder.schedule_id) return `schedule:${reminder.schedule_id}`
+  if (reminder.class_label) return `label:${reminder.class_label}`
+  return null
+}
+
 export default function AgendaClient({ locale }: { locale: Locale }) {
   const t = {
     title: locale === "es" ? "Agenda de Clases" : "Agenda de Aulas",
@@ -125,6 +162,8 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     reminderDone: locale === "es" ? "Completado" : "Concluído",
     reminderUndo: locale === "es" ? "Reabrir" : "Reabrir",
     reminderDelete: locale === "es" ? "Eliminar" : "Excluir",
+    morningShift: locale === "es" ? "Matutino" : "Matutino",
+    afternoonShift: locale === "es" ? "Vespertino" : "Vespertino",
   }
   const weekdayLabels = useMemo(
     () =>
@@ -160,7 +199,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
   const [openClasses, setOpenClasses] = useState<Record<string, boolean>>({})
   const [reminders, setReminders] = useState<TeacherReminder[]>([])
   const [reminderText, setReminderText] = useState("")
-  const [reminderClassLabel, setReminderClassLabel] = useState("")
+  const [reminderTargetKey, setReminderTargetKey] = useState("")
   const [reminderLessonNumber, setReminderLessonNumber] = useState("")
   const [reminderOpen, setReminderOpen] = useState(false)
   const [reminderSaving, setReminderSaving] = useState(false)
@@ -169,6 +208,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
 
   const [form, setForm] = useState<LessonForm>({
     schedule_id: "",
+    class_id: "",
     class_label: "",
     notes: "",
     observations: "",
@@ -235,33 +275,43 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     load()
   }, [])
 
-  const nextByClass = useMemo(() => {
+  const nextByScope = useMemo(() => {
     const map = new Map<string, number>()
     for (const log of logs) {
-      const current = map.get(log.class_label) ?? 0
-      if (log.lesson_number > current) map.set(log.class_label, log.lesson_number)
+      const scopeKey = getLogScopeKey(log)
+      const current = map.get(scopeKey) ?? 0
+      if (log.lesson_number > current) map.set(scopeKey, log.lesson_number)
     }
     const nextMap = new Map<string, number>()
     for (const schedule of schedules) {
-      const last = map.get(schedule.class_label) ?? 0
-      nextMap.set(schedule.class_label, last + 1)
+      const scopeKey = getScheduleScopeKey(schedule)
+      const last = map.get(scopeKey) ?? 0
+      nextMap.set(scopeKey, last + 1)
     }
-    for (const [label, last] of map.entries()) {
-      if (!nextMap.has(label)) nextMap.set(label, last + 1)
+    for (const [scopeKey, last] of map.entries()) {
+      if (!nextMap.has(scopeKey)) nextMap.set(scopeKey, last + 1)
     }
     return nextMap
   }, [logs, schedules])
 
   const groupedLogs = useMemo(() => {
-    const groups: Record<string, TeacherLessonLog[]> = {}
+    const groups = new Map<string, { key: string; label: string; items: TeacherLessonLog[] }>()
     for (const log of logs) {
-      if (!groups[log.class_label]) groups[log.class_label] = []
-      groups[log.class_label].push(log)
+      const key = getLogScopeKey(log)
+      const current = groups.get(key) ?? {
+        key,
+        label: String(log.class_label ?? "").trim() || "Turma",
+        items: [],
+      }
+      current.items.push(log)
+      groups.set(key, current)
     }
-    for (const key of Object.keys(groups)) {
-      groups[key].sort((a, b) => b.lesson_number - a.lesson_number)
+    const list = Array.from(groups.values())
+    for (const group of list) {
+      group.items.sort((a, b) => b.lesson_number - a.lesson_number)
     }
-    return groups
+    list.sort((a, b) => a.label.localeCompare(b.label))
+    return list
   }, [logs])
 
   const schedulesByWeekday = useMemo(() => {
@@ -275,28 +325,57 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     return map
   }, [schedules])
 
-  const classOptions = useMemo(() => {
-    const set = new Set<string>()
+  const classOptions = useMemo<ClassOption[]>(() => {
+    const map = new Map<string, ClassOption>()
     for (const schedule of schedules) {
-      if (schedule.class_label) set.add(schedule.class_label)
+      const key = getScheduleScopeKey(schedule)
+      if (map.has(key)) continue
+      const weekday = weekdayLabels[schedule.weekday] ?? String(schedule.weekday)
+      const label =
+        schedule.class_id
+          ? schedule.class_label
+          : `${schedule.class_label} - ${weekday} ${timeLabel(schedule.start_time)}-${timeLabel(schedule.end_time)}`
+      map.set(key, {
+        key,
+        label: String(label ?? "").trim(),
+        class_id: schedule.class_id ? String(schedule.class_id) : null,
+        schedule_id: schedule.class_id ? null : schedule.id,
+        class_label: schedule.class_label ?? null,
+      })
     }
     for (const log of logs) {
-      if (log.class_label) set.add(log.class_label)
+      const key = getLogScopeKey(log)
+      if (map.has(key)) continue
+      map.set(key, {
+        key,
+        label: String(log.class_label ?? "").trim() || "Turma",
+        class_id: log.class_id ? String(log.class_id) : null,
+        schedule_id: !log.class_id && log.schedule_id ? String(log.schedule_id) : null,
+        class_label: log.class_label ?? null,
+      })
     }
-    return Array.from(set).sort((a, b) => a.localeCompare(b))
-  }, [schedules, logs])
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label))
+  }, [schedules, logs, weekdayLabels])
+
+  const classOptionByKey = useMemo(() => {
+    const map = new Map<string, ClassOption>()
+    for (const option of classOptions) map.set(option.key, option)
+    return map
+  }, [classOptions])
 
   const reminderByLesson = useMemo(() => {
     const map = new Map<string, TeacherReminder>()
     const active = reminders
-      .filter((item) => !item.done && item.class_label && item.lesson_number)
+      .filter((item) => !item.done && item.lesson_number)
       .sort((a, b) => {
         const ad = a.created_at ? new Date(a.created_at).getTime() : 0
         const bd = b.created_at ? new Date(b.created_at).getTime() : 0
         return bd - ad
       })
     for (const reminder of active) {
-      const key = `${reminder.class_label}::${reminder.lesson_number}`
+      const scopeKey = getReminderScopeKey(reminder)
+      if (!scopeKey) continue
+      const key = `${scopeKey}::${reminder.lesson_number}`
       if (!map.has(key)) map.set(key, reminder)
     }
     return map
@@ -305,6 +384,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
   function startRegister(schedule: TeacherSchedule) {
     setForm({
       schedule_id: schedule.id,
+      class_id: schedule.class_id ? String(schedule.class_id) : "",
       class_label: schedule.class_label,
       notes: "",
       observations: "",
@@ -316,7 +396,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
   }
 
   function resetForm() {
-    setForm({ schedule_id: "", class_label: "", notes: "", observations: "" })
+    setForm({ schedule_id: "", class_id: "", class_label: "", notes: "", observations: "" })
     setError("")
   }
 
@@ -325,18 +405,18 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
   }
 
   function handleReminderClassChange(value: string) {
-    setReminderClassLabel(value)
+    setReminderTargetKey(value)
     if (!value) {
       setReminderLessonNumber("")
       return
     }
-    const nextLesson = nextByClass.get(value) ?? 1
+    const nextLesson = nextByScope.get(value) ?? 1
     setReminderLessonNumber(String(nextLesson))
   }
 
   async function submitForm(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.class_label) return
+    if (!form.schedule_id && !form.class_id && !form.class_label) return
     setSaving(true)
     setError("")
 
@@ -420,10 +500,10 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
       setReminderError(t.reminderPlaceholder)
       return
     }
-    const classLabel = reminderClassLabel.trim()
+    const selectedClass = classOptionByKey.get(reminderTargetKey) ?? null
     const lessonRaw = reminderLessonNumber.trim()
     const lessonNumber = lessonRaw ? Number(lessonRaw) : null
-    if (classLabel && !lessonRaw) {
+    if (selectedClass && !lessonRaw) {
       setReminderError(t.reminderLessonRequired)
       return
     }
@@ -431,8 +511,8 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
       setReminderError(t.reminderLessonInvalid)
       return
     }
-    if (classLabel && lessonNumber !== null) {
-      const nextLesson = nextByClass.get(classLabel) ?? 1
+    if (selectedClass && lessonNumber !== null) {
+      const nextLesson = nextByScope.get(selectedClass.key) ?? 1
       if (lessonNumber < nextLesson) {
         setReminderError(t.reminderPast)
         return
@@ -446,7 +526,9 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         content,
-        class_label: classLabel || null,
+        class_label: selectedClass?.class_label ?? null,
+        class_id: selectedClass?.class_id ?? null,
+        schedule_id: selectedClass?.schedule_id ?? null,
         lesson_number: lessonNumber,
       }),
     })
@@ -459,7 +541,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     }
 
     setReminderText("")
-    setReminderClassLabel("")
+    setReminderTargetKey("")
     setReminderLessonNumber("")
     setReminderOpen(false)
     await loadReminders()
@@ -516,6 +598,34 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
               {[1, 2, 3, 4, 5].map((day) => {
                 const list = schedulesByWeekday[day] ?? []
                 const weekday = weekdayLabels[day] ?? day
+                const morningList = list.filter((schedule) => timeToMinutes(schedule.start_time) < 12 * 60)
+                const afternoonList = list.filter((schedule) => timeToMinutes(schedule.start_time) >= 12 * 60)
+                const periodSections = [
+                  {
+                    key: "morning",
+                    label: t.morningShift,
+                    items: morningList,
+                    Icon: Sunrise,
+                    panelClass: "border-amber-400/25 bg-amber-500/10",
+                    chipClass:
+                      "text-amber-50 bg-amber-500/30 border border-amber-300/35",
+                    countClass: "text-amber-100/90",
+                    emptyClass: "text-amber-100/75",
+                    cardClass: "border-amber-300/20 bg-slate-900/50",
+                  },
+                  {
+                    key: "afternoon",
+                    label: t.afternoonShift,
+                    items: afternoonList,
+                    Icon: Sunset,
+                    panelClass: "border-sky-400/25 bg-sky-500/10",
+                    chipClass:
+                      "text-sky-50 bg-sky-500/30 border border-sky-300/35",
+                    countClass: "text-sky-100/90",
+                    emptyClass: "text-sky-100/75",
+                    cardClass: "border-sky-300/20 bg-slate-900/50",
+                  },
+                ]
                 return (
                   <div key={day} className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
                     <div className="px-3 py-2 border-b border-white/10 text-xs font-semibold text-white/80">
@@ -525,53 +635,74 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                       {list.length === 0 && (
                         <p className="text-xs text-slate-400">{t.dayEmpty}</p>
                       )}
-                      {list.map((schedule) => {
-                        const nextLesson = nextByClass.get(schedule.class_label) ?? 1
-                        const reminderKey = `${schedule.class_label}::${nextLesson}`
-                        const reminderForLesson = reminderByLesson.get(reminderKey)
-                        const reminderPreviewMax = 80
-                        return (
-                          <div key={schedule.id} className="rounded-lg border border-white/10 bg-slate-900/40 p-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-semibold text-white truncate max-w-[14rem] sm:max-w-none">
-                                {schedule.class_label}
-                              </p>
-                              <span className="text-[11px] font-semibold text-emerald-200 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                                {t.lesson} {nextLesson}
+                      {list.length > 0 &&
+                        periodSections.map((section) => (
+                          <div key={section.key} className={`rounded-xl border p-2.5 space-y-2 ${section.panelClass}`}>
+                            <div className="flex items-center justify-between gap-2 px-1">
+                              <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold ${section.chipClass}`}>
+                                <section.Icon className="w-3.5 h-3.5" />
+                                {section.label}
                               </span>
-                              <span className="text-[11px] font-semibold text-cyan-100 bg-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                                {timeLabel(schedule.start_time)} - {timeLabel(schedule.end_time)}
+                              <span className={`text-[11px] font-semibold ${section.countClass}`}>
+                                {section.items.length} {t.lessons}
                               </span>
                             </div>
-                            {reminderForLesson && (
-                              <div className="mt-2 text-xs text-amber-200 space-y-1">
-                                <p>
-                                  {t.reminderLabel}:{" "}
-                                  {previewText(reminderForLesson.content, reminderPreviewMax)}
-                                </p>
-                                {isTruncated(reminderForLesson.content, reminderPreviewMax) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setViewReminder(reminderForLesson)}
-                                    className="text-[11px] text-amber-100 underline underline-offset-2"
-                                  >
-                                    {t.reminderView}
-                                  </button>
-                                )}
+                            {section.items.length === 0 ? (
+                              <p className={`px-2 pb-1 text-xs ${section.emptyClass}`}>{t.dayEmpty}</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {section.items.map((schedule) => {
+                                  const scopeKey = getScheduleScopeKey(schedule)
+                                  const nextLesson = nextByScope.get(scopeKey) ?? 1
+                                  const reminderKey = `${scopeKey}::${nextLesson}`
+                                  const reminderForLesson = reminderByLesson.get(reminderKey)
+                                  const reminderPreviewMax = 80
+                                  return (
+                                    <div key={schedule.id} className={`rounded-lg border p-3 ${section.cardClass}`}>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <p className="text-sm font-semibold text-white truncate max-w-[14rem] sm:max-w-none">
+                                          {schedule.class_label}
+                                        </p>
+                                        <span className="text-[11px] font-semibold text-emerald-200 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                                          {t.lesson} {nextLesson}
+                                        </span>
+                                        <span className="text-[11px] font-semibold text-cyan-100 bg-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                                          {timeLabel(schedule.start_time)} - {timeLabel(schedule.end_time)}
+                                        </span>
+                                      </div>
+                                      {reminderForLesson && (
+                                        <div className="mt-2 text-xs text-amber-200 space-y-1">
+                                          <p>
+                                            {t.reminderLabel}:{" "}
+                                            {previewText(reminderForLesson.content, reminderPreviewMax)}
+                                          </p>
+                                          {isTruncated(reminderForLesson.content, reminderPreviewMax) && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setViewReminder(reminderForLesson)}
+                                              className="text-[11px] text-amber-100 underline underline-offset-2"
+                                            >
+                                              {t.reminderView}
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={() => startRegister(schedule)}
+                                        className="mt-3 bg-cyan-600 hover:bg-cyan-700 w-full"
+                                      >
+                                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                                        {registerWithNumber(nextLesson)}
+                                      </Button>
+                                    </div>
+                                  )
+                                })}
                               </div>
                             )}
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() => startRegister(schedule)}
-                              className="mt-3 bg-cyan-600 hover:bg-cyan-700 w-full"
-                            >
-                              <CheckCircle2 className="w-4 h-4 mr-2" />
-                              {registerWithNumber(nextLesson)}
-                            </Button>
                           </div>
-                        )
-                      })}
+                        ))}
                     </div>
                   </div>
                 )
@@ -589,39 +720,37 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
           {logs.length === 0 && !loading && <p className="text-slate-400">{t.noLogs}</p>}
 
           <div className="space-y-6">
-            {Object.keys(groupedLogs)
-              .sort((a, b) => a.localeCompare(b))
-              .map((classLabel) => (
-                <section key={classLabel} className="space-y-3">
+            {groupedLogs.map((group) => (
+                <section key={group.key} className="space-y-3">
                   <button
                     type="button"
-                    onClick={() => toggleClass(classLabel)}
-                    aria-expanded={openClasses[classLabel] === true}
+                    onClick={() => toggleClass(group.key)}
+                    aria-expanded={openClasses[group.key] === true}
                     className="group w-full rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 hover:border-cyan-400/40 transition px-3 py-2"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex items-center gap-2">
                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-white/15 bg-slate-900/50 text-cyan-300">
-                          {openClasses[classLabel] ? (
+                          {openClasses[group.key] ? (
                             <ChevronUp className="w-4 h-4" />
                           ) : (
                             <ChevronDown className="w-4 h-4" />
                           )}
                         </span>
-                        <h3 className="text-sm font-semibold text-white truncate">{classLabel}</h3>
+                        <h3 className="text-sm font-semibold text-white truncate">{group.label}</h3>
                         <span className="text-[11px] text-white/60 border border-white/10 rounded-full px-2 py-0.5 whitespace-nowrap">
-                          {groupedLogs[classLabel].length} {t.lessons}
+                          {group.items.length} {t.lessons}
                         </span>
                       </div>
                       <span className="text-xs font-medium text-cyan-200/90 whitespace-nowrap">
-                        {openClasses[classLabel] ? t.collapse : t.expand}
+                        {openClasses[group.key] ? t.collapse : t.expand}
                       </span>
                     </div>
                   </button>
 
-                  {openClasses[classLabel] && (
+                  {openClasses[group.key] && (
                     <div className="space-y-3">
-                      {groupedLogs[classLabel].map((log) => (
+                      {group.items.map((log) => (
                         <div key={log.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between gap-3">
@@ -688,7 +817,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
             onClick={() => {
               setReminderError("")
               setReminderText("")
-              setReminderClassLabel("")
+              setReminderTargetKey("")
               setReminderLessonNumber("")
               setReminderOpen(true)
             }}
@@ -797,7 +926,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
               setReminderOpen(false)
               setReminderError("")
               setReminderText("")
-              setReminderClassLabel("")
+              setReminderTargetKey("")
               setReminderLessonNumber("")
             }
           }}
@@ -814,7 +943,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                   setReminderOpen(false)
                   setReminderError("")
                   setReminderText("")
-                  setReminderClassLabel("")
+                  setReminderTargetKey("")
                   setReminderLessonNumber("")
                 }}
                 className="text-xs text-white/60 hover:text-white"
@@ -828,14 +957,14 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                 <div>
                   <label className="text-xs text-slate-400">{t.reminderClass}</label>
                   <select
-                    value={reminderClassLabel}
+                    value={reminderTargetKey}
                     onChange={(e) => handleReminderClassChange(e.target.value)}
                     className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white"
                   >
                     <option value="">{t.reminderGeneral}</option>
                     {classOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
+                      <option key={option.key} value={option.key}>
+                        {option.label}
                       </option>
                     ))}
                   </select>
@@ -848,7 +977,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                     step={1}
                     value={reminderLessonNumber}
                     onChange={(e) => setReminderLessonNumber(e.target.value)}
-                    disabled={!reminderClassLabel}
+                    disabled={!reminderTargetKey}
                     className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white disabled:opacity-60"
                   />
                 </div>
@@ -880,7 +1009,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                     setReminderOpen(false)
                     setReminderError("")
                     setReminderText("")
-                    setReminderClassLabel("")
+                    setReminderTargetKey("")
                     setReminderLessonNumber("")
                   }}
                 >
@@ -932,7 +1061,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                 <div>
                   <span className="text-white/60">{t.registeringLesson}</span>
                   <span className="text-white font-semibold bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-full ml-2">
-                    {nextByClass.get(registerSchedule.class_label) ?? 1}
+                    {nextByScope.get(getScheduleScopeKey(registerSchedule)) ?? 1}
                   </span>
                 </div>
                 <div className="text-[11px] text-white/50">{t.autoDate}</div>
@@ -1109,5 +1238,3 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     </div>
   )
 }
-
-

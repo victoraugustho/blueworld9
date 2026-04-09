@@ -46,6 +46,8 @@ type BlogPostRow = {
   title: string
   slug: string
   excerpt: string | null
+  post_type: "article" | "instagram"
+  instagram_url: string | null
   published_at: string
   cover_url: string | null
   author_name: string | null
@@ -79,6 +81,25 @@ function formatDateTime(value: string, locale: Locale) {
     return new Date(value).toLocaleString(locale === "es" ? "es-ES" : "pt-BR")
   } catch {
     return value
+  }
+}
+
+function instagramEmbedUrl(value: string | null | undefined) {
+  const raw = String(value ?? "").trim()
+  if (!raw) return null
+
+  try {
+    const parsed = new URL(raw)
+    const host = parsed.hostname.toLowerCase()
+    if (!(host === "instagram.com" || host === "www.instagram.com" || host.endsWith(".instagram.com"))) return null
+    const parts = parsed.pathname.split("/").filter(Boolean)
+    const kind = parts[0]?.toLowerCase() === "share" ? String(parts[1] ?? "").toLowerCase() : String(parts[0] ?? "").toLowerCase()
+    const code = parts[0]?.toLowerCase() === "share" ? String(parts[2] ?? "").trim() : String(parts[1] ?? "").trim()
+    if (!code) return null
+    if (!["p", "reel", "tv"].includes(kind)) return null
+    return `https://www.instagram.com/${kind}/${code}/embed`
+  } catch {
+    return null
   }
 }
 
@@ -277,6 +298,8 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
         p.title,
         p.slug,
         p.excerpt,
+        p.post_type,
+        p.instagram_url,
         p.published_at,
         cover.public_url AS cover_url,
         author.name AS author_name,
@@ -318,6 +341,8 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
 
   const featuredPost = blogPosts[0] ?? null
   const recentPosts = blogPosts.slice(featuredPost ? 1 : 0)
+  const featuredInstagramEmbedUrl =
+    featuredPost?.post_type === "instagram" ? instagramEmbedUrl(featuredPost.instagram_url) : null
 
   const weekdayLabels = locale === "es"
     ? ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
@@ -567,10 +592,39 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
                           ))}
                         </div>
                       ) : null}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-600/20 border border-indigo-400/40 text-indigo-100">
+                          {featuredPost.post_type === "instagram" ? "Instagram" : "Blog"}
+                        </span>
+                      </div>
+                      {featuredInstagramEmbedUrl ? (
+                        <div className="rounded-xl overflow-hidden border border-white/10 bg-black/40 aspect-[9/16] w-full max-w-[420px] mx-auto">
+                          <iframe
+                            src={featuredInstagramEmbedUrl}
+                            title={`instagram-featured-${featuredPost.id}`}
+                            className="w-full h-full"
+                            loading="lazy"
+                            allowFullScreen
+                          />
+                        </div>
+                      ) : null}
                       {featuredPost.excerpt ? <p className="text-sm text-slate-300 line-clamp-3">{featuredPost.excerpt}</p> : null}
-                      <Link href={`/portal/dashboard/blog/${featuredPost.slug}`} className="text-cyan-300 text-sm hover:text-cyan-200">
-                        {t.readMore}
-                      </Link>
+                      {featuredPost.post_type === "instagram" ? (
+                        featuredInstagramEmbedUrl ? null : featuredPost.instagram_url ? (
+                          <a
+                            href={featuredPost.instagram_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-cyan-300 text-sm hover:text-cyan-200"
+                          >
+                            Ver no Instagram
+                          </a>
+                        ) : null
+                      ) : (
+                        <Link href={`/portal/dashboard/blog/${featuredPost.slug}`} className="text-cyan-300 text-sm hover:text-cyan-200">
+                          {t.readMore}
+                        </Link>
+                      )}
                     </div>
                   </article>
                 </div>
@@ -578,7 +632,11 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
                 <div>
                   <p className="text-xs uppercase tracking-wider text-cyan-300 mb-2">{t.recentPosts}</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {recentPosts.map((post) => (
+                    {recentPosts.map((post) => {
+                      const postInstagramEmbedUrl =
+                        post.post_type === "instagram" ? instagramEmbedUrl(post.instagram_url) : null
+
+                      return (
                       <article key={post.id} className="rounded-xl border border-white/10 bg-white/5 overflow-hidden flex flex-col">
                         {post.cover_url ? <img src={post.cover_url} alt={post.title} className="w-full h-36 object-cover" /> : null}
                         <div className="p-4 space-y-2 flex-1 flex flex-col">
@@ -596,14 +654,41 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
                             </div>
                           ) : null}
                           {post.excerpt ? <p className="text-sm text-slate-300 line-clamp-3">{post.excerpt}</p> : <p className="text-sm text-slate-400">...</p>}
-                          <div className="mt-auto pt-2">
-                            <Link href={`/portal/dashboard/blog/${post.slug}`} className="text-cyan-300 text-sm hover:text-cyan-200">
-                              {t.readMore}
-                            </Link>
+                          <div className="mt-auto pt-2 flex items-center justify-between gap-2">
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-600/20 border border-indigo-400/40 text-indigo-100">
+                              {post.post_type === "instagram" ? "Instagram" : "Blog"}
+                            </span>
+                            {post.post_type === "instagram" ? (
+                              postInstagramEmbedUrl ? null : post.instagram_url ? (
+                                <a
+                                  href={post.instagram_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-cyan-300 text-sm hover:text-cyan-200"
+                                >
+                                  Ver no Instagram
+                                </a>
+                              ) : null
+                            ) : (
+                              <Link href={`/portal/dashboard/blog/${post.slug}`} className="text-cyan-300 text-sm hover:text-cyan-200">
+                                {t.readMore}
+                              </Link>
+                            )}
                           </div>
+                          {postInstagramEmbedUrl ? (
+                            <div className="rounded-xl overflow-hidden border border-white/10 bg-black/40 aspect-[9/16] w-full max-w-[360px] mx-auto">
+                              <iframe
+                                src={postInstagramEmbedUrl}
+                                title={`instagram-card-${post.id}`}
+                                className="w-full h-full"
+                                loading="lazy"
+                                allowFullScreen
+                              />
+                            </div>
+                          ) : null}
                         </div>
                       </article>
-                    ))}
+                    )})}
                     {recentPosts.length === 0 ? (
                       <p className="text-slate-400 text-sm">{t.blogEmpty}</p>
                     ) : null}
@@ -617,3 +702,5 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
     </div>
   )
 }
+
+

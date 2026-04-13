@@ -159,6 +159,22 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "Turma invalida" }, { status: 400 })
   }
 
+  const [classRow] = await db`
+    SELECT id
+    FROM teacher_classes
+    WHERE id = ${id}
+    LIMIT 1
+  `
+
+  if (!classRow) {
+    return NextResponse.json({ error: "Turma nao encontrada" }, { status: 404 })
+  }
+
+  await db`
+    DELETE FROM teacher_schedules
+    WHERE class_id = ${id}
+  `
+
   const [deleted] = await db`
     DELETE FROM teacher_classes
     WHERE id = ${id}

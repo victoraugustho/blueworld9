@@ -4,6 +4,10 @@ import { isValidStudentYear } from "@/lib/turma-years"
 
 export type AttendanceStatus = "present" | "absent"
 
+export function getScoreMaxByCountry(country: unknown) {
+  return String(country ?? "").trim().toUpperCase() === "PY" ? 5 : 10
+}
+
 export function normalizeBimester(value: unknown) {
   const parsed = Number(value)
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 4) return null
@@ -22,11 +26,12 @@ export function normalizeAttendance(value: unknown): AttendanceStatus {
   return value === "absent" ? "absent" : "present"
 }
 
-export function normalizeScore(value: unknown) {
+export function normalizeScore(value: unknown, max = 10) {
   if (value === null || value === undefined || value === "") return null
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return null
-  if (parsed < 0 || parsed > 10) return null
+  if (!Number.isFinite(max) || max <= 0) return null
+  if (parsed < 0 || parsed > max) return null
   return Math.round(parsed * 100) / 100
 }
 
@@ -59,7 +64,7 @@ export function isUuid(value: unknown) {
 }
 
 export async function ensureGradebookSchema() {
-  await ensureRuntimeSchema("schema:gradebook:v5", async () => {
+  await ensureRuntimeSchema("schema:gradebook:v8", async () => {
     await db`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`
 
     await db`
@@ -267,13 +272,184 @@ export async function ensureGradebookSchema() {
     `
 
     await db`
+      ALTER TABLE public.teacher_schedules
+      ADD COLUMN IF NOT EXISTS entry_type TEXT
+    `
+
+    await db`
+      UPDATE public.teacher_schedules
+      SET entry_type = 'class'
+      WHERE entry_type IS NULL
+    `
+
+    await db`
+      ALTER TABLE public.teacher_schedules
+      ALTER COLUMN entry_type SET DEFAULT 'class',
+      ALTER COLUMN entry_type SET NOT NULL
+    `
+
+    await db`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'teacher_schedules_entry_type_check'
+        ) THEN
+          ALTER TABLE public.teacher_schedules
+          ADD CONSTRAINT teacher_schedules_entry_type_check
+          CHECK (entry_type IN ('class', 'event'));
+        END IF;
+      END
+      $$;
+    `
+
+    await db`
+      ALTER TABLE public.teacher_schedules
+      ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN
+    `
+
+    await db`
+      UPDATE public.teacher_schedules
+      SET is_recurring = TRUE
+      WHERE is_recurring IS NULL
+    `
+
+    await db`
+      ALTER TABLE public.teacher_schedules
+      ALTER COLUMN is_recurring SET DEFAULT TRUE,
+      ALTER COLUMN is_recurring SET NOT NULL
+    `
+
+    await db`
+      ALTER TABLE public.teacher_schedules
+      ADD COLUMN IF NOT EXISTS event_date DATE NULL
+    `
+
+    await db`
       CREATE INDEX IF NOT EXISTS teacher_schedules_teacher_class_id_idx
       ON public.teacher_schedules(teacher_id, class_id)
     `
 
     await db`
+      CREATE INDEX IF NOT EXISTS teacher_schedules_teacher_entry_type_idx
+      ON public.teacher_schedules(teacher_id, entry_type, is_recurring)
+    `
+
+    await db`
+      CREATE INDEX IF NOT EXISTS teacher_schedules_event_date_idx
+      ON public.teacher_schedules(event_date)
+    `
+
+    await db`
+      WITH source_labels AS (
+        SELECT DISTINCT
+          s.teacher_id,
+          trim(s.class_label) AS class_name
+        FROM public.teacher_schedules s
+        WHERE s.entry_type = 'class'
+          AND s.class_id IS NULL
+          AND s.class_label IS NOT NULL
+          AND trim(s.class_label) <> ''
+      )
+      INSERT INTO public.teacher_classes (
+        teacher_id,
+        name,
+        school_year,
+        active
+      )
+      SELECT
+        src.teacher_id,
+        src.class_name,
+        EXTRACT(YEAR FROM NOW())::smallint,
+        TRUE
+      FROM source_labels src
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM public.teacher_classes c
+        WHERE c.teacher_id = src.teacher_id
+          AND lower(trim(c.name)) = lower(src.class_name)
+      )
+    `
+
+    await db`
+      UPDATE public.teacher_schedules s
+      SET class_id = (
+        SELECT c.id
+        FROM public.teacher_classes c
+        WHERE c.teacher_id = s.teacher_id
+          AND lower(trim(c.name)) = lower(trim(s.class_label))
+        ORDER BY c.school_year DESC, c.created_at DESC
+        LIMIT 1
+      )
+      WHERE s.class_id IS NULL
+        AND s.entry_type = 'class'
+        AND s.class_label IS NOT NULL
+        AND trim(s.class_label) <> ''
+        AND EXISTS (
+          SELECT 1
+          FROM public.teacher_classes c2
+          WHERE c2.teacher_id = s.teacher_id
+            AND lower(trim(c2.name)) = lower(trim(s.class_label))
+        )
+    `
+
+    await db`
       ALTER TABLE public.teacher_lesson_logs
       ADD COLUMN IF NOT EXISTS class_id UUID NULL REFERENCES public.teacher_classes(id) ON DELETE SET NULL
+    `
+
+    await db`
+      ALTER TABLE public.teacher_lesson_logs
+      ADD COLUMN IF NOT EXISTS school_year SMALLINT
+    `
+
+    await db`
+      UPDATE public.teacher_lesson_logs
+      SET school_year = EXTRACT(YEAR FROM lesson_date)::smallint
+      WHERE school_year IS NULL
+    `
+
+    await db`
+      ALTER TABLE public.teacher_lesson_logs
+      ALTER COLUMN school_year SET DEFAULT EXTRACT(YEAR FROM NOW())::smallint
+    `
+
+    await db`
+      ALTER TABLE public.teacher_lesson_logs
+      ADD COLUMN IF NOT EXISTS bimester SMALLINT
+    `
+
+    await db`
+      UPDATE public.teacher_lesson_logs
+      SET bimester = CASE
+        WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 1 AND 3 THEN 1
+        WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 4 AND 6 THEN 2
+        WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 7 AND 9 THEN 3
+        ELSE 4
+      END
+      WHERE bimester IS NULL
+    `
+
+    await db`
+      ALTER TABLE public.teacher_lesson_logs
+      ALTER COLUMN bimester SET DEFAULT 1
+    `
+
+    await db`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'teacher_lesson_logs_bimester_check'
+        ) THEN
+          ALTER TABLE public.teacher_lesson_logs
+          ADD CONSTRAINT teacher_lesson_logs_bimester_check
+          CHECK (bimester IS NULL OR (bimester BETWEEN 1 AND 4));
+        END IF;
+      END
+      $$;
     `
 
     await db`
@@ -288,6 +464,11 @@ export async function ensureGradebookSchema() {
     await db`
       CREATE INDEX IF NOT EXISTS teacher_lesson_logs_class_id_idx
       ON public.teacher_lesson_logs(class_id)
+    `
+
+    await db`
+      CREATE INDEX IF NOT EXISTS teacher_lesson_logs_scope_bimester_idx
+      ON public.teacher_lesson_logs(teacher_id, class_id, school_year, bimester, lesson_number DESC)
     `
 
     await db`

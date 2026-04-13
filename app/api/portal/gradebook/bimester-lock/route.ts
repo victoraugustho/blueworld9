@@ -4,6 +4,7 @@ import { requireTeacherApi } from "@/lib/auth/require"
 import {
   ensureGradebookSchema,
   getBimesterLock,
+  getScoreMaxByCountry,
   isUuid,
   normalizeBimester,
   normalizeSchoolYear,
@@ -11,10 +12,28 @@ import {
 
 async function loadOwnedClass(teacherId: string, classId: string) {
   const [row] = await db`
-    SELECT *
-    FROM teacher_classes
-    WHERE id = ${classId}
-      AND teacher_id = ${teacherId}
+    SELECT
+      tc.*,
+      t.country AS teacher_country
+    FROM teacher_classes tc
+    LEFT JOIN teachers t
+      ON t.id = tc.teacher_id
+    WHERE tc.id = ${classId}
+      AND tc.teacher_id = ${teacherId}
+    LIMIT 1
+  `
+  return row
+}
+
+async function loadClass(classId: string) {
+  const [row] = await db`
+    SELECT
+      tc.*,
+      t.country AS teacher_country
+    FROM teacher_classes tc
+    LEFT JOIN teachers t
+      ON t.id = tc.teacher_id
+    WHERE tc.id = ${classId}
     LIMIT 1
   `
   return row
@@ -23,6 +42,7 @@ async function loadOwnedClass(teacherId: string, classId: string) {
 export async function GET(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
+  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
 
   await ensureGradebookSchema()
 
@@ -41,7 +61,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Ano letivo invalido" }, { status: 400 })
   }
 
-  const classRow = await loadOwnedClass(auth.teacherId, classId)
+  const classRow = isAdmin
+    ? await loadClass(classId)
+    : await loadOwnedClass(auth.teacherId, classId)
   if (!classRow) {
     return NextResponse.json({ error: "Turma nao encontrada" }, { status: 404 })
   }
@@ -56,6 +78,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
+  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+
+  if (!isAdmin) {
+    return NextResponse.json({ error: "Apenas admin pode fechar bimestre." }, { status: 403 })
+  }
 
   await ensureGradebookSchema()
 
@@ -74,10 +101,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ano letivo invalido" }, { status: 400 })
   }
 
-  const classRow = await loadOwnedClass(auth.teacherId, classId)
+  const classRow = await loadClass(classId)
   if (!classRow) {
     return NextResponse.json({ error: "Turma nao encontrada" }, { status: 404 })
   }
+  const isPyScoreScale = getScoreMaxByCountry(classRow.teacher_country ?? auth.teacher.country) <= 5
 
   const existing = await getBimesterLock(classId, schoolYear, bimester)
   if (existing) {
@@ -87,6 +115,124 @@ export async function POST(req: NextRequest) {
       already_closed: true,
       lock: existing,
     })
+  }
+
+  const [lessonScopeSummary] = await db`
+    SELECT COUNT(*)::int AS lesson_count
+    FROM teacher_grade_lessons
+    WHERE class_id = ${classId}
+      AND school_year = ${schoolYear}
+      AND bimester = ${bimester}
+  `
+
+  if (Number(lessonScopeSummary?.lesson_count ?? 0) <= 0) {
+    return NextResponse.json(
+      { error: "Nao e possivel fechar: nao existem aulas lancadas neste bimestre." },
+      { status: 400 },
+    )
+  }
+
+  const missingLessonRows = await db`
+    WITH lesson_scope AS (
+      SELECT l.id
+      FROM teacher_grade_lessons l
+      WHERE l.class_id = ${classId}
+        AND l.school_year = ${schoolYear}
+        AND l.bimester = ${bimester}
+    ),
+    active_students AS (
+      SELECT s.id, s.full_name
+      FROM teacher_class_students s
+      WHERE s.class_id = ${classId}
+        AND s.active = TRUE
+    )
+    SELECT
+      s.id AS student_id,
+      s.full_name,
+      COUNT(*) FILTER (
+        WHERE e.lesson_id IS NULL
+           OR e.attendance IS NULL
+           OR e.c1 IS NULL
+           OR e.c2 IS NULL
+           OR e.c3 IS NULL
+           OR e.c4 IS NULL
+      )::int AS pending_lessons
+    FROM active_students s
+    CROSS JOIN lesson_scope l
+    LEFT JOIN teacher_grade_entries e
+      ON e.lesson_id = l.id
+     AND e.student_id = s.id
+    GROUP BY s.id, s.full_name
+    HAVING COUNT(*) FILTER (
+      WHERE e.lesson_id IS NULL
+         OR e.attendance IS NULL
+         OR e.c1 IS NULL
+         OR e.c2 IS NULL
+         OR e.c3 IS NULL
+         OR e.c4 IS NULL
+    ) > 0
+    ORDER BY s.full_name ASC
+  `
+
+  if (missingLessonRows.length > 0) {
+    const previewNames = missingLessonRows
+      .slice(0, 5)
+      .map((row) => String(row.full_name ?? "").trim())
+      .filter(Boolean)
+    const moreCount = Math.max(0, missingLessonRows.length - previewNames.length)
+    const namesPart =
+      previewNames.length > 0
+        ? ` Pendentes: ${previewNames.join(", ")}${moreCount > 0 ? ` e mais ${moreCount}.` : "."}`
+        : ""
+
+    return NextResponse.json(
+      {
+        error: `Nao e possivel fechar: existem ${missingLessonRows.length} aluno(s) com notas/presenca pendentes nas aulas.${namesPart}`,
+        missing_lesson_count: missingLessonRows.length,
+        missing_lesson_students: missingLessonRows,
+      },
+      { status: 400 },
+    )
+  }
+
+  const missingNote2Rows = await db`
+    SELECT
+      s.id AS student_id,
+      s.full_name
+    FROM teacher_class_students s
+    LEFT JOIN teacher_bimester_grades bg
+      ON bg.class_id = ${classId}
+     AND bg.student_id = s.id
+     AND bg.school_year = ${schoolYear}
+     AND bg.bimester = ${bimester}
+    WHERE s.class_id = ${classId}
+      AND s.active = TRUE
+      AND (
+        bg.exam_score IS NULL
+        OR bg.c5_score IS NULL
+      )
+    ORDER BY s.full_name ASC
+  `
+
+  if (missingNote2Rows.length > 0) {
+    const previewNames = missingNote2Rows
+      .slice(0, 5)
+      .map((row) => String(row.full_name ?? "").trim())
+      .filter(Boolean)
+    const moreCount = Math.max(0, missingNote2Rows.length - previewNames.length)
+    const namesPart =
+      previewNames.length > 0
+        ? ` Pendentes: ${previewNames.join(", ")}${moreCount > 0 ? ` e mais ${moreCount}.` : "."}`
+        : ""
+
+    return NextResponse.json(
+      {
+        error: `Nao e possivel fechar: existem ${missingNote2Rows.length} aluno(s) sem Prova/Atividade e/ou C5 lancados.${namesPart}`,
+        missing_note2_count: missingNote2Rows.length,
+        missing_note2_students: missingNote2Rows,
+      },
+      { status: 400 },
+    )
   }
 
   const missingFinalRows = await db`
@@ -141,17 +287,15 @@ export async function POST(req: NextRequest) {
         CASE
           WHEN b.manual_final_score IS NOT NULL THEN b.manual_final_score
           WHEN b.note1 IS NOT NULL
-            AND (
-              (b.exam_score IS NOT NULL AND b.c5_score IS NOT NULL)
-              OR (b.exam_score IS NULL AND b.c5_score IS NOT NULL)
-            )
+           AND b.exam_score IS NOT NULL
+           AND b.c5_score IS NOT NULL
             THEN ROUND(
               (
                 b.note1 + (
                   CASE
-                    WHEN b.exam_score IS NOT NULL
+                    WHEN ${isPyScoreScale}
                       THEN ((b.exam_score + b.c5_score) / 2.0)
-                    ELSE b.c5_score
+                    ELSE (b.exam_score + b.c5_score)
                   END
                 )
               ) / 2.0
@@ -222,6 +366,11 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
+  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+
+  if (!isAdmin) {
+    return NextResponse.json({ error: "Apenas admin pode reabrir bimestre." }, { status: 403 })
+  }
 
   await ensureGradebookSchema()
 
@@ -240,7 +389,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Ano letivo invalido" }, { status: 400 })
   }
 
-  const classRow = await loadOwnedClass(auth.teacherId, classId)
+  const classRow = await loadClass(classId)
   if (!classRow) {
     return NextResponse.json({ error: "Turma nao encontrada" }, { status: 404 })
   }

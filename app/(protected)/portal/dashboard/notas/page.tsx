@@ -1,6 +1,6 @@
 ﻿import { requireTeacherPage } from "@/lib/auth/server"
 import Link from "next/link"
-import { Sigma, Users, ClipboardCheck, CalendarRange, FileSpreadsheet } from "lucide-react"
+import { Sigma, ClipboardCheck, CalendarRange } from "lucide-react"
 import NotasSectionNav from "./_components/NotasSectionNav"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -8,27 +8,13 @@ export default async function NotasPage() {
   const teacher = await requireTeacherPage()
   const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
   const isEs = locale === "es"
-  const isAdmin = teacher.is_admin === true || teacher.role === "admin"
-
   const cards = [
     {
-      href: "/portal/dashboard/notas/turmas",
-      title: isEs ? "Turmas y Alumnos" : "Turmas e Alunos",
-      description: isEs
-        ? isAdmin
-          ? "Cree turmas para profesores y gestione alumnos."
-          : "Visualice turmas asignadas por administracion."
-        : isAdmin
-          ? "Crie turmas para professores e gerencie alunos."
-          : "Visualize turmas atribuidas pela administracao.",
-      icon: Users,
-    },
-    {
       href: "/portal/dashboard/notas/lancamentos",
-      title: isEs ? "Lanzamiento por Clase" : "Lancamento por Aula",
+      title: isEs ? "Lanzamiento + Agenda" : "Lancamento + Agenda",
       description: isEs
-        ? "Registre asistencia y notas C1..C4 por clase."
-        : "Registre presenca e notas C1..C4 por aula.",
+        ? "Abra la agenda y registre asistencia/notas C1..C4 en el mismo flujo."
+        : "Abra a agenda e registre presenca/notas C1..C4 no mesmo fluxo.",
       icon: ClipboardCheck,
     },
     {
@@ -38,14 +24,6 @@ export default async function NotasPage() {
         ? "Vea todas las clases de una turma y abra una clase especifica."
         : "Veja todas as aulas de uma turma e abra uma aula especifica.",
       icon: CalendarRange,
-    },
-    {
-      href: "/portal/dashboard/notas/resumo",
-      title: isEs ? "Resumen Bimestral" : "Resumo Bimestral",
-      description: isEs
-        ? "Consulte Nota 1, Nota 2 y nota final por alumno."
-        : "Consulte Nota 1, Nota 2 e nota final por aluno.",
-      icon: FileSpreadsheet,
     },
   ]
 
@@ -58,8 +36,8 @@ export default async function NotasPage() {
         </h1>
         <p className="text-slate-300 text-sm mt-1">
           {isEs
-            ? "Flujo separado por paginas: turmas, lanzamientos, clases y resumen."
-            : "Fluxo separado por paginas: turmas, lancamentos, aulas e resumo."}
+            ? "Flujo separado por paginas: lanzamientos y clases."
+            : "Fluxo separado por paginas: lancamentos e aulas."}
         </p>
       </div>
 

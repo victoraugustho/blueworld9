@@ -10,6 +10,7 @@ type TeacherRow = {
   email: string
   approved: boolean
   active: boolean
+  session_expires_at: string
   locale: "pt-BR" | "es"
   country: "BR" | "UY" | "PY"
   role: string | null
@@ -25,7 +26,7 @@ export async function getTeacherFromSession() {
 
   const [row] = await db`
     SELECT
-      s.expires_at,
+      s.expires_at AS session_expires_at,
       s.revoked_at,
       t.id,
       t.name,

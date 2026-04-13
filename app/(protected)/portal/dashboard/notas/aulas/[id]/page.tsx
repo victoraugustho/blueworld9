@@ -8,7 +8,16 @@ type Params = {
 export default async function NotasAulaDetalhePage({ params }: Params) {
   const teacher = await requireTeacherPage()
   const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
+  const isAdmin = teacher.is_admin === true || teacher.role === "admin"
+  const scoreMax = teacher.country === "PY" ? 5 : 10
   const resolved = await params
 
-  return <AulaDetalheClient locale={locale} lessonId={String(resolved?.id ?? "")} />
+  return (
+    <AulaDetalheClient
+      locale={locale}
+      lessonId={String(resolved?.id ?? "")}
+      canDeleteLesson={isAdmin}
+      scoreMax={scoreMax}
+    />
+  )
 }

@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
 import {
   ensureGradebookSchema,
+  getScoreMaxByCountry,
   getBimesterLock,
   isUuid,
   normalizeBimester,
@@ -12,10 +13,14 @@ import {
 
 async function loadOwnedClass(teacherId: string, classId: string) {
   const [row] = await db`
-    SELECT *
-    FROM teacher_classes
-    WHERE id = ${classId}
-      AND teacher_id = ${teacherId}
+    SELECT
+      tc.*,
+      t.country AS teacher_country
+    FROM teacher_classes tc
+    LEFT JOIN teachers t
+      ON t.id = tc.teacher_id
+    WHERE tc.id = ${classId}
+      AND tc.teacher_id = ${teacherId}
     LIMIT 1
   `
   return row
@@ -80,6 +85,7 @@ export async function PUT(req: NextRequest) {
   if (!auth.ok) return auth.response
 
   await ensureGradebookSchema()
+  const note2ComponentMax = 5
 
   const body = await req.json().catch(() => ({}))
   const classId = String(body.class_id ?? "").trim()
@@ -103,6 +109,7 @@ export async function PUT(req: NextRequest) {
   if (!classRow) {
     return NextResponse.json({ error: "Turma nao encontrada" }, { status: 404 })
   }
+  const scoreMax = getScoreMaxByCountry(classRow.teacher_country ?? auth.teacher.country)
 
   const lock = await getBimesterLock(classId, schoolYear, bimester)
   if (lock) {
@@ -132,10 +139,31 @@ export async function PUT(req: NextRequest) {
     const studentId = String(item?.student_id ?? "").trim()
     if (!isUuid(studentId)) continue
 
-    const examScore = normalizeScore(item?.exam_score)
-    if (examScore === null) {
+    const examScoreRaw = item?.exam_score
+    const examScoreRawText = String(examScoreRaw ?? "").trim()
+    if (!examScoreRawText) {
       return NextResponse.json(
         { error: "Campo Prova/Atividade obrigatorio para todos os alunos" },
+        { status: 400 },
+      )
+    }
+    const examScore = normalizeScore(examScoreRaw, note2ComponentMax)
+    if (examScore === null) {
+      return NextResponse.json(
+        { error: `Campo Prova/Atividade invalido (use valores de 0 a ${note2ComponentMax})` },
+        { status: 400 },
+      )
+    }
+
+    const c5ScoreRaw = item?.c5_score
+    if (
+      c5ScoreRaw !== undefined &&
+      c5ScoreRaw !== null &&
+      String(c5ScoreRaw).trim() !== "" &&
+      normalizeScore(c5ScoreRaw, note2ComponentMax) === null
+    ) {
+      return NextResponse.json(
+        { error: `Campo C5 invalido (use valores de 0 a ${note2ComponentMax})` },
         { status: 400 },
       )
     }
@@ -145,10 +173,10 @@ export async function PUT(req: NextRequest) {
       manualFinalScoreRaw !== undefined &&
       manualFinalScoreRaw !== null &&
       String(manualFinalScoreRaw).trim() !== "" &&
-      normalizeScore(manualFinalScoreRaw) === null
+      normalizeScore(manualFinalScoreRaw, scoreMax) === null
     ) {
       return NextResponse.json(
-        { error: "Campo Nota Final Manual invalido (use valores de 0 a 10)" },
+        { error: `Campo Nota Final Manual invalido (use valores de 0 a ${scoreMax})` },
         { status: 400 },
       )
     }
@@ -161,9 +189,9 @@ export async function PUT(req: NextRequest) {
       if (!isUuid(studentId)) continue
 
       const hasExam = true
-      const examScore = normalizeScore(item?.exam_score)
-      const c5Score = normalizeScore(item?.c5_score)
-      const manualFinalScore = normalizeScore(item?.manual_final_score)
+      const examScore = normalizeScore(item?.exam_score, note2ComponentMax)
+      const c5Score = normalizeScore(item?.c5_score, note2ComponentMax)
+      const manualFinalScore = normalizeScore(item?.manual_final_score, scoreMax)
       const notes = typeof item?.notes === "string" ? item.notes.trim() : null
 
       await sql`

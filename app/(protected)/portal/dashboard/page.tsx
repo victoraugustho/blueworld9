@@ -416,7 +416,7 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
                 ))
               )}
 
-              <Link href="/portal/dashboard/agenda">
+              <Link href="/portal/dashboard/notas/lancamentos">
                 <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
                   {t.viewAll}
                 </Button>
@@ -481,7 +481,7 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
                   <p className="text-sm text-white/70">
                     {nextLabel} • {timeLabel(nextSchedule.schedule.start_time)} - {timeLabel(nextSchedule.schedule.end_time)}
                   </p>
-                  <Link href="/portal/dashboard/agenda">
+                  <Link href="/portal/dashboard/notas/lancamentos">
                     <Button className="mt-3 bg-cyan-600 hover:bg-cyan-700">
                       {t.openAgenda}
                     </Button>
@@ -499,12 +499,12 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Link href="/portal/dashboard/agenda">
+              <Link href="/portal/dashboard/notas/lancamentos">
                 <Button className="w-full bg-cyan-600 hover:bg-cyan-700">
                   {t.registerClass}
                 </Button>
               </Link>
-              <Link href="/portal/dashboard/agenda">
+              <Link href="/portal/dashboard/notas/lancamentos">
                 <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
                   {t.openAgenda}
                 </Button>

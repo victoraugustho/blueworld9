@@ -45,7 +45,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
     SELECT *
     FROM teacher_class_students
     WHERE class_id = ${classId}
-    ORDER BY active DESC, full_name ASC
+    ORDER BY LOWER(TRIM(full_name)) ASC, full_name ASC, created_at ASC
   `
 
   return NextResponse.json(rows)
@@ -76,10 +76,19 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   const bulk = Array.isArray(body.students) ? body.students : null
   if (bulk && bulk.length > 0) {
+    const sortedBulk = [...bulk].sort((a, b) =>
+      String(a?.full_name ?? a?.name ?? "")
+        .trim()
+        .localeCompare(String(b?.full_name ?? b?.name ?? "").trim(), "pt-BR", {
+          sensitivity: "base",
+          ignorePunctuation: true,
+        }),
+    )
+
     const inserted: any[] = []
     await db.begin(async (tx) => {
       const sql = (tx as any).sql ?? tx
-      for (const item of bulk) {
+      for (const item of sortedBulk) {
         const fullName = normalizeStudentName(item?.full_name ?? item?.name)
         if (!fullName) continue
         const enrollmentCode = normalizeEnrollmentCode(item?.enrollment_code)
@@ -91,6 +100,13 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         inserted.push(row)
       }
     })
+
+    inserted.sort((a, b) =>
+      String(a?.full_name ?? "").localeCompare(String(b?.full_name ?? ""), "pt-BR", {
+        sensitivity: "base",
+        ignorePunctuation: true,
+      }),
+    )
 
     return NextResponse.json(inserted)
   }

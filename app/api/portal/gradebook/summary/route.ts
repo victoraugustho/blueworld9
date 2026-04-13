@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
 import {
   ensureGradebookSchema,
+  getScoreMaxByCountry,
   getBimesterLock,
   isUuid,
   normalizeBimester,
@@ -11,10 +12,14 @@ import {
 
 async function loadOwnedClass(teacherId: string, classId: string) {
   const [row] = await db`
-    SELECT *
-    FROM teacher_classes
-    WHERE id = ${classId}
-      AND teacher_id = ${teacherId}
+    SELECT
+      tc.*,
+      t.country AS teacher_country
+    FROM teacher_classes tc
+    LEFT JOIN teachers t
+      ON t.id = tc.teacher_id
+    WHERE tc.id = ${classId}
+      AND tc.teacher_id = ${teacherId}
     LIMIT 1
   `
   return row
@@ -47,6 +52,39 @@ export async function GET(req: NextRequest) {
   if (!classRow) {
     return NextResponse.json({ error: "Turma nao encontrada" }, { status: 404 })
   }
+  const className = String(classRow.name ?? "")
+  const isPyScoreScale = getScoreMaxByCountry(classRow.teacher_country ?? auth.teacher.country) <= 5
+
+  await db`
+    DELETE FROM teacher_grade_lessons gl
+    WHERE gl.teacher_id = ${auth.teacherId}
+      AND gl.class_id = ${classId}
+      AND gl.school_year = ${schoolYear}
+      AND gl.bimester = ${bimester}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM teacher_lesson_logs l
+        WHERE l.teacher_id = ${auth.teacherId}
+          AND (
+            l.class_id = ${classId}
+            OR (
+              l.class_id IS NULL
+              AND lower(trim(l.class_label)) = lower(trim(${className}))
+            )
+          )
+          AND COALESCE(l.school_year::int, EXTRACT(YEAR FROM l.lesson_date)::int) = ${schoolYear}
+          AND COALESCE(
+            l.bimester::int,
+            CASE
+              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 1 AND 3 THEN 1
+              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 4 AND 6 THEN 2
+              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 7 AND 9 THEN 3
+              ELSE 4
+            END
+          ) = ${bimester}
+          AND l.lesson_number = gl.lesson_number
+      )
+  `
 
   const lock = await getBimesterLock(classId, schoolYear, bimester)
 
@@ -113,26 +151,30 @@ export async function GET(req: NextRequest) {
       CASE
         WHEN b.exam_score IS NOT NULL
          AND b.c5_score IS NOT NULL
-          THEN ROUND(((b.exam_score + b.c5_score) / 2.0)::numeric, 2)
-        WHEN b.exam_score IS NULL
-         AND b.c5_score IS NOT NULL
-          THEN ROUND((b.c5_score)::numeric, 2)
+          THEN ROUND(
+            (
+              CASE
+                WHEN ${isPyScoreScale}
+                  THEN ((b.exam_score + b.c5_score) / 2.0)
+                ELSE (b.exam_score + b.c5_score)
+              END
+            )::numeric,
+            2
+          )
         ELSE NULL
       END AS note2,
       CASE
         WHEN b.manual_final_score IS NOT NULL THEN b.manual_final_score
         WHEN b.note1 IS NOT NULL
-         AND (
-           (b.exam_score IS NOT NULL AND b.c5_score IS NOT NULL)
-           OR (b.exam_score IS NULL AND b.c5_score IS NOT NULL)
-         )
+         AND b.exam_score IS NOT NULL
+         AND b.c5_score IS NOT NULL
           THEN ROUND(
             (
               b.note1 + (
                 CASE
-                  WHEN b.exam_score IS NOT NULL
+                  WHEN ${isPyScoreScale}
                     THEN ((b.exam_score + b.c5_score) / 2.0)
-                  ELSE b.c5_score
+                  ELSE (b.exam_score + b.c5_score)
                 END
               )
             ) / 2.0

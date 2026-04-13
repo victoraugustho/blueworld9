@@ -70,6 +70,9 @@ export interface TeacherSchedule {
   teacher_id: string
   class_id?: string | null
   class_label: string
+  entry_type?: "class" | "event"
+  is_recurring?: boolean
+  event_date?: string | null
   weekday: number
   start_time: string
   end_time: string
@@ -85,6 +88,8 @@ export interface TeacherLessonLog {
   schedule_id?: string | null
   class_id?: string | null
   class_label: string
+  school_year?: number | null
+  bimester?: number | null
   lesson_number: number
   lesson_date: string
   notes?: string | null
@@ -139,7 +144,14 @@ export interface TeacherGradeLesson {
   lesson_number: number
   lesson_date: string
   notes?: string | null
+  diary_notes?: string | null
+  observations?: string | null
+  lesson_log_id?: string | null
   entries_count?: number
+  graded_entries_count?: number
+  total_students?: number
+  completion_percent?: number
+  fully_launched?: boolean
   absences_count?: number
   created_at?: string
   updated_at?: string

@@ -15,6 +15,9 @@ export async function GET() {
       teacher_id,
       class_id,
       class_label,
+      entry_type,
+      is_recurring,
+      event_date,
       weekday,
       start_time,
       end_time,
@@ -25,7 +28,12 @@ export async function GET() {
     FROM teacher_schedules
     WHERE teacher_id = ${auth.teacherId}
       AND active = TRUE
-    ORDER BY weekday ASC, start_time ASC
+      AND (
+        COALESCE(is_recurring, TRUE) = TRUE
+        OR event_date IS NULL
+        OR event_date >= CURRENT_DATE
+      )
+    ORDER BY event_date ASC NULLS LAST, weekday ASC, start_time ASC
   `
 
   return NextResponse.json(rows)

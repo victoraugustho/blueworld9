@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
 import {
   ensureGradebookSchema,
+  getScoreMaxByCountry,
   isUuid,
   normalizeSchoolYear,
 } from "@/lib/gradebook"
@@ -12,10 +13,10 @@ function round(value: number, decimals = 2) {
   return Math.round(value * factor) / factor
 }
 
-function calcNote2(examScore: number | null, c5Score: number | null) {
-  if (examScore !== null && c5Score !== null) return round((examScore + c5Score) / 2, 2)
-  if (examScore === null && c5Score !== null) return round(c5Score, 2)
-  return null
+function calcNote2(examScore: number | null, c5Score: number | null, isPyScoreScale: boolean) {
+  if (examScore === null || c5Score === null) return null
+  const value = isPyScoreScale ? (examScore + c5Score) / 2 : examScore + c5Score
+  return round(value, 2)
 }
 
 function calcFinal(note1: number | null, note2: number | null) {
@@ -25,10 +26,14 @@ function calcFinal(note1: number | null, note2: number | null) {
 
 async function loadOwnedClass(teacherId: string, classId: string) {
   const [row] = await db`
-    SELECT *
-    FROM teacher_classes
-    WHERE id = ${classId}
-      AND teacher_id = ${teacherId}
+    SELECT
+      tc.*,
+      t.country AS teacher_country
+    FROM teacher_classes tc
+    LEFT JOIN teachers t
+      ON t.id = tc.teacher_id
+    WHERE tc.id = ${classId}
+      AND tc.teacher_id = ${teacherId}
     LIMIT 1
   `
   return row
@@ -36,9 +41,13 @@ async function loadOwnedClass(teacherId: string, classId: string) {
 
 async function loadClass(classId: string) {
   const [row] = await db`
-    SELECT *
-    FROM teacher_classes
-    WHERE id = ${classId}
+    SELECT
+      tc.*,
+      t.country AS teacher_country
+    FROM teacher_classes tc
+    LEFT JOIN teachers t
+      ON t.id = tc.teacher_id
+    WHERE tc.id = ${classId}
     LIMIT 1
   `
   return row
@@ -63,6 +72,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (!classRow) {
     return NextResponse.json({ error: "Turma nao encontrada" }, { status: 404 })
   }
+  const isPyScoreScale = getScoreMaxByCountry(classRow.teacher_country ?? auth.teacher.country) <= 5
 
   const search = new URL(req.url).searchParams
   const schoolYear = normalizeSchoolYear(search.get("schoolYear") ?? classRow.school_year)
@@ -155,7 +165,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
         grade?.manual_final_score === null || grade?.manual_final_score === undefined
           ? null
           : Number(grade.manual_final_score)
-      const note2 = calcNote2(examScore, c5Score)
+      const note2 = calcNote2(examScore, c5Score, isPyScoreScale)
       const calculatedFinal = calcFinal(note1, note2)
       const finalGrade = manualFinalScore ?? calculatedFinal
 

@@ -10,14 +10,12 @@ export default function NotasSectionNav({ locale }: { locale: Locale }) {
   const isEs = locale === "es"
 
   const items = [
-    { href: "/portal/dashboard/notas", label: isEs ? "Visión general" : "Visão geral" },
-    { href: "/portal/dashboard/notas/turmas", label: "Turmas" },
-    { href: "/portal/dashboard/notas/lancamentos", label: isEs ? "Lanzamientos" : "Lançamentos" },
-    { href: "/portal/dashboard/notas/aulas", label: "Aulas" },
+    { href: "/portal/dashboard/notas", label: isEs ? "Vision general" : "Visao geral" },
     {
-      href: "/portal/dashboard/notas/resumo",
-      label: isEs ? "Cierre y Nota Final" : "Fechamento e Nota Final",
+      href: "/portal/dashboard/notas/lancamentos",
+      label: isEs ? "Lanzamientos + Agenda" : "Lancamentos + Agenda",
     },
+    { href: "/portal/dashboard/notas/aulas", label: "Aulas" },
   ]
 
   return (

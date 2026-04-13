@@ -19,8 +19,11 @@ export async function GET(req: NextRequest) {
   await ensureGradebookSchema()
 
   const search = new URL(req.url).searchParams
+  const allYears = String(search.get("allYears") ?? "").trim().toLowerCase()
+  const loadAllYears = isAdmin && (allYears === "1" || allYears === "true")
+
   const schoolYear = normalizeSchoolYear(search.get("schoolYear"))
-  if (schoolYear === null) {
+  if (!loadAllYears && schoolYear === null) {
     return NextResponse.json({ error: "Ano letivo invalido" }, { status: 400 })
   }
   const teacherIdParam = String(search.get("teacherId") ?? "").trim()
@@ -32,19 +35,32 @@ export async function GET(req: NextRequest) {
       ? teacherIdParam
       : auth.teacherId
 
-  const rows = await db`
-    SELECT
-      c.*,
-      COUNT(DISTINCT s.id)::int AS student_count
-    FROM teacher_classes c
-    LEFT JOIN teacher_class_students s
-      ON s.class_id = c.id
-     AND s.active = TRUE
-    WHERE c.teacher_id = ${targetTeacherId}
-      AND c.school_year = ${schoolYear}
-    GROUP BY c.id
-    ORDER BY c.active DESC, c.name ASC
-  `
+  const rows = loadAllYears
+    ? await db`
+        SELECT
+          c.*,
+          COUNT(DISTINCT s.id)::int AS student_count
+        FROM teacher_classes c
+        LEFT JOIN teacher_class_students s
+          ON s.class_id = c.id
+         AND s.active = TRUE
+        WHERE c.teacher_id = ${targetTeacherId}
+        GROUP BY c.id
+        ORDER BY c.school_year DESC, c.active DESC, c.name ASC
+      `
+    : await db`
+        SELECT
+          c.*,
+          COUNT(DISTINCT s.id)::int AS student_count
+        FROM teacher_classes c
+        LEFT JOIN teacher_class_students s
+          ON s.class_id = c.id
+         AND s.active = TRUE
+        WHERE c.teacher_id = ${targetTeacherId}
+          AND c.school_year = ${schoolYear}
+        GROUP BY c.id
+        ORDER BY c.active DESC, c.name ASC
+      `
 
   return NextResponse.json(rows)
 }

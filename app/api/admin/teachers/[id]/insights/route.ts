@@ -30,6 +30,37 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "Professor nao encontrado" }, { status: 404 })
   }
 
+  await db`
+    DELETE FROM teacher_grade_lessons gl
+    USING teacher_classes c
+    WHERE gl.class_id = c.id
+      AND c.teacher_id = ${id}
+      AND gl.school_year = ${schoolYear}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM teacher_lesson_logs l
+        WHERE l.teacher_id = ${id}
+          AND COALESCE(l.school_year::int, EXTRACT(YEAR FROM l.lesson_date)::int) = ${schoolYear}
+          AND l.lesson_number = gl.lesson_number
+          AND COALESCE(
+            l.bimester::int,
+            CASE
+              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 1 AND 3 THEN 1
+              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 4 AND 6 THEN 2
+              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 7 AND 9 THEN 3
+              ELSE 4
+            END
+          ) = gl.bimester
+          AND (
+            l.class_id = gl.class_id
+            OR (
+              l.class_id IS NULL
+              AND lower(trim(l.class_label)) = lower(trim(c.name))
+            )
+          )
+      )
+  `
+
   const logs = await db`
     SELECT id, action, status, request_path, created_at
     FROM audit_logs
@@ -180,15 +211,22 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
       c.active,
       COUNT(DISTINCT s.id)::int AS student_count,
       COUNT(DISTINCT s.id) FILTER (WHERE s.active = TRUE)::int AS active_student_count,
-      COUNT(DISTINCT l.id)::int AS lesson_count,
-      MAX(l.lesson_date)::text AS last_lesson_date,
-      MAX(l.lesson_number)::int AS last_lesson_number
+      COUNT(DISTINCT ll.id)::int AS lesson_count,
+      MAX(ll.lesson_date)::text AS last_lesson_date,
+      MAX(ll.lesson_number)::int AS last_lesson_number
     FROM teacher_classes c
     LEFT JOIN teacher_class_students s
       ON s.class_id = c.id
-    LEFT JOIN teacher_grade_lessons l
-      ON l.class_id = c.id
-     AND l.school_year = ${schoolYear}
+    LEFT JOIN teacher_lesson_logs ll
+      ON ll.teacher_id = c.teacher_id
+     AND COALESCE(ll.school_year::int, EXTRACT(YEAR FROM ll.lesson_date)::int) = ${schoolYear}
+     AND (
+       ll.class_id = c.id
+       OR (
+         ll.class_id IS NULL
+         AND lower(trim(ll.class_label)) = lower(trim(c.name))
+       )
+     )
     WHERE c.teacher_id = ${id}
       AND c.school_year = ${schoolYear}
     GROUP BY c.id

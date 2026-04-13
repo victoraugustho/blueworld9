@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { Eye, GraduationCap, Pencil, Plus, RefreshCcw, Trash2, Users } from "lucide-react"
+import { Eye, GraduationCap, Pencil, RefreshCcw, Trash2, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -169,8 +169,7 @@ export default function TurmasClient({ locale, isAdmin }: { locale: Locale; isAd
 
       <Card className="bg-slate-900/35 border border-white/10 backdrop-blur-sm">
         <CardContent className="pt-6">
-          <div className="flex flex-wrap items-end gap-3 justify-between">
-            <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-wrap items-end gap-3">
               {isAdmin && (
                 <div>
                   <Label className="text-white">{isEs ? "Profesor" : "Professor"}</Label>
@@ -209,22 +208,6 @@ export default function TurmasClient({ locale, isAdmin }: { locale: Locale; isAd
                 <RefreshCcw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
                 {isEs ? "Actualizar" : "Atualizar"}
               </Button>
-            </div>
-
-            {isAdmin &&
-              (selectedTeacherId ? (
-                <Button asChild className="bg-cyan-600 hover:bg-cyan-700">
-                  <Link href={`/portal/dashboard/notas/turmas/nova?teacherId=${selectedTeacherId}`}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    {isEs ? "Nueva turma" : "Nova turma"}
-                  </Link>
-                </Button>
-              ) : (
-                <Button disabled className="bg-cyan-600/60">
-                  <Plus className="w-4 h-4 mr-2" />
-                  {isEs ? "Nueva turma" : "Nova turma"}
-                </Button>
-              ))}
           </div>
         </CardContent>
       </Card>

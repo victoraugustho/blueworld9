@@ -4,6 +4,7 @@ import { requireTeacherApi } from "@/lib/auth/require"
 import { getDefaultTimezone } from "@/lib/timezones"
 import {
   ensureGradebookSchema,
+  getScoreMaxByCountry,
   getBimesterLock,
   isUuid,
   normalizeAttendance,
@@ -57,6 +58,56 @@ async function loadOwnedLesson(teacherId: string, lessonId: string) {
   return lesson
 }
 
+function inferredBimesterSql() {
+  return db`
+    CASE
+      WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 1 AND 3 THEN 1
+      WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 4 AND 6 THEN 2
+      WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 7 AND 9 THEN 3
+      ELSE 4
+    END
+  `
+}
+
+async function loadLinkedLessonLog(params: {
+  teacherId: string
+  classId: string
+  lessonNumber: number
+  bimester: number
+  lessonDate: string
+}) {
+  const { teacherId, classId, lessonNumber, bimester, lessonDate } = params
+
+  const [byNumber] = await db`
+    SELECT id, notes, observations, lesson_date
+    FROM teacher_lesson_logs
+    WHERE teacher_id = ${teacherId}
+      AND class_id = ${classId}
+      AND lesson_number = ${lessonNumber}
+      AND COALESCE(bimester::int, ${inferredBimesterSql()}) = ${bimester}
+    ORDER BY updated_at DESC NULLS LAST, created_at DESC
+    LIMIT 1
+  `
+
+  if (byNumber) return byNumber
+
+  const normalizedDate = normalizeDateInput(lessonDate)
+  if (!normalizedDate) return null
+
+  const [byDate] = await db`
+    SELECT id, notes, observations, lesson_date
+    FROM teacher_lesson_logs
+    WHERE teacher_id = ${teacherId}
+      AND class_id = ${classId}
+      AND lesson_date = ${normalizedDate}::date
+      AND COALESCE(bimester::int, ${inferredBimesterSql()}) = ${bimester}
+    ORDER BY updated_at DESC NULLS LAST, created_at DESC
+    LIMIT 1
+  `
+
+  return byDate ?? null
+}
+
 export async function GET(_req: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
@@ -73,6 +124,14 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   if (!lesson) {
     return NextResponse.json({ error: "Aula nao encontrada" }, { status: 404 })
   }
+
+  const linkedLog = await loadLinkedLessonLog({
+    teacherId: auth.teacherId,
+    classId: String(lesson.class_id),
+    lessonNumber: Number(lesson.lesson_number),
+    bimester: Number(lesson.bimester),
+    lessonDate: String(lesson.lesson_date ?? ""),
+  })
 
   const entries = await db`
     SELECT
@@ -96,7 +155,12 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   `
 
   return NextResponse.json({
-    lesson,
+    lesson: {
+      ...lesson,
+      diary_notes: linkedLog?.notes ?? lesson.notes ?? null,
+      observations: linkedLog?.observations ?? null,
+      lesson_log_id: linkedLog?.id ?? null,
+    },
     entries,
   })
 }
@@ -106,6 +170,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   if (!auth.ok) return auth.response
 
   await ensureGradebookSchema()
+  const scoreMax = getScoreMaxByCountry(auth.teacher.country)
 
   const resolved = await ctx.params
   const lessonId = String(resolved?.id ?? "").trim()
@@ -131,7 +196,22 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   }
 
   const body = await req.json().catch(() => ({}))
-  const notes = typeof body.notes === "string" ? body.notes.trim() : String(lesson.notes ?? "")
+  const linkedLog = await loadLinkedLessonLog({
+    teacherId: auth.teacherId,
+    classId: String(lesson.class_id),
+    lessonNumber: Number(lesson.lesson_number),
+    bimester: Number(lesson.bimester),
+    lessonDate: String(lesson.lesson_date ?? ""),
+  })
+
+  const notes =
+    typeof body.notes === "string"
+      ? body.notes.trim()
+      : String(linkedLog?.notes ?? lesson.notes ?? "")
+  const observations =
+    typeof body.observations === "string"
+      ? body.observations.trim()
+      : String(linkedLog?.observations ?? "")
   const rawLessonDateInput = body.lesson_date !== undefined ? String(body.lesson_date ?? "").trim() : ""
   const lessonDateFromPayload = normalizeDateInput(body.lesson_date)
   if (rawLessonDateInput && !lessonDateFromPayload) {
@@ -172,15 +252,56 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       WHERE id = ${lessonId}
     `
 
+    if (linkedLog?.id) {
+      await sql`
+        UPDATE teacher_lesson_logs
+        SET
+          lesson_date = ${lessonDateRaw},
+          notes = ${notes || null},
+          observations = ${observations || null},
+          updated_at = NOW()
+        WHERE id = ${linkedLog.id}
+      `
+    } else {
+      await sql`
+        WITH candidate AS (
+          SELECT id
+          FROM teacher_lesson_logs
+          WHERE teacher_id = ${auth.teacherId}
+            AND class_id = ${lesson.class_id}
+            AND lesson_number = ${lesson.lesson_number}
+            AND COALESCE(
+              bimester::int,
+              CASE
+                WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 1 AND 3 THEN 1
+                WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 4 AND 6 THEN 2
+                WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 7 AND 9 THEN 3
+                ELSE 4
+              END
+            ) = ${lesson.bimester}
+          ORDER BY updated_at DESC NULLS LAST, created_at DESC
+          LIMIT 1
+        )
+        UPDATE teacher_lesson_logs l
+        SET
+          lesson_date = ${lessonDateRaw},
+          notes = ${notes || null},
+          observations = ${observations || null},
+          updated_at = NOW()
+        FROM candidate c
+        WHERE l.id = c.id
+      `
+    }
+
     for (const entry of entries) {
       const studentId = String(entry?.student_id ?? "").trim()
       if (!isUuid(studentId)) continue
 
       const attendance = normalizeAttendance(entry?.attendance)
-      const c1 = normalizeScore(entry?.c1)
-      const c2 = normalizeScore(entry?.c2)
-      const c3 = normalizeScore(entry?.c3)
-      const c4 = normalizeScore(entry?.c4)
+      const c1 = normalizeScore(entry?.c1, scoreMax)
+      const c2 = normalizeScore(entry?.c2, scoreMax)
+      const c3 = normalizeScore(entry?.c3, scoreMax)
+      const c4 = normalizeScore(entry?.c4, scoreMax)
       const comment = typeof entry?.comment === "string" ? entry.comment.trim() : null
 
       await sql`
@@ -235,6 +356,14 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
 
   await ensureGradebookSchema()
 
+  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  if (!isAdmin) {
+    return NextResponse.json(
+      { error: "Somente administradores podem excluir aulas." },
+      { status: 403 },
+    )
+  }
+
   const resolved = await ctx.params
   const lessonId = String(resolved?.id ?? "").trim()
   if (!isUuid(lessonId)) {
@@ -258,12 +387,73 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
     )
   }
 
-  const [deleted] = await db`
-    DELETE FROM teacher_grade_lessons
-    WHERE id = ${lessonId}
-      AND teacher_id = ${auth.teacherId}
-    RETURNING id
-  `
+  let deleted: any = null
+
+  await db.begin(async (tx) => {
+    const sql = (tx as any).sql ?? tx
+
+    const [removedLesson] = await sql`
+      DELETE FROM teacher_grade_lessons
+      WHERE id = ${lessonId}
+        AND teacher_id = ${auth.teacherId}
+      RETURNING id, class_id, lesson_number, lesson_date, bimester
+    `
+
+    if (!removedLesson) return
+
+    deleted = removedLesson
+
+    const removedByNumber = await sql`
+      WITH candidate AS (
+        SELECT id
+        FROM teacher_lesson_logs
+        WHERE teacher_id = ${auth.teacherId}
+          AND class_id = ${removedLesson.class_id}
+          AND lesson_number = ${removedLesson.lesson_number}
+          AND COALESCE(
+            bimester::int,
+            CASE
+              WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 1 AND 3 THEN 1
+              WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 4 AND 6 THEN 2
+              WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 7 AND 9 THEN 3
+              ELSE 4
+            END
+          ) = ${removedLesson.bimester}
+        ORDER BY updated_at DESC NULLS LAST, created_at DESC
+        LIMIT 1
+      )
+      DELETE FROM teacher_lesson_logs l
+      USING candidate c
+      WHERE l.id = c.id
+      RETURNING l.id
+    `
+
+    if (removedByNumber.length > 0) return
+
+    await sql`
+      WITH candidate AS (
+        SELECT id
+        FROM teacher_lesson_logs
+        WHERE teacher_id = ${auth.teacherId}
+          AND class_id = ${removedLesson.class_id}
+          AND lesson_date = ${removedLesson.lesson_date}::date
+          AND COALESCE(
+            bimester::int,
+            CASE
+              WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 1 AND 3 THEN 1
+              WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 4 AND 6 THEN 2
+              WHEN EXTRACT(MONTH FROM lesson_date)::int BETWEEN 7 AND 9 THEN 3
+              ELSE 4
+            END
+          ) = ${removedLesson.bimester}
+        ORDER BY updated_at DESC NULLS LAST, created_at DESC
+        LIMIT 1
+      )
+      DELETE FROM teacher_lesson_logs l
+      USING candidate c
+      WHERE l.id = c.id
+    `
+  })
 
   if (!deleted) {
     return NextResponse.json({ error: "Aula nao encontrada" }, { status: 404 })

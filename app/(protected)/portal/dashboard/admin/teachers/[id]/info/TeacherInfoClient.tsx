@@ -13,6 +13,7 @@ import {
   ChevronUp,
   ClipboardList,
   FileText,
+  Lock,
   Pencil,
   RefreshCcw,
   RotateCcw,
@@ -224,6 +225,8 @@ export default function TeacherInfoClient({ teacherId }: { teacherId: string }) 
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
   const [scheduleSaving, setScheduleSaving] = useState(false)
   const [scheduleError, setScheduleError] = useState("")
+  const [gradebookLockSavingKey, setGradebookLockSavingKey] = useState("")
+  const [gradebookLockError, setGradebookLockError] = useState("")
   const [scheduleForm, setScheduleForm] = useState({
     teacher_id: "",
     class_label: "",
@@ -440,6 +443,42 @@ export default function TeacherInfoClient({ teacherId }: { teacherId: string }) 
       body: JSON.stringify({ active: true }),
     })
     refresh()
+  }
+
+  async function toggleBimesterLock(
+    classId: string,
+    schoolYear: number,
+    bimester: number,
+    closed: boolean,
+  ) {
+    const confirmMessage = closed
+      ? `Reabrir o bimestre ${bimester} desta turma?`
+      : `Fechar o bimestre ${bimester} desta turma?`
+    if (!confirm(confirmMessage)) return
+
+    const key = `${classId}:${schoolYear}:${bimester}`
+    setGradebookLockSavingKey(key)
+    setGradebookLockError("")
+
+    const res = await fetch("/api/portal/gradebook/bimester-lock", {
+      method: closed ? "DELETE" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        class_id: classId,
+        school_year: schoolYear,
+        bimester,
+      }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+    setGradebookLockSavingKey("")
+
+    if (!res.ok) {
+      setGradebookLockError(String(data?.error ?? "Nao foi possivel atualizar o status do bimestre."))
+      return
+    }
+
+    await refresh()
   }
 
   function toggleClass(label: string) {
@@ -949,19 +988,47 @@ export default function TeacherInfoClient({ teacherId }: { teacherId: string }) 
                             <div className="px-4 pb-3">
                               <div className="flex flex-wrap gap-2">
                                 {item.bimesters.map((bim) => (
-                                  <span
-                                    key={`${item.id}-${bim.bimester}`}
-                                    className={`text-[11px] px-2 py-1 rounded-full border ${
-                                      bim.closed
-                                        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                                        : "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                                    }`}
-                                  >
-                                    B{bim.bimester}: {bim.students_with_final}/{bim.total_students} finais{" "}
-                                    {bim.closed ? "(fechado)" : "(aberto)"}
-                                  </span>
+                                  <div key={`${item.id}-${bim.bimester}`} className="inline-flex items-center gap-2">
+                                    <span
+                                      className={`text-[11px] px-2 py-1 rounded-full border ${
+                                        bim.closed
+                                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                                          : "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                                      }`}
+                                    >
+                                      B{bim.bimester}: {bim.students_with_final}/{bim.total_students} finais{" "}
+                                      {bim.closed ? "(fechado)" : "(aberto)"}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        toggleBimesterLock(
+                                          item.id,
+                                          item.school_year,
+                                          bim.bimester,
+                                          bim.closed,
+                                        )
+                                      }
+                                      disabled={gradebookLockSavingKey === `${item.id}:${item.school_year}:${bim.bimester}`}
+                                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] ${
+                                        bim.closed
+                                          ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
+                                          : "border-rose-500/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                                      } disabled:opacity-60 disabled:cursor-not-allowed`}
+                                    >
+                                      <Lock className="w-3 h-3" />
+                                      {gradebookLockSavingKey === `${item.id}:${item.school_year}:${bim.bimester}`
+                                        ? "Salvando..."
+                                        : bim.closed
+                                          ? "Reabrir"
+                                          : "Fechar"}
+                                    </button>
+                                  </div>
                                 ))}
                               </div>
+                              {gradebookLockError ? (
+                                <p className="text-[11px] text-rose-300 mt-2">{gradebookLockError}</p>
+                              ) : null}
                               {item.last_lesson_date && (
                                 <p className="text-[11px] text-white/50 mt-2">
                                   Ultima aula: {formatDate(item.last_lesson_date)}{" "}

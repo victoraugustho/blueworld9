@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -16,7 +16,13 @@ import {
   Sunset,
   Trash2,
 } from "lucide-react"
-import type { TeacherLessonLog, TeacherReminder, TeacherSchedule } from "@/app/types/portal"
+import type {
+  AttendanceStatus,
+  TeacherClassStudent,
+  TeacherLessonLog,
+  TeacherReminder,
+  TeacherSchedule,
+} from "@/app/types/portal"
 import { getTimezoneLabel } from "@/lib/timezones"
 
 type Locale = "pt-BR" | "es"
@@ -25,8 +31,22 @@ type LessonForm = {
   schedule_id: string
   class_id: string
   class_label: string
+  lesson_date: string
+  school_year: number
+  bimester: number
   notes: string
   observations: string
+}
+
+type RegisterEntry = {
+  student_id: string
+  full_name: string
+  attendance: AttendanceStatus
+  c1: number | null
+  c2: number | null
+  c3: number | null
+  c4: number | null
+  comment: string
 }
 
 type ClassOption = {
@@ -42,13 +62,16 @@ function timeLabel(value: string) {
   return String(value).slice(0, 5)
 }
 
-function formatDate(value: string, locale: Locale) {
+function formatDate(value: unknown, locale: Locale) {
   if (!value) return "-"
   try {
-    const d = new Date(`${value}T00:00:00Z`)
+    const normalized = normalizeDateInput(value)
+    if (!normalized) return "-"
+    const d = new Date(`${normalized}T00:00:00Z`)
+    if (Number.isNaN(d.getTime())) return String(value)
     return d.toLocaleDateString(locale === "es" ? "es-ES" : "pt-BR", { timeZone: "UTC" })
   } catch {
-    return value
+    return String(value)
   }
 }
 
@@ -63,6 +86,37 @@ function normalizeDateInput(value: any) {
   }
   return ""
 }
+
+function getTodayInTimeZone(timeZone: string) {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date())
+  } catch {
+    return new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date())
+  }
+}
+
+function parseScoreInput(value: string, max = 10) {
+  const clean = value.replace(",", ".").trim()
+  if (!clean) return null
+  const parsed = Number(clean)
+  if (!Number.isFinite(parsed)) return null
+  return Math.max(0, Math.min(max, Math.round(parsed * 100) / 100))
+}
+
+const scoreInputClass =
+  "h-8 w-16 bg-slate-900/80 border border-white/10 rounded-md text-white text-center text-xs px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+
+type ScoreField = "c1" | "c2" | "c3" | "c4"
+const scoreFieldOrder: ScoreField[] = ["c1", "c2", "c3", "c4"]
 
 function formatDateTime(value: string | null | undefined, locale: Locale) {
   if (!value) return "-"
@@ -164,6 +218,30 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     reminderDelete: locale === "es" ? "Eliminar" : "Excluir",
     morningShift: locale === "es" ? "Matutino" : "Matutino",
     afternoonShift: locale === "es" ? "Vespertino" : "Vespertino",
+    classTag: locale === "es" ? "Clase" : "Turma",
+    eventTag: locale === "es" ? "Evento" : "Evento",
+    recurringTag: locale === "es" ? "Semanal" : "Semanal",
+    oneOffTag: locale === "es" ? "Puntual" : "Pontual",
+    eventNoRegister:
+      locale === "es"
+        ? "Evento sin lanzamiento de notas."
+        : "Evento sem lancamento de notas.",
+    oneOffEvents: locale === "es" ? "Eventos puntuales" : "Eventos pontuais",
+    noOneOffEvents:
+      locale === "es" ? "Sin eventos puntuales." : "Nenhum evento pontual.",
+    lessonDate: locale === "es" ? "Fecha de la clase" : "Data da aula",
+    schoolYear: locale === "es" ? "Ano lectivo" : "Ano letivo",
+    bimester: locale === "es" ? "Bimestre" : "Bimestre",
+    students: locale === "es" ? "Alumnos" : "Alunos",
+    loadingStudents: locale === "es" ? "Cargando alumnos..." : "Carregando alunos...",
+    noStudents: locale === "es" ? "Sin alumnos activos en la clase." : "Sem alunos ativos na turma.",
+    attendance: locale === "es" ? "Asistencia" : "Presenca",
+    studentObservation: locale === "es" ? "Observacion" : "Observacao",
+    classSummary: locale === "es" ? "Resumo da aula" : "Resumo da aula",
+    scoreLegend:
+      locale === "es"
+        ? "C1 a C4: notas de 0 a 10 por alumno."
+        : "C1 a C4: notas de 0 a 10 por aluno.",
   }
   const weekdayLabels = useMemo(
     () =>
@@ -210,12 +288,18 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     schedule_id: "",
     class_id: "",
     class_label: "",
+    lesson_date: "",
+    school_year: new Date().getFullYear(),
+    bimester: 1,
     notes: "",
     observations: "",
   })
 
   const [registerSchedule, setRegisterSchedule] = useState<TeacherSchedule | null>(null)
   const [registerOpen, setRegisterOpen] = useState(false)
+  const [registerEntries, setRegisterEntries] = useState<RegisterEntry[]>([])
+  const [registerLoadingStudents, setRegisterLoadingStudents] = useState(false)
+  const registerScoreInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
   const [editing, setEditing] = useState<
     | {
         id: string
@@ -241,6 +325,65 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
 
   function registerWithNumber(value: number) {
     return `${t.register} ${value}`
+  }
+
+  function registerScoreRefKey(studentId: string, field: ScoreField) {
+    return `${studentId}:${field}`
+  }
+
+  function setRegisterScoreInputRef(studentId: string, field: ScoreField, el: HTMLInputElement | null) {
+    registerScoreInputRefs.current[registerScoreRefKey(studentId, field)] = el
+  }
+
+  function focusRegisterScoreCell(rowIndex: number, field: ScoreField) {
+    const row = registerEntries[rowIndex]
+    if (!row) return
+    const input = registerScoreInputRefs.current[registerScoreRefKey(row.student_id, field)]
+    input?.focus()
+    input?.select()
+  }
+
+  function handleRegisterScoreKeyDown(
+    event: ReactKeyboardEvent<HTMLInputElement>,
+    rowIndex: number,
+    field: ScoreField,
+  ) {
+    const colIndex = scoreFieldOrder.indexOf(field)
+    if (colIndex < 0) return
+
+    let targetRow = rowIndex
+    let targetCol = colIndex
+
+    if (event.key === "Enter" || event.key === "ArrowRight") {
+      if (colIndex < scoreFieldOrder.length - 1) {
+        targetCol = colIndex + 1
+      } else if (rowIndex < registerEntries.length - 1) {
+        targetRow = rowIndex + 1
+        targetCol = 0
+      } else {
+        return
+      }
+    } else if (event.key === "ArrowLeft") {
+      if (colIndex > 0) {
+        targetCol = colIndex - 1
+      } else if (rowIndex > 0) {
+        targetRow = rowIndex - 1
+        targetCol = scoreFieldOrder.length - 1
+      } else {
+        return
+      }
+    } else if (event.key === "ArrowDown") {
+      if (rowIndex >= registerEntries.length - 1) return
+      targetRow = rowIndex + 1
+    } else if (event.key === "ArrowUp") {
+      if (rowIndex <= 0) return
+      targetRow = rowIndex - 1
+    } else {
+      return
+    }
+
+    event.preventDefault()
+    focusRegisterScoreCell(targetRow, scoreFieldOrder[targetCol])
   }
 
   async function load() {
@@ -315,8 +458,9 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
   }, [logs])
 
   const schedulesByWeekday = useMemo(() => {
-    const map: Record<number, TeacherSchedule[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] }
+    const map: Record<number, TeacherSchedule[]> = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] }
     for (const schedule of schedules) {
+      if (schedule.is_recurring === false) continue
       if (map[schedule.weekday]) map[schedule.weekday].push(schedule)
     }
     for (const day of Object.keys(map)) {
@@ -325,9 +469,24 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     return map
   }, [schedules])
 
+  const oneOffEvents = useMemo(
+    () =>
+      schedules
+        .filter((schedule) => schedule.entry_type === "event" && schedule.is_recurring === false)
+        .sort((a, b) => {
+          const da = String(a.event_date ?? "")
+          const db = String(b.event_date ?? "")
+          const dateCompare = da.localeCompare(db)
+          if (dateCompare !== 0) return dateCompare
+          return timeLabel(a.start_time).localeCompare(timeLabel(b.start_time))
+        }),
+    [schedules],
+  )
+
   const classOptions = useMemo<ClassOption[]>(() => {
     const map = new Map<string, ClassOption>()
     for (const schedule of schedules) {
+      if (schedule.entry_type === "event") continue
       const key = getScheduleScopeKey(schedule)
       if (map.has(key)) continue
       const weekday = weekdayLabels[schedule.weekday] ?? String(schedule.weekday)
@@ -381,11 +540,58 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     return map
   }, [reminders])
 
-  function startRegister(schedule: TeacherSchedule) {
+  async function loadRegisterStudents(classId: string) {
+    if (!classId) {
+      setRegisterEntries([])
+      return
+    }
+    setRegisterLoadingStudents(true)
+    try {
+      const [classRes, studentsRes] = await Promise.all([
+        fetch(`/api/portal/gradebook/classes/${classId}`, { cache: "no-store" }),
+        fetch(`/api/portal/gradebook/classes/${classId}/students`, { cache: "no-store" }),
+      ])
+      const classData = await classRes.json().catch(() => null)
+      const studentsData = await studentsRes.json().catch(() => [])
+      const students: TeacherClassStudent[] = Array.isArray(studentsData) ? studentsData : []
+      const activeStudents = students.filter((student) => student.active !== false)
+      if (classData && typeof classData === "object") {
+        setForm((prev) => ({
+          ...prev,
+          class_label: String((classData as any).name ?? prev.class_label),
+          school_year: Number((classData as any).school_year ?? prev.school_year),
+        }))
+      }
+      setRegisterEntries(
+        activeStudents.map((student) => ({
+          student_id: student.id,
+          full_name: student.full_name,
+          attendance: "present",
+          c1: null,
+          c2: null,
+          c3: null,
+          c4: null,
+          comment: "",
+        })),
+      )
+    } catch {
+      setRegisterEntries([])
+      setError(locale === "es" ? "Error al cargar alumnos." : "Erro ao carregar alunos.")
+    } finally {
+      setRegisterLoadingStudents(false)
+    }
+  }
+
+  async function startRegister(schedule: TeacherSchedule) {
+    if (schedule.entry_type === "event" || !schedule.class_id) return
+    const lessonDate = getTodayInTimeZone(schedule.timezone)
     setForm({
       schedule_id: schedule.id,
       class_id: schedule.class_id ? String(schedule.class_id) : "",
       class_label: schedule.class_label,
+      lesson_date: lessonDate,
+      school_year: new Date().getFullYear(),
+      bimester: 1,
       notes: "",
       observations: "",
     })
@@ -393,11 +599,42 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     setRegisterOpen(true)
     setEditing(null)
     setError("")
+    await loadRegisterStudents(String(schedule.class_id))
   }
 
   function resetForm() {
-    setForm({ schedule_id: "", class_id: "", class_label: "", notes: "", observations: "" })
+    setForm({
+      schedule_id: "",
+      class_id: "",
+      class_label: "",
+      lesson_date: "",
+      school_year: new Date().getFullYear(),
+      bimester: 1,
+      notes: "",
+      observations: "",
+    })
+    setRegisterEntries([])
+    setRegisterLoadingStudents(false)
     setError("")
+  }
+
+  function updateRegisterEntry(studentId: string, patch: Partial<RegisterEntry>) {
+    setRegisterEntries((prev) =>
+      prev.map((entry) => (entry.student_id === studentId ? { ...entry, ...patch } : entry)),
+    )
+  }
+
+  function clampRegisterScore(studentId: string, field: "c1" | "c2" | "c3" | "c4", max = 10) {
+    setRegisterEntries((prev) =>
+      prev.map((entry) => {
+        if (entry.student_id !== studentId) return entry
+        const value = entry[field]
+        if (value === null || value === undefined) return entry
+        const clamped = parseScoreInput(String(value), max)
+        if (clamped === value) return entry
+        return { ...entry, [field]: clamped }
+      }),
+    )
   }
 
   function toggleClass(label: string) {
@@ -419,11 +656,26 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
     if (!form.schedule_id && !form.class_id && !form.class_label) return
     setSaving(true)
     setError("")
+    const lessonDate = normalizeDateInput(form.lesson_date) || getTodayInTimeZone(registerSchedule?.timezone ?? "UTC")
 
     const res = await fetch("/api/portal/lesson-logs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        lesson_date: lessonDate,
+        school_year: form.school_year,
+        bimester: form.bimester,
+        entries: registerEntries.map((entry) => ({
+          student_id: entry.student_id,
+          attendance: entry.attendance,
+          c1: entry.c1,
+          c2: entry.c2,
+          c3: entry.c3,
+          c4: entry.c4,
+          comment: entry.comment.trim() || null,
+        })),
+      }),
     })
 
     if (!res.ok) {
@@ -594,7 +846,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
             {loading && <p className="text-slate-400">{t.loading}</p>}
             {!loading && schedules.length === 0 && <p className="text-slate-400">{t.noSchedules}</p>}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-3">
               {[1, 2, 3, 4, 5].map((day) => {
                 const list = schedulesByWeekday[day] ?? []
                 const weekday = weekdayLabels[day] ?? day
@@ -606,44 +858,56 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                     label: t.morningShift,
                     items: morningList,
                     Icon: Sunrise,
-                    panelClass: "border-amber-400/25 bg-amber-500/10",
+                    panelClass: "border-amber-400/35 bg-amber-500/15",
                     chipClass:
-                      "text-amber-50 bg-amber-500/30 border border-amber-300/35",
+                      "text-amber-50 bg-amber-500/35 border border-amber-300/40",
                     countClass: "text-amber-100/90",
                     emptyClass: "text-amber-100/75",
-                    cardClass: "border-amber-300/20 bg-slate-900/50",
+                    cardClass: "border-amber-300/35 bg-amber-500/10",
+                    shiftBadgeClass:
+                      "text-amber-100 bg-amber-500/20 border border-amber-300/35",
+                    timeChipClass:
+                      "text-amber-100 bg-amber-500/20 border border-amber-300/35",
+                    actionClass:
+                      "bg-amber-600 hover:bg-amber-700 text-amber-50",
                   },
                   {
                     key: "afternoon",
                     label: t.afternoonShift,
                     items: afternoonList,
                     Icon: Sunset,
-                    panelClass: "border-sky-400/25 bg-sky-500/10",
+                    panelClass: "border-sky-400/35 bg-sky-500/15",
                     chipClass:
-                      "text-sky-50 bg-sky-500/30 border border-sky-300/35",
+                      "text-sky-50 bg-sky-500/35 border border-sky-300/40",
                     countClass: "text-sky-100/90",
                     emptyClass: "text-sky-100/75",
-                    cardClass: "border-sky-300/20 bg-slate-900/50",
+                    cardClass: "border-sky-300/35 bg-sky-500/10",
+                    shiftBadgeClass:
+                      "text-sky-100 bg-sky-500/20 border border-sky-300/35",
+                    timeChipClass:
+                      "text-sky-100 bg-sky-500/20 border border-sky-300/35",
+                    actionClass:
+                      "bg-sky-600 hover:bg-sky-700 text-sky-50",
                   },
                 ]
                 return (
                   <div key={day} className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
-                    <div className="px-3 py-2 border-b border-white/10 text-xs font-semibold text-white/80">
+                    <div className="px-2.5 py-1.5 border-b border-white/10 text-[11px] font-semibold text-white/80">
                       {weekday}
                     </div>
-                    <div className="p-3 space-y-3">
+                    <div className="p-2.5 space-y-2">
                       {list.length === 0 && (
                         <p className="text-xs text-slate-400">{t.dayEmpty}</p>
                       )}
                       {list.length > 0 &&
                         periodSections.map((section) => (
-                          <div key={section.key} className={`rounded-xl border p-2.5 space-y-2 ${section.panelClass}`}>
-                            <div className="flex items-center justify-between gap-2 px-1">
-                              <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold ${section.chipClass}`}>
-                                <section.Icon className="w-3.5 h-3.5" />
+                          <div key={section.key} className={`rounded-xl border p-2 space-y-1.5 ${section.panelClass}`}>
+                            <div className="flex items-center justify-between gap-2 px-0.5">
+                              <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${section.chipClass}`}>
+                                <section.Icon className="w-3 h-3" />
                                 {section.label}
                               </span>
-                              <span className={`text-[11px] font-semibold ${section.countClass}`}>
+                              <span className={`text-[10px] font-semibold ${section.countClass}`}>
                                 {section.items.length} {t.lessons}
                               </span>
                             </div>
@@ -657,20 +921,40 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                                   const reminderKey = `${scopeKey}::${nextLesson}`
                                   const reminderForLesson = reminderByLesson.get(reminderKey)
                                   const reminderPreviewMax = 80
+                                  const isEvent = schedule.entry_type === "event"
                                   return (
-                                    <div key={schedule.id} className={`rounded-lg border p-3 ${section.cardClass}`}>
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <p className="text-sm font-semibold text-white truncate max-w-[14rem] sm:max-w-none">
+                                    <div key={schedule.id} className={`rounded-lg border p-2 ${section.cardClass}`}>
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <p className="text-xs font-semibold text-white truncate max-w-[14rem] sm:max-w-none">
                                           {schedule.class_label}
                                         </p>
-                                        <span className="text-[11px] font-semibold text-emerald-200 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                                          {t.lesson} {nextLesson}
+                                        <span
+                                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                                            isEvent
+                                              ? "text-amber-100 bg-amber-500/20 border-amber-400/30"
+                                              : "text-cyan-100 bg-cyan-500/20 border-cyan-500/30"
+                                          }`}
+                                        >
+                                          {isEvent ? t.eventTag : t.classTag}
                                         </span>
-                                        <span className="text-[11px] font-semibold text-cyan-100 bg-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${section.shiftBadgeClass}`}>
+                                          {section.label}
+                                        </span>
+                                        {!isEvent && (
+                                          <span className="text-[10px] font-semibold text-emerald-200 bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.5 rounded-full">
+                                            {t.lesson} {nextLesson}
+                                          </span>
+                                        )}
+                                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${section.timeChipClass}`}>
                                           {timeLabel(schedule.start_time)} - {timeLabel(schedule.end_time)}
                                         </span>
                                       </div>
-                                      {reminderForLesson && (
+                                      {schedule.is_recurring === false && (
+                                        <div className="mt-2 text-xs text-white/70">
+                                          {t.date}: {formatDate(String(schedule.event_date ?? ""), locale)}
+                                        </div>
+                                      )}
+                                      {!isEvent && reminderForLesson && (
                                         <div className="mt-2 text-xs text-amber-200 space-y-1">
                                           <p>
                                             {t.reminderLabel}:{" "}
@@ -687,15 +971,19 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                                           )}
                                         </div>
                                       )}
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        onClick={() => startRegister(schedule)}
-                                        className="mt-3 bg-cyan-600 hover:bg-cyan-700 w-full"
-                                      >
-                                        <CheckCircle2 className="w-4 h-4 mr-2" />
-                                        {registerWithNumber(nextLesson)}
-                                      </Button>
+                                      {isEvent ? (
+                                        <p className="mt-3 text-xs text-white/70">{t.eventNoRegister}</p>
+                                      ) : (
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          onClick={() => startRegister(schedule)}
+                                          className={`mt-2 h-7 px-2 text-[11px] ${section.actionClass}`}
+                                        >
+                                          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                                          {registerWithNumber(nextLesson)}
+                                        </Button>
+                                      )}
                                     </div>
                                   )
                                 })}
@@ -708,6 +996,36 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                 )
               })}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-slate-900/30 border border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white text-base">{t.oneOffEvents}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {oneOffEvents.length === 0 && <p className="text-slate-400 text-sm">{t.noOneOffEvents}</p>}
+            {oneOffEvents.map((event) => (
+              <div
+                key={event.id}
+                className="rounded-xl border border-white/10 bg-white/5 p-3 flex items-center justify-between gap-3 flex-wrap"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-white">{event.class_label}</p>
+                  <p className="text-xs text-white/60">
+                    {formatDate(String(event.event_date ?? ""), locale)} • {timeLabel(event.start_time)} - {timeLabel(event.end_time)}
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-2">
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border text-amber-100 bg-amber-500/20 border-amber-400/30">
+                    {t.eventTag}
+                  </span>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border text-amber-100/90 bg-amber-500/10 border-amber-300/20">
+                    {t.oneOffTag}
+                  </span>
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>
@@ -1032,11 +1350,19 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
             }
           }}
         >
-          <div className="w-full max-w-lg rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl shadow-2xl overflow-hidden">
+          <div className="w-full max-w-6xl rounded-2xl border border-white/15 bg-slate-950/85 backdrop-blur-xl shadow-2xl overflow-hidden">
             <div className="p-4 border-b border-white/10 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-white font-semibold">{t.register}</p>
-                <p className="text-xs text-white/60 truncate">{registerSchedule.class_label}</p>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <p className="text-xs text-white/60 truncate">{registerSchedule.class_label}</p>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border text-cyan-100 bg-cyan-500/20 border-cyan-500/30">
+                    {t.classTag}
+                  </span>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border text-white/80 bg-white/10 border-white/15">
+                    {t.recurringTag}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
@@ -1051,7 +1377,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
               </button>
             </div>
 
-            <form onSubmit={submitForm} className="p-4 space-y-4">
+            <form onSubmit={submitForm} className="p-4 space-y-4 max-h-[82vh] overflow-y-auto">
               <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-white/70 space-y-1">
                 <div>
                   {weekdayLabels[registerSchedule.weekday] ?? registerSchedule.weekday} •{" "}
@@ -1064,33 +1390,212 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                     {nextByScope.get(getScheduleScopeKey(registerSchedule)) ?? 1}
                   </span>
                 </div>
-                <div className="text-[11px] text-white/50">{t.autoDate}</div>
+                <div className="text-[11px] text-white/50">{t.scoreLegend}</div>
               </div>
 
-              <div>
-                <label className="text-xs text-slate-400">{t.notes}</label>
-                <textarea
-                  value={form.notes}
-                  onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  rows={3}
-                  className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-slate-400">{t.lessonDate}</label>
+                  <input
+                    type="date"
+                    value={form.lesson_date}
+                    onChange={(e) => setForm((prev) => ({ ...prev, lesson_date: e.target.value }))}
+                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400">{t.schoolYear}</label>
+                  <input
+                    type="number"
+                    min={2000}
+                    max={2100}
+                    value={form.school_year}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        school_year: Number(e.target.value || new Date().getFullYear()),
+                      }))
+                    }
+                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400">{t.bimester}</label>
+                  <select
+                    value={form.bimester}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, bimester: Number(e.target.value) }))
+                    }
+                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white"
+                  >
+                    <option value={1}>1</option>
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                    <option value={4}>4</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="text-xs text-slate-400">{t.observations}</label>
-                <textarea
-                  value={form.observations}
-                  onChange={(e) => setForm((prev) => ({ ...prev, observations: e.target.value }))}
-                  rows={3}
-                  className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white"
-                />
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <p className="text-xs text-slate-400 mb-2">{t.students}</p>
+                {registerLoadingStudents ? (
+                  <p className="text-sm text-slate-300">{t.loadingStudents}</p>
+                ) : registerEntries.length === 0 ? (
+                  <p className="text-sm text-slate-400">{t.noStudents}</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <p className="mb-2 text-xs text-slate-300">
+                      {locale === "es"
+                        ? "Atajo: Enter avanza C1 a C4 y al siguiente alumno. Flechas tambien navegan."
+                        : "Atalho: Enter avanca C1 a C4 e para o proximo aluno. Setas tambem navegam."}
+                    </p>
+                    <table className="min-w-[760px] w-full text-xs sm:text-sm">
+                      <thead>
+                        <tr className="text-slate-300 border-b border-white/10">
+                          <th className="text-left py-2 pr-2">{t.students}</th>
+                          <th className="text-left py-2 pr-2">{t.attendance}</th>
+                          <th className="text-left py-2 pr-2">C1</th>
+                          <th className="text-left py-2 pr-2">C2</th>
+                          <th className="text-left py-2 pr-2">C3</th>
+                          <th className="text-left py-2 pr-2">C4</th>
+                          <th className="text-left py-2 pr-2">{t.studentObservation}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {registerEntries.map((entry, rowIndex) => (
+                          <tr key={entry.student_id} className="border-b border-white/10 last:border-b-0">
+                            <td className="py-2 pr-2 text-white max-w-[220px] truncate">{entry.full_name}</td>
+                            <td className="py-2 pr-2">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-cyan-500 cursor-pointer"
+                                checked={entry.attendance !== "absent"}
+                                onChange={(e) =>
+                                  updateRegisterEntry(entry.student_id, {
+                                    attendance: e.target.checked ? "present" : "absent",
+                                  })
+                                }
+                              />
+                            </td>
+                            <td className="py-2 pr-2">
+                              <input
+                                ref={(el) => setRegisterScoreInputRef(entry.student_id, "c1", el)}
+                                type="number"
+                                min={0}
+                                max={10}
+                                step={0.01}
+                                value={entry.c1 ?? ""}
+                                onChange={(e) =>
+                                  updateRegisterEntry(entry.student_id, {
+                                    c1: parseScoreInput(e.target.value, 10),
+                                  })
+                                }
+                                onBlur={() => clampRegisterScore(entry.student_id, "c1", 10)}
+                                onKeyDown={(e) => handleRegisterScoreKeyDown(e, rowIndex, "c1")}
+                                className={scoreInputClass}
+                              />
+                            </td>
+                            <td className="py-2 pr-2">
+                              <input
+                                ref={(el) => setRegisterScoreInputRef(entry.student_id, "c2", el)}
+                                type="number"
+                                min={0}
+                                max={10}
+                                step={0.01}
+                                value={entry.c2 ?? ""}
+                                onChange={(e) =>
+                                  updateRegisterEntry(entry.student_id, {
+                                    c2: parseScoreInput(e.target.value, 10),
+                                  })
+                                }
+                                onBlur={() => clampRegisterScore(entry.student_id, "c2", 10)}
+                                onKeyDown={(e) => handleRegisterScoreKeyDown(e, rowIndex, "c2")}
+                                className={scoreInputClass}
+                              />
+                            </td>
+                            <td className="py-2 pr-2">
+                              <input
+                                ref={(el) => setRegisterScoreInputRef(entry.student_id, "c3", el)}
+                                type="number"
+                                min={0}
+                                max={10}
+                                step={0.01}
+                                value={entry.c3 ?? ""}
+                                onChange={(e) =>
+                                  updateRegisterEntry(entry.student_id, {
+                                    c3: parseScoreInput(e.target.value, 10),
+                                  })
+                                }
+                                onBlur={() => clampRegisterScore(entry.student_id, "c3", 10)}
+                                onKeyDown={(e) => handleRegisterScoreKeyDown(e, rowIndex, "c3")}
+                                className={scoreInputClass}
+                              />
+                            </td>
+                            <td className="py-2 pr-2">
+                              <input
+                                ref={(el) => setRegisterScoreInputRef(entry.student_id, "c4", el)}
+                                type="number"
+                                min={0}
+                                max={10}
+                                step={0.01}
+                                value={entry.c4 ?? ""}
+                                onChange={(e) =>
+                                  updateRegisterEntry(entry.student_id, {
+                                    c4: parseScoreInput(e.target.value, 10),
+                                  })
+                                }
+                                onBlur={() => clampRegisterScore(entry.student_id, "c4", 10)}
+                                onKeyDown={(e) => handleRegisterScoreKeyDown(e, rowIndex, "c4")}
+                                className={scoreInputClass}
+                              />
+                            </td>
+                            <td className="py-2 pr-2">
+                              <input
+                                value={entry.comment}
+                                onChange={(e) =>
+                                  updateRegisterEntry(entry.student_id, { comment: e.target.value })
+                                }
+                                placeholder={t.studentObservation}
+                                className="w-full px-2 py-1 rounded-md bg-slate-900/80 border border-white/10 text-white"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-400">{t.classSummary}</label>
+                  <textarea
+                    value={form.notes}
+                    onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+                    rows={3}
+                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400">{t.observations}</label>
+                  <textarea
+                    value={form.observations}
+                    onChange={(e) => setForm((prev) => ({ ...prev, observations: e.target.value }))}
+                    rows={3}
+                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white"
+                  />
+                </div>
               </div>
 
               {error && <p className="text-xs text-rose-300">{error}</p>}
 
               <div className="flex gap-2">
-                <Button type="submit" className="bg-cyan-600 hover:bg-cyan-700" disabled={saving}>
+                <Button
+                  type="submit"
+                  className="bg-cyan-600 hover:bg-cyan-700"
+                  disabled={saving || registerLoadingStudents}
+                >
                   {t.save}
                 </Button>
                 <Button

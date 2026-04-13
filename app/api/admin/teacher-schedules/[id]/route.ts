@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
@@ -13,6 +13,17 @@ function timeToMinutes(value: string) {
   return h * 60 + m
 }
 
+function isValidDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function weekdayFromIsoDate(value: string) {
+  const date = new Date(`${value}T00:00:00Z`)
+  if (Number.isNaN(date.getTime())) return null
+  const jsDay = date.getUTCDay()
+  return jsDay === 0 ? 7 : jsDay
+}
+
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
@@ -23,18 +34,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const id = String(rawId ?? "").trim()
   if (!id) return NextResponse.json({ error: "ID invalido" }, { status: 400 })
 
-  const body = await req.json()
-  const class_id_raw = String(body.class_id ?? "").trim()
-  const class_id = class_id_raw && isUuid(class_id_raw) ? class_id_raw : null
-  let class_label = String(body.class_label ?? "").trim()
-  const weekday = Number(body.weekday)
-  const start_time = String(body.start_time ?? "").trim()
-  const end_time = String(body.end_time ?? "").trim()
-  const timezone = String(body.timezone ?? "").trim()
-  const active = body.active !== undefined ? !!body.active : true
-
   const [current] = await db`
-    SELECT id, teacher_id
+    SELECT id, teacher_id, class_id, class_label, entry_type, is_recurring, event_date, weekday, start_time, end_time, timezone, active
     FROM teacher_schedules
     WHERE id = ${id}
     LIMIT 1
@@ -44,11 +45,59 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Nao encontrado" }, { status: 404 })
   }
 
+  const body = await req.json()
+
+  const entry_type =
+    String(body.entry_type ?? current.entry_type ?? "class").trim().toLowerCase() === "event"
+      ? "event"
+      : "class"
+  let is_recurring = body.is_recurring !== undefined ? body.is_recurring === true : current.is_recurring !== false
+  let event_date = String(body.event_date ?? current.event_date ?? "").trim()
+
+  const class_id_raw =
+    body.class_id !== undefined ? String(body.class_id ?? "").trim() : String(current.class_id ?? "").trim()
+  let class_id = class_id_raw && isUuid(class_id_raw) ? class_id_raw : null
+
+  let class_label =
+    body.class_label !== undefined ? String(body.class_label ?? "").trim() : String(current.class_label ?? "").trim()
+
+  let weekday = Number(body.weekday ?? current.weekday)
+  const start_time = String(body.start_time ?? current.start_time ?? "").trim()
+  const end_time = String(body.end_time ?? current.end_time ?? "").trim()
+  const timezone = String(body.timezone ?? current.timezone ?? "").trim()
+  const active = body.active !== undefined ? body.active === true : current.active === true
+
   if (!timezone) {
     return NextResponse.json({ error: "Dados incompletos" }, { status: 400 })
   }
 
-  if (class_id) {
+  const isConvertingClassToEvent =
+    String(current.entry_type ?? "class") === "class" &&
+    entry_type === "event" &&
+    current.class_id
+
+  if (isConvertingClassToEvent) {
+    const [studentsCountRow] = await db`
+      SELECT COUNT(*)::int AS students_count
+      FROM teacher_class_students
+      WHERE class_id = ${current.class_id}
+    `
+    const studentsCount = Number(studentsCountRow?.students_count ?? 0)
+    if (studentsCount > 0) {
+      return NextResponse.json(
+        { error: "Nao e possivel transformar turma em evento com alunos cadastrados." },
+        { status: 400 },
+      )
+    }
+  }
+
+  if (entry_type === "class") {
+    is_recurring = true
+    event_date = ""
+    if (!class_id) {
+      return NextResponse.json({ error: "Turma obrigatoria para horario de aula" }, { status: 400 })
+    }
+
     const [classRow] = await db`
       SELECT id, name
       FROM teacher_classes
@@ -61,16 +110,28 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Turma invalida" }, { status: 400 })
     }
 
+    class_label = String(classRow.name ?? "").trim()
+  } else {
+    class_id = null
     if (!class_label) {
-      class_label = String(classRow.name ?? "").trim()
+      return NextResponse.json({ error: "Titulo do evento obrigatorio" }, { status: 400 })
     }
   }
 
-  if (!class_label) {
-    return NextResponse.json({ error: "Dados incompletos" }, { status: 400 })
+  if (!is_recurring) {
+    if (!event_date || !isValidDate(event_date)) {
+      return NextResponse.json({ error: "Data do evento invalida" }, { status: 400 })
+    }
+    const parsedWeekday = weekdayFromIsoDate(event_date)
+    if (!parsedWeekday) {
+      return NextResponse.json({ error: "Data do evento invalida" }, { status: 400 })
+    }
+    weekday = parsedWeekday
+  } else {
+    event_date = ""
   }
 
-  if (!Number.isInteger(weekday) || weekday < 1 || weekday > 5) {
+  if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) {
     return NextResponse.json({ error: "Dia da semana invalido" }, { status: 400 })
   }
 
@@ -84,13 +145,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const [updated] = await db`
     UPDATE teacher_schedules
-    SET class_id = ${class_id},
-        class_label = ${class_label},
-        weekday = ${weekday},
-        start_time = ${start_time},
-        end_time = ${end_time},
-        timezone = ${timezone},
-        active = ${active}
+    SET
+      class_id = ${class_id},
+      class_label = ${class_label},
+      entry_type = ${entry_type},
+      is_recurring = ${is_recurring},
+      event_date = ${event_date || null},
+      weekday = ${weekday},
+      start_time = ${start_time},
+      end_time = ${end_time},
+      timezone = ${timezone},
+      active = ${active}
     WHERE id = ${id}
     RETURNING *
   `
@@ -110,7 +175,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       sessionId: admin.sessionId,
     },
     target: { type: "teacher_schedule", id },
-    metadata: { class_id, class_label, weekday, start_time, end_time, timezone, active },
+    metadata: {
+      class_id,
+      class_label,
+      entry_type,
+      is_recurring,
+      event_date: event_date || null,
+      weekday,
+      start_time,
+      end_time,
+      timezone,
+      active,
+    },
   })
 
   return NextResponse.json(updated)

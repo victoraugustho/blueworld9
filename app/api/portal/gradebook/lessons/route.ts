@@ -42,6 +42,119 @@ async function loadOwnedClass(teacherId: string, classId: string) {
   return row
 }
 
+async function syncLegacyLessonLogsToGradebook(params: {
+  teacherId: string
+  classId: string
+  className: string
+  schoolYear: number
+  bimester: number
+}) {
+  const { teacherId, classId, className, schoolYear, bimester } = params
+
+  await db.begin(async (tx) => {
+    const sql = (tx as any).sql ?? tx
+
+    await sql`
+      WITH source_logs AS (
+        SELECT
+          l.lesson_number,
+          l.lesson_date,
+          NULLIF(trim(l.notes), '') AS notes
+        FROM teacher_lesson_logs l
+        WHERE l.teacher_id = ${teacherId}
+          AND (
+            l.class_id = ${classId}
+            OR (
+              l.class_id IS NULL
+              AND lower(trim(l.class_label)) = lower(trim(${className}))
+            )
+          )
+          AND COALESCE(l.school_year::int, EXTRACT(YEAR FROM l.lesson_date)::int) = ${schoolYear}
+          AND COALESCE(
+            l.bimester::int,
+            CASE
+              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 1 AND 3 THEN 1
+              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 4 AND 6 THEN 2
+              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 7 AND 9 THEN 3
+              ELSE 4
+            END
+          ) = ${bimester}
+      )
+      INSERT INTO teacher_grade_lessons (
+        teacher_id,
+        class_id,
+        school_year,
+        bimester,
+        lesson_number,
+        lesson_date,
+        notes
+      )
+      SELECT
+        ${teacherId},
+        ${classId},
+        ${schoolYear},
+        ${bimester},
+        sl.lesson_number,
+        sl.lesson_date,
+        sl.notes
+      FROM source_logs sl
+      LEFT JOIN teacher_grade_lessons gl
+        ON gl.class_id = ${classId}
+       AND gl.school_year = ${schoolYear}
+       AND gl.bimester = ${bimester}
+       AND gl.lesson_number = sl.lesson_number
+      WHERE gl.id IS NULL
+      ON CONFLICT (class_id, school_year, bimester, lesson_number) DO NOTHING
+    `
+
+    await sql`
+      INSERT INTO teacher_grade_entries (lesson_id, student_id, attendance)
+      SELECT
+        l.id,
+        s.id,
+        'present'
+      FROM teacher_grade_lessons l
+      JOIN teacher_class_students s
+        ON s.class_id = l.class_id
+       AND s.active = TRUE
+      WHERE l.class_id = ${classId}
+        AND l.school_year = ${schoolYear}
+        AND l.bimester = ${bimester}
+      ON CONFLICT (lesson_id, student_id) DO NOTHING
+    `
+
+    await sql`
+      DELETE FROM teacher_grade_lessons gl
+      WHERE gl.class_id = ${classId}
+        AND gl.school_year = ${schoolYear}
+        AND gl.bimester = ${bimester}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM teacher_lesson_logs l
+          WHERE l.teacher_id = ${teacherId}
+            AND (
+              l.class_id = ${classId}
+              OR (
+                l.class_id IS NULL
+                AND lower(trim(l.class_label)) = lower(trim(${className}))
+              )
+            )
+            AND COALESCE(l.school_year::int, EXTRACT(YEAR FROM l.lesson_date)::int) = ${schoolYear}
+            AND COALESCE(
+              l.bimester::int,
+              CASE
+                WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 1 AND 3 THEN 1
+                WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 4 AND 6 THEN 2
+                WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 7 AND 9 THEN 3
+                ELSE 4
+              END
+            ) = ${bimester}
+            AND l.lesson_number = gl.lesson_number
+        )
+    `
+  })
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
@@ -70,10 +183,55 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Turma nao encontrada" }, { status: 404 })
   }
 
+  await syncLegacyLessonLogsToGradebook({
+    teacherId: auth.teacherId,
+    classId,
+    className: String(classRow.name ?? ""),
+    schoolYear,
+    bimester,
+  })
+
   const rows = await db`
+    WITH active_students AS (
+      SELECT COUNT(*)::int AS total_students
+      FROM teacher_class_students s
+      WHERE s.class_id = ${classId}
+        AND s.active = TRUE
+    )
     SELECT
       l.*,
       COUNT(e.student_id)::int AS entries_count,
+      COUNT(*) FILTER (
+        WHERE e.c1 IS NOT NULL
+          AND e.c2 IS NOT NULL
+          AND e.c3 IS NOT NULL
+          AND e.c4 IS NOT NULL
+      )::int AS graded_entries_count,
+      (SELECT total_students FROM active_students) AS total_students,
+      CASE
+        WHEN (SELECT total_students FROM active_students) > 0
+          THEN ROUND(
+            (
+              COUNT(*) FILTER (
+                WHERE e.c1 IS NOT NULL
+                  AND e.c2 IS NOT NULL
+                  AND e.c3 IS NOT NULL
+                  AND e.c4 IS NOT NULL
+              )::numeric / (SELECT total_students FROM active_students)::numeric
+            ) * 100.0
+          , 2)
+        ELSE 0
+      END AS completion_percent,
+      CASE
+        WHEN (SELECT total_students FROM active_students) > 0
+          THEN COUNT(*) FILTER (
+            WHERE e.c1 IS NOT NULL
+              AND e.c2 IS NOT NULL
+              AND e.c3 IS NOT NULL
+              AND e.c4 IS NOT NULL
+          ) >= (SELECT total_students FROM active_students)
+        ELSE FALSE
+      END AS fully_launched,
       COUNT(*) FILTER (WHERE e.attendance = 'absent')::int AS absences_count
     FROM teacher_grade_lessons l
     LEFT JOIN teacher_grade_entries e
@@ -83,7 +241,7 @@ export async function GET(req: NextRequest) {
       AND l.school_year = ${schoolYear}
       AND l.bimester = ${bimester}
     GROUP BY l.id
-    ORDER BY l.lesson_number ASC
+    ORDER BY l.lesson_number DESC, l.lesson_date DESC
   `
 
   return NextResponse.json(rows)

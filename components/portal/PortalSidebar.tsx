@@ -65,7 +65,7 @@ export function PortalSidebar({
     menu: {
       home: locale === "es" ? "Inicio" : "In\u00edcio",
       aulas: locale === "es" ? "Clases" : "Aulas",
-      agenda: locale === "es" ? "Agenda" : "Agenda",
+      agenda: locale === "es" ? "Agenda + Notas" : "Agenda + Notas",
       materiais: locale === "es" ? "Materiales" : "Materiais",
       notas: locale === "es" ? "Notas" : "Notas",
       notificacoes: locale === "es" ? "Notificaciones" : "Notifica\u00e7\u00f5es",
@@ -74,7 +74,7 @@ export function PortalSidebar({
       adminBlog: locale === "es" ? "Blog (Admin)" : "Blog (Admin)",
       adminTurmas: locale === "es" ? "Categorias/Turmas" : "Categorias/Turmas",
       teachers: locale === "es" ? "Profesores" : "Professores",
-      adminSchedules: locale === "es" ? "Horarios (Admin)" : "Hor\u00e1rios (Admin)",
+      adminSchedules: locale === "es" ? "Agenda de Profesores" : "Agenda de Professores",
       adminAgenda: locale === "es" ? "Agenda de Coordinadores" : "Agenda de Coordenadores",
       technicalScheduling: locale === "es" ? "Agendamiento Tecnico" : "Agendamento Tecnico",
       adminNotifications: locale === "es" ? "Notificaciones (Admin)" : "Notifica\u00e7\u00f5es (Admin)",
@@ -88,9 +88,8 @@ export function PortalSidebar({
     () => [
       { href: "/portal/dashboard", label: t.menu.home, icon: Home },
       { href: "/portal/dashboard/aulas", label: t.menu.aulas, icon: BookOpen },
-      { href: "/portal/dashboard/agenda", label: t.menu.agenda, icon: CalendarDays },
+      { href: "/portal/dashboard/notas/lancamentos", label: t.menu.agenda, icon: CalendarDays },
       { href: "/portal/dashboard/materiais", label: t.menu.materiais, icon: FileText },
-      { href: "/portal/dashboard/notas", label: t.menu.notas, icon: GraduationCap },
       { href: "/portal/dashboard/ia", label: t.menu.ai, icon: Sparkles },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps

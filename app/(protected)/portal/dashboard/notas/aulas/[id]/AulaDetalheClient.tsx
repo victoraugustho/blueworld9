@@ -1,13 +1,14 @@
 ﻿"use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Save, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import type { TeacherGradeLesson, TeacherGradeLessonEntry } from "@/app/types/portal"
 import NotasSectionNav from "../../_components/NotasSectionNav"
 
@@ -41,12 +42,19 @@ function parseNumericInput(value: string, max = 10) {
 const scoreInputClass =
   "h-7 w-14 md:w-16 bg-slate-800/80 border-slate-700 text-white text-center text-xs px-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 
+type ScoreField = "c1" | "c2" | "c3" | "c4"
+const scoreFieldOrder: ScoreField[] = ["c1", "c2", "c3", "c4"]
+
 export default function AulaDetalheClient({
   locale,
   lessonId,
+  canDeleteLesson,
+  scoreMax = 10,
 }: {
   locale: Locale
   lessonId: string
+  canDeleteLesson: boolean
+  scoreMax?: number
 }) {
   const router = useRouter()
   const isEs = locale === "es"
@@ -57,8 +65,69 @@ export default function AulaDetalheClient({
   const [lesson, setLesson] = useState<TeacherGradeLesson | null>(null)
   const [entries, setEntries] = useState<TeacherGradeLessonEntry[]>([])
   const [lessonDate, setLessonDate] = useState(todayIsoDate())
-  const [lessonNotes, setLessonNotes] = useState("")
+  const [lessonDiaryNotes, setLessonDiaryNotes] = useState("")
+  const [lessonObservations, setLessonObservations] = useState("")
   const [className, setClassName] = useState("")
+  const scoreInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+
+  function scoreRefKey(studentId: string, field: ScoreField) {
+    return `${studentId}:${field}`
+  }
+
+  function setScoreInputRef(studentId: string, field: ScoreField, el: HTMLInputElement | null) {
+    scoreInputRefs.current[scoreRefKey(studentId, field)] = el
+  }
+
+  function focusScoreCell(rowIndex: number, field: ScoreField) {
+    const row = entries[rowIndex]
+    if (!row) return
+    const input = scoreInputRefs.current[scoreRefKey(row.student_id, field)]
+    input?.focus()
+    input?.select()
+  }
+
+  function handleScoreKeyDown(
+    event: ReactKeyboardEvent<HTMLInputElement>,
+    rowIndex: number,
+    field: ScoreField,
+  ) {
+    const colIndex = scoreFieldOrder.indexOf(field)
+    if (colIndex < 0) return
+
+    let targetRow = rowIndex
+    let targetCol = colIndex
+
+    if (event.key === "Enter" || event.key === "ArrowRight") {
+      if (colIndex < scoreFieldOrder.length - 1) {
+        targetCol = colIndex + 1
+      } else if (rowIndex < entries.length - 1) {
+        targetRow = rowIndex + 1
+        targetCol = 0
+      } else {
+        return
+      }
+    } else if (event.key === "ArrowLeft") {
+      if (colIndex > 0) {
+        targetCol = colIndex - 1
+      } else if (rowIndex > 0) {
+        targetRow = rowIndex - 1
+        targetCol = scoreFieldOrder.length - 1
+      } else {
+        return
+      }
+    } else if (event.key === "ArrowDown") {
+      if (rowIndex >= entries.length - 1) return
+      targetRow = rowIndex + 1
+    } else if (event.key === "ArrowUp") {
+      if (rowIndex <= 0) return
+      targetRow = rowIndex - 1
+    } else {
+      return
+    }
+
+    event.preventDefault()
+    focusScoreCell(targetRow, scoreFieldOrder[targetCol])
+  }
 
   async function load() {
     setLoading(true)
@@ -73,7 +142,8 @@ export default function AulaDetalheClient({
       setLesson(data?.lesson ?? null)
       setEntries(Array.isArray(data?.entries) ? data.entries : [])
       setLessonDate(normalizeLessonDate(String(data?.lesson?.lesson_date ?? "")))
-      setLessonNotes(String(data?.lesson?.notes ?? ""))
+      setLessonDiaryNotes(String(data?.lesson?.diary_notes ?? data?.lesson?.notes ?? ""))
+      setLessonObservations(String(data?.lesson?.observations ?? ""))
       setClassName(String(data?.lesson?.class_name ?? ""))
     } catch {
       setError(isEs ? "No se pudo cargar la clase." : "Nao foi possivel carregar a aula.")
@@ -93,7 +163,7 @@ export default function AulaDetalheClient({
     )
   }
 
-  function clampEntryScore(studentId: string, field: "c1" | "c2" | "c3" | "c4", max = 10) {
+  function clampEntryScore(studentId: string, field: "c1" | "c2" | "c3" | "c4", max = scoreMax) {
     setEntries((prev) =>
       prev.map((item) => {
         if (item.student_id !== studentId) return item
@@ -117,7 +187,8 @@ export default function AulaDetalheClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         lesson_date: safeDate,
-        notes: lessonNotes,
+        notes: lessonDiaryNotes,
+        observations: lessonObservations,
         entries: entries.map((item) => ({
           student_id: item.student_id,
           attendance: item.attendance,
@@ -209,16 +280,34 @@ export default function AulaDetalheClient({
                   />
                 </div>
                 <div>
-                  <Label className="text-white">{isEs ? "Observaciones" : "Observacoes"}</Label>
-                  <Input
-                    value={lessonNotes}
-                    onChange={(e) => setLessonNotes(e.target.value)}
-                    className="mt-1 bg-slate-800/70 border-slate-700 text-white"
+                  <Label className="text-white">
+                    {isEs ? "Texto libre del diario" : "Texto livre do diario"}
+                  </Label>
+                  <Textarea
+                    value={lessonDiaryNotes}
+                    onChange={(e) => setLessonDiaryNotes(e.target.value)}
+                    rows={7}
+                    className="mt-1 min-h-[170px] resize-y bg-slate-800/70 border-slate-700 text-white"
                   />
                 </div>
               </div>
 
+              <div>
+                <Label className="text-white">{isEs ? "Observaciones" : "Observacoes"}</Label>
+                <Textarea
+                  value={lessonObservations}
+                  onChange={(e) => setLessonObservations(e.target.value)}
+                  rows={6}
+                  className="mt-1 min-h-[150px] resize-y bg-slate-800/70 border-slate-700 text-white"
+                />
+              </div>
+
               <div className="overflow-x-auto">
+                <p className="mb-2 text-xs text-slate-300">
+                  {isEs
+                    ? "Atajo: Enter avanza C1 a C4 y al siguiente alumno. Flechas tambien navegan."
+                    : "Atalho: Enter avanca C1 a C4 e para o proximo aluno. Setas tambem navegam."}
+                </p>
                 <table className="min-w-[760px] md:min-w-[860px] w-full text-sm">
                   <thead>
                     <tr className="text-slate-300 border-b border-white/10">
@@ -232,7 +321,7 @@ export default function AulaDetalheClient({
                     </tr>
                   </thead>
                   <tbody>
-                    {entries.map((entry) => (
+                    {entries.map((entry, rowIndex) => (
                       <tr key={entry.student_id} className="border-b border-white/10 last:border-b-0">
                         <td className="py-2 pr-1 text-white max-w-[220px] truncate">{entry.full_name}</td>
                         <td className="py-2 pr-1">
@@ -251,53 +340,61 @@ export default function AulaDetalheClient({
                         </td>
                         <td className="py-2 pr-1">
                           <Input
+                            ref={(el) => setScoreInputRef(entry.student_id, "c1", el)}
                             type="number"
                             min={0}
-                            max={10}
+                            max={scoreMax}
                             step={0.01}
                             inputMode="decimal"
                             value={entry.c1 ?? ""}
-                            onChange={(e) => updateEntry(entry.student_id, { c1: parseNumericInput(e.target.value, 10) })}
-                            onBlur={() => clampEntryScore(entry.student_id, "c1", 10)}
+                            onChange={(e) => updateEntry(entry.student_id, { c1: parseNumericInput(e.target.value, scoreMax) })}
+                            onBlur={() => clampEntryScore(entry.student_id, "c1", scoreMax)}
+                            onKeyDown={(e) => handleScoreKeyDown(e, rowIndex, "c1")}
                             className={scoreInputClass}
                           />
                         </td>
                         <td className="py-2 pr-1">
                           <Input
+                            ref={(el) => setScoreInputRef(entry.student_id, "c2", el)}
                             type="number"
                             min={0}
-                            max={10}
+                            max={scoreMax}
                             step={0.01}
                             inputMode="decimal"
                             value={entry.c2 ?? ""}
-                            onChange={(e) => updateEntry(entry.student_id, { c2: parseNumericInput(e.target.value, 10) })}
-                            onBlur={() => clampEntryScore(entry.student_id, "c2", 10)}
+                            onChange={(e) => updateEntry(entry.student_id, { c2: parseNumericInput(e.target.value, scoreMax) })}
+                            onBlur={() => clampEntryScore(entry.student_id, "c2", scoreMax)}
+                            onKeyDown={(e) => handleScoreKeyDown(e, rowIndex, "c2")}
                             className={scoreInputClass}
                           />
                         </td>
                         <td className="py-2 pr-1">
                           <Input
+                            ref={(el) => setScoreInputRef(entry.student_id, "c3", el)}
                             type="number"
                             min={0}
-                            max={10}
+                            max={scoreMax}
                             step={0.01}
                             inputMode="decimal"
                             value={entry.c3 ?? ""}
-                            onChange={(e) => updateEntry(entry.student_id, { c3: parseNumericInput(e.target.value, 10) })}
-                            onBlur={() => clampEntryScore(entry.student_id, "c3", 10)}
+                            onChange={(e) => updateEntry(entry.student_id, { c3: parseNumericInput(e.target.value, scoreMax) })}
+                            onBlur={() => clampEntryScore(entry.student_id, "c3", scoreMax)}
+                            onKeyDown={(e) => handleScoreKeyDown(e, rowIndex, "c3")}
                             className={scoreInputClass}
                           />
                         </td>
                         <td className="py-2 pr-1">
                           <Input
+                            ref={(el) => setScoreInputRef(entry.student_id, "c4", el)}
                             type="number"
                             min={0}
-                            max={10}
+                            max={scoreMax}
                             step={0.01}
                             inputMode="decimal"
                             value={entry.c4 ?? ""}
-                            onChange={(e) => updateEntry(entry.student_id, { c4: parseNumericInput(e.target.value, 10) })}
-                            onBlur={() => clampEntryScore(entry.student_id, "c4", 10)}
+                            onChange={(e) => updateEntry(entry.student_id, { c4: parseNumericInput(e.target.value, scoreMax) })}
+                            onBlur={() => clampEntryScore(entry.student_id, "c4", scoreMax)}
+                            onKeyDown={(e) => handleScoreKeyDown(e, rowIndex, "c4")}
                             className={scoreInputClass}
                           />
                         </td>
@@ -319,10 +416,12 @@ export default function AulaDetalheClient({
                   <Save className="w-4 h-4 mr-2" />
                   {isEs ? "Guardar" : "Salvar"}
                 </Button>
-                <Button onClick={deleteLesson} disabled={saving} className="bg-rose-600 hover:bg-rose-700">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  {isEs ? "Eliminar" : "Excluir"}
-                </Button>
+                {canDeleteLesson ? (
+                  <Button onClick={deleteLesson} disabled={saving} className="bg-rose-600 hover:bg-rose-700">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    {isEs ? "Eliminar" : "Excluir"}
+                  </Button>
+                ) : null}
               </div>
             </>
           )}

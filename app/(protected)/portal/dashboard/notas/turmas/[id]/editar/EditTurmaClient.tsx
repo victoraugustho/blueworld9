@@ -25,6 +25,13 @@ type ClassDetail = TeacherClass & {
   active_student_count?: number
 }
 
+function compareStudentNames(a: string, b: string) {
+  return String(a ?? "").localeCompare(String(b ?? ""), "pt-BR", {
+    sensitivity: "base",
+    ignorePunctuation: true,
+  })
+}
+
 export default function EditTurmaClient({
   locale,
   classId,
@@ -117,7 +124,7 @@ export default function EditTurmaClient({
   }, [classId])
 
   const sortedStudents = useMemo(
-    () => [...students].sort((a, b) => String(a.full_name).localeCompare(String(b.full_name), "pt-BR")),
+    () => [...students].sort((a, b) => compareStudentNames(String(a.full_name), String(b.full_name))),
     [students],
   )
 
@@ -203,6 +210,7 @@ export default function EditTurmaClient({
       .split(/\r?\n/)
       .map((item) => item.trim())
       .filter(Boolean)
+      .sort((a, b) => compareStudentNames(a, b))
 
     if (lines.length === 0) return
 

@@ -288,7 +288,11 @@ export default function AdminSchedulesPage() {
     setLoading(true)
     try {
       const res = await fetch("/api/admin/teachers", { cache: "no-store" })
-      const data: TeacherGroupResponse = await res.json()
+      const data: TeacherGroupResponse = await res.json().catch(() => ({ approved: [] as Teacher[] }))
+      if (!res.ok) {
+        setTeachers([])
+        return
+      }
       const list = Array.isArray(data?.approved) ? data.approved : []
       list.sort((a, b) => a.name.localeCompare(b.name))
       setTeachers(list)
@@ -305,7 +309,11 @@ export default function AdminSchedulesPage() {
     setLoadingSchedules(true)
     try {
       const res = await fetch(`/api/admin/teacher-schedules?teacherId=${teacherId}`, { cache: "no-store" })
-      const data = await res.json()
+      const data = await res.json().catch(() => [])
+      if (!res.ok) {
+        setSchedules([])
+        return
+      }
       setSchedules(Array.isArray(data) ? data : [])
     } finally {
       setLoadingSchedules(false)
@@ -322,6 +330,10 @@ export default function AdminSchedulesPage() {
       { cache: "no-store" },
     )
     const data = await res.json().catch(() => [])
+    if (!res.ok) {
+      setTeacherClasses([])
+      return
+    }
     setTeacherClasses(Array.isArray(data) ? data : [])
   }
 

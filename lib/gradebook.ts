@@ -88,7 +88,7 @@ export async function ensureGradebookSchema() {
     `
 
     await db`
-      CREATE UNIQUE INDEX IF NOT EXISTS teacher_classes_unique_teacher_name_year_idx
+      CREATE INDEX IF NOT EXISTS teacher_classes_teacher_year_name_idx
       ON public.teacher_classes(teacher_id, school_year, name)
     `
 

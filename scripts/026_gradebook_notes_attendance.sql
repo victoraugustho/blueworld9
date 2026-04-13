@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS public.teacher_classes (
     )
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS teacher_classes_unique_teacher_name_year_idx
+DROP INDEX IF EXISTS teacher_classes_unique_teacher_name_year_idx;
+
+CREATE INDEX IF NOT EXISTS teacher_classes_teacher_year_name_idx
   ON public.teacher_classes(teacher_id, school_year, name);
 
 CREATE INDEX IF NOT EXISTS teacher_classes_teacher_year_idx

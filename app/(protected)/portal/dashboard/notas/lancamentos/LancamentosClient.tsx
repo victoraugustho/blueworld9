@@ -1378,18 +1378,9 @@ export default function LancamentosClient({
       null
     const classMatchesSelection =
       hasClass && selectedClassId && String(schedule.class_id) === String(selectedClassId)
-    const defaultCardClass = isMorning
-      ? "border-amber-300/30 bg-amber-500/10"
-      : "border-sky-300/30 bg-sky-500/10"
-    const selectedCardClass = isMorning
-      ? "border-amber-300/60 bg-amber-500/20 ring-1 ring-amber-300/30"
-      : "border-sky-300/60 bg-sky-500/20 ring-1 ring-sky-300/30"
-    const shiftBadgeClass = isMorning
-      ? "text-amber-100 bg-amber-500/20 border-amber-300/35"
-      : "text-sky-100 bg-sky-500/20 border-sky-300/35"
-    const timeChipClass = isMorning
-      ? "text-amber-100 bg-amber-500/15 border-amber-300/30"
-      : "text-sky-100 bg-sky-500/15 border-sky-300/30"
+    const defaultCardClass = "border-white/10 bg-white/[0.04]"
+    const selectedCardClass = "border-cyan-300/45 bg-cyan-500/10"
+    const metaClass = isMorning ? "text-amber-100/90" : "text-sky-100/90"
 
     return (
       <div
@@ -1400,24 +1391,13 @@ export default function LancamentosClient({
             : defaultCardClass
         }`}
       >
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <p className="text-xs sm:text-[13px] font-semibold text-white leading-tight">{schedule.class_label}</p>
-          <span className={`text-[11px] px-2 py-0.5 rounded-full border ${shiftBadgeClass}`}>
-            {shiftLabel}
-          </span>
-          <span
-            className={`text-[11px] px-2 py-0.5 rounded-full border ${
-              isEvent
-                ? "text-amber-100 bg-amber-500/20 border-amber-400/30"
-                : "text-cyan-100 bg-cyan-500/20 border-cyan-400/30"
-            }`}
-          >
-            {isEvent ? (isEs ? "Evento" : "Evento") : isEs ? "Turma" : "Turma"}
-          </span>
         </div>
-        <span className={`inline-flex text-xs px-2 py-0.5 rounded-full border ${timeChipClass}`}>
+        <p className={`text-[11px] ${metaClass}`}>
+          {shiftLabel} • {isEvent ? (isEs ? "Evento" : "Evento") : isEs ? "Turma" : "Turma"} •{" "}
           {timeLabel(schedule.start_time)} - {timeLabel(schedule.end_time)}
-        </span>
+        </p>
         {!isEvent && hasClass ? (
           <p className={`hidden sm:block text-[11px] ${classMatchesSelection ? "text-cyan-100" : "text-slate-300"}`}>
             {isEs ? "Clases registradas" : "Aulas registradas"}: {classSummary?.count ?? 0}
@@ -1580,7 +1560,7 @@ export default function LancamentosClient({
               : "Visual semanal por colunas: cada turma da agenda usa o mesmo fluxo de notas."}
           </p>
 
-          <div className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-2 md:gap-2.5 md:overflow-visible xl:grid-cols-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-2">
             {weekdayOptions.map((day) => {
               const daySchedules = recurringByWeekday[day.value] ?? []
               const morningSchedules = daySchedules.filter((schedule) => getShiftPeriod(schedule.start_time) === "morning")
@@ -1590,36 +1570,37 @@ export default function LancamentosClient({
                   key: "morning",
                   label: isEs ? "Matutino" : "Matutino",
                   list: morningSchedules,
-                  wrapperClass: "border-amber-300/30 bg-amber-500/10",
-                  badgeClass: "text-amber-50 bg-amber-500/30 border border-amber-300/35",
+                  wrapperClass: "border-amber-300/20 bg-amber-500/5",
+                  badgeClass: "text-amber-100 bg-amber-500/15 border border-amber-300/25",
                   countClass: "text-amber-100/95",
                 },
                 {
                   key: "afternoon",
                   label: isEs ? "Vespertino" : "Vespertino",
                   list: afternoonSchedules,
-                  wrapperClass: "border-sky-300/30 bg-sky-500/10",
-                  badgeClass: "text-sky-50 bg-sky-500/30 border border-sky-300/35",
+                  wrapperClass: "border-sky-300/20 bg-sky-500/5",
+                  badgeClass: "text-sky-100 bg-sky-500/15 border border-sky-300/25",
                   countClass: "text-sky-100/95",
                 },
               ] as const
+              const visibleGroups = periodGroups.filter((group) => group.list.length > 0)
               return (
                 <div
                   key={day.value}
-                  className="shrink-0 w-[84vw] max-w-[320px] snap-start rounded-xl border border-white/10 bg-slate-950/30 p-2 space-y-2 min-h-[150px] md:w-auto md:max-w-none md:shrink md:min-h-[170px]"
+                  className="rounded-xl border border-white/10 bg-slate-950/20 p-2 space-y-1.5 min-h-[140px]"
                 >
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-white">{day.full}</p>
                     <span className="text-[11px] text-slate-400">{daySchedules.length}</span>
                   </div>
-                  {daySchedules.length === 0 ? (
+                  {visibleGroups.length === 0 ? (
                     <p className="text-sm text-slate-400">
                       {isEs ? "Sin clases." : "Sem aulas."}
                     </p>
                   ) : (
-                    <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
-                      {periodGroups.map((group) => (
-                        <div key={group.key} className={`rounded-lg border p-1.5 space-y-1.5 ${group.wrapperClass}`}>
+                    <div className="space-y-1.5">
+                      {visibleGroups.map((group) => (
+                        <div key={group.key} className={`rounded-lg border p-1.5 space-y-1 ${group.wrapperClass}`}>
                           <div className="flex items-center justify-between gap-2">
                             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${group.badgeClass}`}>
                               {group.label}
@@ -1633,7 +1614,7 @@ export default function LancamentosClient({
                               {isEs ? "Sin clases." : "Sem aulas."}
                             </p>
                           ) : (
-                            <div className="space-y-1.5 max-h-[170px] overflow-y-auto pr-1">
+                            <div className="space-y-1">
                               {group.list.map((schedule) => renderScheduleCard(schedule))}
                             </div>
                           )}

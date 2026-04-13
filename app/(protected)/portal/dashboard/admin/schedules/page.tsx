@@ -64,6 +64,12 @@ function timeToMinutes(value: string) {
   return Math.max(0, h * 60 + m)
 }
 
+function shortClassId(value?: string | null) {
+  const raw = String(value ?? "").trim()
+  if (!raw) return "-"
+  return raw.slice(0, 8)
+}
+
 function formatDate(value?: string | null) {
   if (!value) return "-"
   const normalized = String(value).match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? ""
@@ -168,12 +174,14 @@ export default function AdminSchedulesPage() {
     if (!query) return schedules
     return schedules.filter((item) => {
       const label = String(item.class_label ?? "").toLowerCase()
+      const classId = String(item.class_id ?? "").toLowerCase()
       const day = weekdayLabel(item.weekday).toLowerCase()
       const date = formatDate(item.event_date).toLowerCase()
       const start = timeLabel(item.start_time)
       const end = timeLabel(item.end_time)
       return (
         label.includes(query) ||
+        classId.includes(query) ||
         day.includes(query) ||
         date.includes(query) ||
         start.includes(query) ||
@@ -201,6 +209,29 @@ export default function AdminSchedulesPage() {
         .sort((a, b) => String(a.event_date ?? "").localeCompare(String(b.event_date ?? ""))),
     [filteredSchedules],
   )
+
+  const classScheduleSummaryMap = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const item of schedules) {
+      const classId = String(item.class_id ?? "").trim()
+      if (!classId) continue
+
+      const slot = item.is_recurring === false
+        ? `${formatDate(item.event_date)} ${timeLabel(item.start_time)}-${timeLabel(item.end_time)}`
+        : `${weekdayLabel(item.weekday)} ${timeLabel(item.start_time)}-${timeLabel(item.end_time)}`
+
+      const current = map.get(classId) ?? []
+      if (!current.includes(slot)) current.push(slot)
+      map.set(classId, current)
+    }
+
+    for (const [classId, slots] of map.entries()) {
+      const sorted = [...slots].sort((a, b) => a.localeCompare(b, "pt-BR"))
+      map.set(classId, sorted)
+    }
+
+    return map
+  }, [schedules])
 
   const timezoneOptions = useMemo(() => {
     if (!selectedTeacher) return []
@@ -917,7 +948,7 @@ export default function AdminSchedulesPage() {
                   <input
                     value={classSearch}
                     onChange={(e) => setClassSearch(e.target.value)}
-                    placeholder="Buscar turma por nome, ano ou ano letivo"
+                    placeholder="Buscar turma por nome, ID, ano ou ano letivo"
                     className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white"
                   />
                   <Button
@@ -936,6 +967,9 @@ export default function AdminSchedulesPage() {
                   <div className="space-y-2">
                     {filteredTeacherClasses.map((item) => {
                       const isDeleting = deletingClassId === item.id
+                      const slots = classScheduleSummaryMap.get(item.id) ?? []
+                      const slotsPreview = slots.slice(0, 2).join(" • ")
+                      const extraSlots = Math.max(0, slots.length - 2)
                       return (
                         <div
                           key={item.id}
@@ -945,8 +979,14 @@ export default function AdminSchedulesPage() {
                             <p className="text-sm font-semibold text-white">{item.name}</p>
                             <p className="text-xs text-slate-300">
                               {studentYearLabel(item.student_year)} | {item.school_year} |{" "}
-                              {item.student_count ?? 0} aluno(s)
+                              {item.student_count ?? 0} aluno(s) | ID: {shortClassId(item.id)}
                             </p>
+                            {slots.length > 0 ? (
+                              <p className="text-[11px] text-cyan-200/90">
+                                Agenda: {slotsPreview}
+                                {extraSlots > 0 ? ` • +${extraSlots}` : ""}
+                              </p>
+                            ) : null}
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <Button
@@ -1033,7 +1073,10 @@ export default function AdminSchedulesPage() {
                   <option value="">Selecione uma turma</option>
                   {teacherClasses.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name} | {item.school_year} | {item.student_count ?? 0} aluno(s)
+                      {item.name} | ID:{shortClassId(item.id)} | {item.school_year} | {item.student_count ?? 0} aluno(s)
+                      {classScheduleSummaryMap.get(item.id)?.[0]
+                        ? ` | ${classScheduleSummaryMap.get(item.id)?.[0]}`
+                        : ""}
                     </option>
                   ))}
                 </select>
@@ -1243,7 +1286,10 @@ export default function AdminSchedulesPage() {
                       <option value="">Selecione uma turma</option>
                       {teacherClasses.map((item) => (
                         <option key={item.id} value={item.id}>
-                          {item.name} | {item.school_year} | {item.student_count ?? 0} aluno(s)
+                          {item.name} | ID:{shortClassId(item.id)} | {item.school_year} | {item.student_count ?? 0} aluno(s)
+                          {classScheduleSummaryMap.get(item.id)?.[0]
+                            ? ` | ${classScheduleSummaryMap.get(item.id)?.[0]}`
+                            : ""}
                         </option>
                       ))}
                     </select>
@@ -1397,7 +1443,7 @@ export default function AdminSchedulesPage() {
                 <input
                   value={scheduleSearch}
                   onChange={(e) => setScheduleSearch(e.target.value)}
-                  placeholder="Buscar por turma, evento, dia, data ou horario"
+                  placeholder="Buscar por turma, ID, evento, dia, data ou horario"
                   className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white"
                 />
                 <Button
@@ -1473,6 +1519,11 @@ export default function AdminSchedulesPage() {
                                         <p className="text-xs font-semibold text-white truncate max-w-[14rem] sm:max-w-none">
                                           {schedule.class_label}
                                         </p>
+                                        {schedule.class_id ? (
+                                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-white/20 bg-white/10 text-white/90">
+                                            ID: {shortClassId(String(schedule.class_id))}
+                                          </span>
+                                        ) : null}
                                         <span
                                           className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
                                             schedule.entry_type === "event"
@@ -1534,6 +1585,9 @@ export default function AdminSchedulesPage() {
                         <p className="text-xs text-white/60">
                           {formatDate(event.event_date)} | {timeLabel(event.start_time)} - {timeLabel(event.end_time)}
                         </p>
+                        {event.class_id ? (
+                          <p className="text-[11px] text-white/75">ID turma: {shortClassId(String(event.class_id))}</p>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2">
                         <button

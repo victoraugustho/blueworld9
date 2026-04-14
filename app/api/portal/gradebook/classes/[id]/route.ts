@@ -128,17 +128,47 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "Professor nao encontrado" }, { status: 404 })
   }
 
-  const [updated] = await db`
-    UPDATE teacher_classes
-    SET
-      teacher_id = ${teacherId},
-      name = ${name},
-      student_year = ${studentYear},
-      school_year = ${schoolYear},
-      active = ${active}
-    WHERE id = ${id}
-    RETURNING *
-  `
+  let updated: any = null
+
+  await db.begin(async (tx) => {
+    const sql = (tx as any).sql ?? tx
+
+    const [updatedRow] = await sql`
+      UPDATE teacher_classes
+      SET
+        teacher_id = ${teacherId},
+        name = ${name},
+        student_year = ${studentYear},
+        school_year = ${schoolYear},
+        active = ${active}
+      WHERE id = ${id}
+      RETURNING *
+    `
+
+    updated = updatedRow
+
+    await sql`
+      UPDATE teacher_schedules
+      SET class_label = ${name}
+      WHERE class_id = ${id}
+        AND entry_type = 'class'
+        AND class_label IS DISTINCT FROM ${name}
+    `
+
+    await sql`
+      UPDATE teacher_lesson_logs
+      SET class_label = ${name}
+      WHERE class_id = ${id}
+        AND class_label IS DISTINCT FROM ${name}
+    `
+
+    await sql`
+      UPDATE teacher_reminders
+      SET class_label = ${name}
+      WHERE class_id = ${id}
+        AND class_label IS DISTINCT FROM ${name}
+    `
+  })
 
   return NextResponse.json(updated)
 }

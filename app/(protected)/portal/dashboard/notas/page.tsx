@@ -18,7 +18,7 @@ export default async function NotasPage() {
       icon: ClipboardCheck,
     },
     {
-      href: "/portal/dashboard/notas/aulas",
+      href: "/portal/dashboard/notas/lancamentos",
       title: isEs ? "Clases por Turma" : "Aulas por Turma",
       description: isEs
         ? "Vea todas las clases de una turma y abra una clase especifica."

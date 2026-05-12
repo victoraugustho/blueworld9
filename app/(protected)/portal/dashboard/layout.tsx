@@ -1,5 +1,6 @@
 import { ReactNode } from "react"
 import { PortalSidebar } from "@/components/portal/PortalSidebar"
+import SpecialNotificationModal from "@/components/portal/SpecialNotificationModal"
 import { requireTeacherPage } from "@/lib/auth/server"
 import { isRestrictedAdminUser } from "@/lib/auth/restricted-admin"
 
@@ -34,6 +35,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
         {children}
       </main>
+      <SpecialNotificationModal />
     </div>
   )
 }

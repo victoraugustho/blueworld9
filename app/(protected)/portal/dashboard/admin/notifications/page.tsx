@@ -1,13 +1,15 @@
-"use client"
+﻿"use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Bell, Info, Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-type N = {
+type NotificationItem = {
   id: string
   title: string
+  type?: "standard" | "special_modal"
+  special_mode?: "once" | "until" | null
   audience: "all" | "country" | "locale" | "teacher"
   active: boolean
   created_at: string
@@ -18,11 +20,10 @@ type N = {
 }
 
 type LocaleKey = "pt-BR" | "es" | "geral"
-
 type CountryKey = "BR" | "UY" | "PY" | "all"
 
 function localeLabel(locale: string | null | undefined) {
-  if (locale === "pt-BR") return "Português (BR)"
+  if (locale === "pt-BR") return "Portugues (BR)"
   if (locale === "es") return "Espanhol"
   return "Geral"
 }
@@ -31,7 +32,7 @@ function countryLabel(country: string | null | undefined) {
   if (country === "BR") return "Brasil"
   if (country === "UY") return "Uruguai"
   if (country === "PY") return "Paraguai"
-  return "Todos os países"
+  return "Todos os paises"
 }
 
 function mapLocaleFromCountry(country: string | null | undefined): LocaleKey {
@@ -40,14 +41,14 @@ function mapLocaleFromCountry(country: string | null | undefined): LocaleKey {
   return "geral"
 }
 
-function getLocaleGroup(n: N): LocaleKey {
-  if (n.locale) return n.locale === "es" ? "es" : "pt-BR"
-  if (n.country) return mapLocaleFromCountry(n.country)
+function getLocaleGroup(item: NotificationItem): LocaleKey {
+  if (item.locale) return item.locale === "es" ? "es" : "pt-BR"
+  if (item.country) return mapLocaleFromCountry(item.country)
   return "geral"
 }
 
-function getCountryGroup(n: N): CountryKey {
-  if (n.country === "BR" || n.country === "UY" || n.country === "PY") return n.country
+function getCountryGroup(item: NotificationItem): CountryKey {
+  if (item.country === "BR" || item.country === "UY" || item.country === "PY") return item.country
   return "all"
 }
 
@@ -56,28 +57,35 @@ function shortId(id?: string | null) {
   return id.length > 10 ? `${id.slice(0, 8)}...` : id
 }
 
-function audienceLabel(n: N) {
-  if (n.audience === "all") return "Todos"
-  if (n.audience === "country") return `País: ${countryLabel(n.country)}`
-  if (n.audience === "locale") return `Idioma: ${localeLabel(n.locale)}`
-  if (n.audience === "teacher") {
-    const ids = Array.isArray(n.teacher_ids) ? n.teacher_ids : []
-    const count = ids.length || (n.teacher_id ? 1 : 0)
+function audienceLabel(item: NotificationItem) {
+  if (item.audience === "all") return "Todos"
+  if (item.audience === "country") return `Pais: ${countryLabel(item.country)}`
+  if (item.audience === "locale") return `Idioma: ${localeLabel(item.locale)}`
+  if (item.audience === "teacher") {
+    const ids = Array.isArray(item.teacher_ids) ? item.teacher_ids : []
+    const count = ids.length || (item.teacher_id ? 1 : 0)
     if (count > 1) return `Professores selecionados: ${count}`
-    const id = n.teacher_id ?? ids[0]
-    return `Professor específico: ${shortId(id)}`
+    const id = item.teacher_id ?? ids[0]
+    return `Professor: ${shortId(id)}`
   }
   return "Todos"
 }
 
+function typeLabel(item: NotificationItem) {
+  if (item.type === "special_modal") {
+    return item.special_mode === "until" ? "Especial (ate expirar)" : "Especial (uma vez)"
+  }
+  return "Padrao"
+}
+
 export default function AdminNotificationsPage() {
-  const [rows, setRows] = useState<N[]>([])
+  const [rows, setRows] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(true)
 
   async function load() {
     setLoading(true)
     const res = await fetch("/api/admin/notifications", { cache: "no-store" })
-    const data = await res.json()
+    const data = await res.json().catch(() => [])
     setRows(Array.isArray(data) ? data : [])
     setLoading(false)
   }
@@ -87,32 +95,40 @@ export default function AdminNotificationsPage() {
   }, [])
 
   async function del(id: string) {
-    if (!confirm("Excluir esta notificação?")) return
+    if (!confirm("Excluir esta notificacao?")) return
     const res = await fetch(`/api/admin/notifications/${id}`, { method: "DELETE" })
     if (res.ok) load()
+    else {
+      const err = await res.json().catch(() => ({}))
+      alert(err.error || "Nao foi possivel excluir.")
+    }
   }
 
   const localeOrder: LocaleKey[] = ["pt-BR", "es", "geral"]
   const countryOrder: CountryKey[] = ["BR", "UY", "PY", "all"]
 
-  const groups: Record<LocaleKey, Record<CountryKey, N[]>> = {
-    "pt-BR": { BR: [], UY: [], PY: [], all: [] },
-    es: { BR: [], UY: [], PY: [], all: [] },
-    geral: { BR: [], UY: [], PY: [], all: [] },
-  }
+  const groups = useMemo(() => {
+    const grouped: Record<LocaleKey, Record<CountryKey, NotificationItem[]>> = {
+      "pt-BR": { BR: [], UY: [], PY: [], all: [] },
+      es: { BR: [], UY: [], PY: [], all: [] },
+      geral: { BR: [], UY: [], PY: [], all: [] },
+    }
 
-  for (const n of rows) {
-    const lg = getLocaleGroup(n)
-    const cg = getCountryGroup(n)
-    groups[lg][cg].push(n)
-  }
+    for (const item of rows) {
+      const lg = getLocaleGroup(item)
+      const cg = getCountryGroup(item)
+      grouped[lg][cg].push(item)
+    }
+
+    return grouped
+  }, [rows])
 
   return (
     <div className="p-6 text-white">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <Bell className="w-7 h-7 text-yellow-400" />
-          {"Notificações (Admin)"}
+          Notificacoes (Admin)
         </h1>
 
         <Link href="/portal/dashboard/admin/notifications/new">
@@ -122,16 +138,14 @@ export default function AdminNotificationsPage() {
         </Link>
       </div>
 
-      {loading && <p className="text-slate-400">Carregando...</p>}
-      {!loading && rows.length === 0 && (
-        <p className="text-slate-400">{"Nenhuma notificação."}</p>
-      )}
+      {loading ? <p className="text-slate-400">Carregando...</p> : null}
+      {!loading && rows.length === 0 ? <p className="text-slate-400">Nenhuma notificacao.</p> : null}
 
-      {!loading && rows.length > 0 && (
+      {!loading && rows.length > 0 ? (
         <div className="space-y-10">
           {localeOrder.map((localeKey) => {
             const localeGroup = groups[localeKey]
-            const localeHasItems = countryOrder.some((c) => localeGroup[c].length > 0)
+            const localeHasItems = countryOrder.some((countryKey) => localeGroup[countryKey].length > 0)
             if (!localeHasItems) return null
 
             return (
@@ -152,33 +166,31 @@ export default function AdminNotificationsPage() {
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {items.map((n) => (
+                          {items.map((item) => (
                             <div
-                              key={n.id}
+                              key={item.id}
                               className="p-5 rounded-xl bg-slate-800/40 border border-slate-700 backdrop-blur-xl"
                             >
-                              <h3 className="text-lg font-semibold">{n.title}</h3>
+                              <h3 className="text-lg font-semibold">{item.title}</h3>
                               <p className="text-slate-400 text-sm mt-1">
-                                Tipo: <b className="text-white">{audienceLabel(n)}</b> {"•"}{" "}
-                                {n.active ? "Ativa" : "Desativada"}
+                                Publico: <b className="text-white">{audienceLabel(item)}</b> • {item.active ? "Ativa" : "Desativada"}
                               </p>
-                              <p className="text-xs text-slate-500 mt-3">
-                                {new Date(n.created_at).toLocaleString("pt-BR")}
-                              </p>
+                              <p className="text-slate-500 text-xs mt-1">Formato: {typeLabel(item)}</p>
+                              <p className="text-xs text-slate-500 mt-3">{new Date(item.created_at).toLocaleString("pt-BR")}</p>
 
                               <div className="flex flex-wrap gap-3 mt-4">
-                                <Link href={`/portal/dashboard/admin/notifications/edit/${n.id}`}>
+                                <Link href={`/portal/dashboard/admin/notifications/edit/${item.id}`}>
                                   <Button className="bg-blue-600 hover:bg-blue-700 flex items-center gap-2">
                                     <Pencil className="w-4 h-4" /> Editar
                                   </Button>
                                 </Link>
-                                <Link href={`/portal/dashboard/admin/notifications/edit/${n.id}?tab=info`}>
+                                <Link href={`/portal/dashboard/admin/notifications/edit/${item.id}?tab=info`}>
                                   <Button className="bg-slate-700 hover:bg-slate-600 flex items-center gap-2">
-                                    <Info className="w-4 h-4" /> {"Informações"}
+                                    <Info className="w-4 h-4" /> Informacoes
                                   </Button>
                                 </Link>
                                 <Button
-                                  onClick={() => del(n.id)}
+                                  onClick={() => del(item.id)}
                                   className="bg-red-600 hover:bg-red-700 flex items-center gap-2"
                                 >
                                   <Trash2 className="w-4 h-4" /> Excluir
@@ -195,7 +207,7 @@ export default function AdminNotificationsPage() {
             )
           })}
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

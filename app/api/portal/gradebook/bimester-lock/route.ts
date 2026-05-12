@@ -134,21 +134,34 @@ export async function POST(req: NextRequest) {
 
   const missingLessonRows = await db`
     WITH lesson_scope AS (
-      SELECT l.id
+      SELECT l.id, l.lesson_date
       FROM teacher_grade_lessons l
       WHERE l.class_id = ${classId}
         AND l.school_year = ${schoolYear}
         AND l.bimester = ${bimester}
+        AND COALESCE(l.has_grades, TRUE) = TRUE
     ),
     active_students AS (
-      SELECT s.id, s.full_name
+      SELECT
+        s.id,
+        s.full_name,
+        COALESCE(s.enrollment_at, s.created_at::date) AS enrollment_date
       FROM teacher_class_students s
       WHERE s.class_id = ${classId}
         AND s.active = TRUE
+    ),
+    eligible_pairs AS (
+      SELECT
+        s.id AS student_id,
+        s.full_name,
+        l.id AS lesson_id
+      FROM active_students s
+      JOIN lesson_scope l
+        ON s.enrollment_date <= l.lesson_date::date
     )
     SELECT
-      s.id AS student_id,
-      s.full_name,
+      ep.student_id,
+      ep.full_name,
       COUNT(*) FILTER (
         WHERE e.lesson_id IS NULL
            OR e.attendance IS NULL
@@ -157,12 +170,11 @@ export async function POST(req: NextRequest) {
            OR e.c3 IS NULL
            OR e.c4 IS NULL
       )::int AS pending_lessons
-    FROM active_students s
-    CROSS JOIN lesson_scope l
+    FROM eligible_pairs ep
     LEFT JOIN teacher_grade_entries e
-      ON e.lesson_id = l.id
-     AND e.student_id = s.id
-    GROUP BY s.id, s.full_name
+      ON e.lesson_id = ep.lesson_id
+     AND e.student_id = ep.student_id
+    GROUP BY ep.student_id, ep.full_name
     HAVING COUNT(*) FILTER (
       WHERE e.lesson_id IS NULL
          OR e.attendance IS NULL
@@ -171,7 +183,7 @@ export async function POST(req: NextRequest) {
          OR e.c3 IS NULL
          OR e.c4 IS NULL
     ) > 0
-    ORDER BY s.full_name ASC
+    ORDER BY ep.full_name ASC
   `
 
   if (missingLessonRows.length > 0) {
@@ -196,21 +208,26 @@ export async function POST(req: NextRequest) {
   }
 
   const missingNote2Rows = await db`
+    WITH
+    active_students AS (
+      SELECT
+        s.id,
+        s.full_name
+      FROM teacher_class_students s
+      WHERE s.class_id = ${classId}
+        AND s.active = TRUE
+    )
     SELECT
       s.id AS student_id,
       s.full_name
-    FROM teacher_class_students s
+    FROM active_students s
     LEFT JOIN teacher_bimester_grades bg
       ON bg.class_id = ${classId}
      AND bg.student_id = s.id
      AND bg.school_year = ${schoolYear}
      AND bg.bimester = ${bimester}
-    WHERE s.class_id = ${classId}
-      AND s.active = TRUE
-      AND (
-        bg.exam_score IS NULL
-        OR bg.c5_score IS NULL
-      )
+    WHERE bg.exam_score IS NULL
+       OR bg.c5_score IS NULL
     ORDER BY s.full_name ASC
   `
 
@@ -237,11 +254,31 @@ export async function POST(req: NextRequest) {
 
   const missingFinalRows = await db`
     WITH lesson_scope AS (
-      SELECT l.id
+      SELECT l.id, l.lesson_date
       FROM teacher_grade_lessons l
       WHERE l.class_id = ${classId}
         AND l.school_year = ${schoolYear}
         AND l.bimester = ${bimester}
+        AND COALESCE(l.has_grades, TRUE) = TRUE
+    ),
+    active_students AS (
+      SELECT
+        s.id,
+        s.full_name,
+        COALESCE(s.enrollment_at, s.created_at::date) AS enrollment_date
+      FROM teacher_class_students s
+      WHERE s.class_id = ${classId}
+        AND s.active = TRUE
+    ),
+    student_scope AS (
+      SELECT
+        s.id AS student_id,
+        s.full_name,
+        COUNT(l.id)::int AS eligible_lessons
+      FROM active_students s
+      LEFT JOIN lesson_scope l
+        ON s.enrollment_date <= l.lesson_date::date
+      GROUP BY s.id, s.full_name
     ),
     lesson_metrics AS (
       SELECT
@@ -263,22 +300,21 @@ export async function POST(req: NextRequest) {
     ),
     base AS (
       SELECT
-        s.id AS student_id,
-        s.full_name,
+        ss.student_id,
+        ss.full_name,
+        ss.eligible_lessons,
         lm.note1,
         bg.exam_score,
         bg.c5_score,
         bg.manual_final_score
-      FROM teacher_class_students s
+      FROM student_scope ss
       LEFT JOIN lesson_metrics lm
-        ON lm.student_id = s.id
+        ON lm.student_id = ss.student_id
       LEFT JOIN teacher_bimester_grades bg
         ON bg.class_id = ${classId}
-       AND bg.student_id = s.id
+       AND bg.student_id = ss.student_id
        AND bg.school_year = ${schoolYear}
        AND bg.bimester = ${bimester}
-      WHERE s.class_id = ${classId}
-        AND s.active = TRUE
     ),
     final_calc AS (
       SELECT
@@ -286,6 +322,7 @@ export async function POST(req: NextRequest) {
         b.full_name,
         CASE
           WHEN b.manual_final_score IS NOT NULL THEN b.manual_final_score
+          WHEN b.eligible_lessons = 0 THEN NULL
           WHEN b.note1 IS NOT NULL
            AND b.exam_score IS NOT NULL
            AND b.c5_score IS NOT NULL

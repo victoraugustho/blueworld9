@@ -92,6 +92,7 @@ export interface TeacherLessonLog {
   bimester?: number | null
   lesson_number: number
   lesson_date: string
+  has_grades?: boolean
   notes?: string | null
   observations?: string | null
   created_at?: string
@@ -128,6 +129,7 @@ export interface TeacherClassStudent {
   class_id: string
   full_name: string
   enrollment_code?: string | null
+  enrollment_at?: string | null
   active: boolean
   created_at?: string
   updated_at?: string
@@ -143,6 +145,7 @@ export interface TeacherGradeLesson {
   bimester: number
   lesson_number: number
   lesson_date: string
+  has_grades?: boolean
   notes?: string | null
   diary_notes?: string | null
   observations?: string | null
@@ -150,6 +153,8 @@ export interface TeacherGradeLesson {
   entries_count?: number
   graded_entries_count?: number
   total_students?: number
+  total_active_students?: number
+  non_eligible_students?: number
   completion_percent?: number
   fully_launched?: boolean
   absences_count?: number

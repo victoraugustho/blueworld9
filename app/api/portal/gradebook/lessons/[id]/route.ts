@@ -151,6 +151,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
      AND e.lesson_id = ${lessonId}
     WHERE s.class_id = ${lesson.class_id}
       AND s.active = TRUE
+      AND COALESCE(s.enrollment_at, s.created_at::date) <= ${lesson.lesson_date}::date
     ORDER BY s.full_name ASC
   `
 
@@ -208,6 +209,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     typeof body.notes === "string"
       ? body.notes.trim()
       : String(linkedLog?.notes ?? lesson.notes ?? "")
+  const hasGrades =
+    body.has_grades === undefined ? lesson.has_grades !== false : body.has_grades === false ? false : true
   const observations =
     typeof body.observations === "string"
       ? body.observations.trim()
@@ -234,6 +237,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       SELECT id
       FROM teacher_class_students
       WHERE class_id = ${lesson.class_id}
+        AND COALESCE(enrollment_at, created_at::date) <= ${lessonDateRaw}::date
         AND id = ANY(${studentIds}::uuid[])
     `
     if (validStudents.length !== studentIds.length) {
@@ -248,6 +252,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       UPDATE teacher_grade_lessons
       SET
         lesson_date = ${lessonDateRaw},
+        has_grades = ${hasGrades},
         notes = ${notes || null}
       WHERE id = ${lessonId}
     `
@@ -257,6 +262,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
         UPDATE teacher_lesson_logs
         SET
           lesson_date = ${lessonDateRaw},
+          has_grades = ${hasGrades},
           notes = ${notes || null},
           observations = ${observations || null},
           updated_at = NOW()
@@ -285,6 +291,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
         UPDATE teacher_lesson_logs l
         SET
           lesson_date = ${lessonDateRaw},
+          has_grades = ${hasGrades},
           notes = ${notes || null},
           observations = ${observations || null},
           updated_at = NOW()
@@ -293,49 +300,66 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       `
     }
 
-    for (const entry of entries) {
-      const studentId = String(entry?.student_id ?? "").trim()
-      if (!isUuid(studentId)) continue
+    if (!hasGrades) {
+      await sql`
+        DELETE FROM teacher_grade_entries
+        WHERE lesson_id = ${lessonId}
+      `
+    } else {
+      for (const entry of entries) {
+        const studentId = String(entry?.student_id ?? "").trim()
+        if (!isUuid(studentId)) continue
 
-      const attendance = normalizeAttendance(entry?.attendance)
-      const c1 = normalizeScore(entry?.c1, scoreMax)
-      const c2 = normalizeScore(entry?.c2, scoreMax)
-      const c3 = normalizeScore(entry?.c3, scoreMax)
-      const c4 = normalizeScore(entry?.c4, scoreMax)
-      const comment = typeof entry?.comment === "string" ? entry.comment.trim() : null
+        const attendance = normalizeAttendance(entry?.attendance)
+        const c1 = normalizeScore(entry?.c1, scoreMax)
+        const c2 = normalizeScore(entry?.c2, scoreMax)
+        const c3 = normalizeScore(entry?.c3, scoreMax)
+        const c4 = normalizeScore(entry?.c4, scoreMax)
+        const comment = typeof entry?.comment === "string" ? entry.comment.trim() : null
+
+        await sql`
+          INSERT INTO teacher_grade_entries (
+            lesson_id,
+            student_id,
+            attendance,
+            c1,
+            c2,
+            c3,
+            c4,
+            comment,
+            updated_at
+          )
+          VALUES (
+            ${lessonId},
+            ${studentId},
+            ${attendance},
+            ${c1},
+            ${c2},
+            ${c3},
+            ${c4},
+            ${comment},
+            NOW()
+          )
+          ON CONFLICT (lesson_id, student_id)
+          DO UPDATE SET
+            attendance = EXCLUDED.attendance,
+            c1 = EXCLUDED.c1,
+            c2 = EXCLUDED.c2,
+            c3 = EXCLUDED.c3,
+            c4 = EXCLUDED.c4,
+            comment = EXCLUDED.comment,
+            updated_at = NOW()
+        `
+      }
 
       await sql`
-        INSERT INTO teacher_grade_entries (
-          lesson_id,
-          student_id,
-          attendance,
-          c1,
-          c2,
-          c3,
-          c4,
-          comment,
-          updated_at
-        )
-        VALUES (
-          ${lessonId},
-          ${studentId},
-          ${attendance},
-          ${c1},
-          ${c2},
-          ${c3},
-          ${c4},
-          ${comment},
-          NOW()
-        )
-        ON CONFLICT (lesson_id, student_id)
-        DO UPDATE SET
-          attendance = EXCLUDED.attendance,
-          c1 = EXCLUDED.c1,
-          c2 = EXCLUDED.c2,
-          c3 = EXCLUDED.c3,
-          c4 = EXCLUDED.c4,
-          comment = EXCLUDED.comment,
-          updated_at = NOW()
+        INSERT INTO teacher_grade_entries (lesson_id, student_id, attendance)
+        SELECT ${lessonId}::uuid, s.id, 'present'
+        FROM teacher_class_students s
+        WHERE s.class_id = ${lesson.class_id}
+          AND s.active = TRUE
+          AND COALESCE(s.enrollment_at, s.created_at::date) <= ${lessonDateRaw}::date
+        ON CONFLICT (lesson_id, student_id) DO NOTHING
       `
     }
   })

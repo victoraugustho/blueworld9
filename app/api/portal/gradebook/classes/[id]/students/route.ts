@@ -5,6 +5,7 @@ import {
   ensureGradebookSchema,
   isUuid,
   normalizeEnrollmentCode,
+  normalizeEnrollmentDate,
   normalizeStudentName,
 } from "@/lib/gradebook"
 
@@ -92,9 +93,10 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         const fullName = normalizeStudentName(item?.full_name ?? item?.name)
         if (!fullName) continue
         const enrollmentCode = normalizeEnrollmentCode(item?.enrollment_code)
+        const enrollmentAt = normalizeEnrollmentDate(item?.enrollment_at)
         const [row] = await sql`
-          INSERT INTO teacher_class_students (class_id, full_name, enrollment_code, active)
-          VALUES (${classId}, ${fullName}, ${enrollmentCode}, TRUE)
+          INSERT INTO teacher_class_students (class_id, full_name, enrollment_code, enrollment_at, active)
+          VALUES (${classId}, ${fullName}, ${enrollmentCode}, COALESCE(${enrollmentAt}, CURRENT_DATE), TRUE)
           RETURNING *
         `
         inserted.push(row)
@@ -113,6 +115,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   const fullName = normalizeStudentName(body.full_name ?? body.name)
   const enrollmentCode = normalizeEnrollmentCode(body.enrollment_code)
+  const enrollmentAt = normalizeEnrollmentDate(body.enrollment_at)
   const active = body.active === undefined ? true : body.active === true
 
   if (!fullName) {
@@ -121,8 +124,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   try {
     const [created] = await db`
-      INSERT INTO teacher_class_students (class_id, full_name, enrollment_code, active)
-      VALUES (${classId}, ${fullName}, ${enrollmentCode}, ${active})
+      INSERT INTO teacher_class_students (class_id, full_name, enrollment_code, enrollment_at, active)
+      VALUES (${classId}, ${fullName}, ${enrollmentCode}, COALESCE(${enrollmentAt}, CURRENT_DATE), ${active})
       RETURNING *
     `
     return NextResponse.json(created)

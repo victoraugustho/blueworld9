@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { ensureGradebookSchema } from "@/lib/gradebook"
 import { ensureTurmasSchema } from "@/lib/turmas"
+import { ensureAuditSchema } from "@/lib/audit-schema"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -12,6 +13,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 
   await ensureTurmasSchema()
   await ensureGradebookSchema()
+  await ensureAuditSchema()
 
   const { id } = await ctx.params
   if (!id) {
@@ -30,44 +32,62 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "Professor nao encontrado" }, { status: 404 })
   }
 
-  await db`
-    DELETE FROM teacher_grade_lessons gl
-    USING teacher_classes c
-    WHERE gl.class_id = c.id
-      AND c.teacher_id = ${id}
-      AND gl.school_year = ${schoolYear}
-      AND NOT EXISTS (
-        SELECT 1
-        FROM teacher_lesson_logs l
-        WHERE l.teacher_id = ${id}
-          AND COALESCE(l.school_year::int, EXTRACT(YEAR FROM l.lesson_date)::int) = ${schoolYear}
-          AND l.lesson_number = gl.lesson_number
-          AND COALESCE(
-            l.bimester::int,
-            CASE
-              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 1 AND 3 THEN 1
-              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 4 AND 6 THEN 2
-              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 7 AND 9 THEN 3
-              ELSE 4
-            END
-          ) = gl.bimester
-          AND (
-            l.class_id = gl.class_id
-            OR (
-              l.class_id IS NULL
-              AND lower(trim(l.class_label)) = lower(trim(c.name))
-            )
-          )
-      )
-  `
+  // Intentionally no automatic delete here.
+  // Reconciliation/deletion must be explicit to avoid accidental grade loss.
 
-  const logs = await db`
-    SELECT id, action, status, request_path, created_at
-    FROM audit_logs
-    WHERE actor_id = ${id}
-    ORDER BY created_at DESC
-    LIMIT 20
-  `
+  let logs: any[] = []
+  try {
+    const auditColumnsRows = await db`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'audit_logs'
+    `
+    const auditColumns = new Set(
+      (Array.isArray(auditColumnsRows) ? auditColumnsRows : [])
+        .map((row: any) => String(row?.column_name ?? "").trim().toLowerCase())
+        .filter(Boolean),
+    )
+
+    const hasActorId = auditColumns.has("actor_id")
+    const hasCreatedAt = auditColumns.has("created_at")
+    const hasId = auditColumns.has("id")
+    const hasAction = auditColumns.has("action")
+    const hasStatus = auditColumns.has("status")
+    const hasRequestPath = auditColumns.has("request_path")
+
+    if (hasActorId && hasCreatedAt) {
+      if (hasId) {
+        logs = await db`
+          SELECT
+            id::text AS id,
+            ${hasAction ? db`action` : db`'audit_log'::text`} AS action,
+            ${hasStatus ? db`status` : db`NULL::text`} AS status,
+            ${hasRequestPath ? db`request_path` : db`NULL::text`} AS request_path,
+            created_at::text AS created_at
+          FROM public.audit_logs
+          WHERE actor_id = ${id}
+          ORDER BY created_at DESC
+          LIMIT 20
+        `
+      } else {
+        logs = await db`
+          SELECT
+            md5(created_at::text || ':' || row_number() OVER (ORDER BY created_at DESC)::text) AS id,
+            ${hasAction ? db`action` : db`'audit_log'::text`} AS action,
+            ${hasStatus ? db`status` : db`NULL::text`} AS status,
+            ${hasRequestPath ? db`request_path` : db`NULL::text`} AS request_path,
+            created_at::text AS created_at
+          FROM public.audit_logs
+          WHERE actor_id = ${id}
+          ORDER BY created_at DESC
+          LIMIT 20
+        `
+      }
+    }
+  } catch {
+    logs = []
+  }
 
   const [summary] = await db`
     WITH teacher_turmas AS (

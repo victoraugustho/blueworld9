@@ -182,6 +182,11 @@ export default function PortalCadastroPage() {
     password: "",
     confirmPassword: "",
   })
+  const [consents, setConsents] = useState({
+    acceptPrivacy: false,
+    acceptTerms: false,
+    acceptMarketing: false,
+  })
 
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -192,6 +197,26 @@ export default function PortalCadastroPage() {
 
   const docLabel = country === "BR" ? t.docCpf : t.docCi
   const docPlaceholder = country === "BR" ? t.placeholders.cpf : t.placeholders.ci
+  const consentText =
+    locale === "pt-BR"
+      ? {
+          title: "Privacidade e LGPD",
+          requiredError: "Para continuar, aceite os Termos de Uso e o Aviso de Privacidade.",
+          acceptPrivacyPrefix: "Li e aceito o ",
+          acceptPrivacyLink: "Aviso de Privacidade",
+          acceptTermsPrefix: "Li e aceito os ",
+          acceptTermsLink: "Termos de Uso",
+          acceptMarketing: "Quero receber comunicacoes e novidades (opcional).",
+        }
+      : {
+          title: "Privacidad y datos personales",
+          requiredError: "Para continuar, acepta Terminos de Uso y Aviso de Privacidad.",
+          acceptPrivacyPrefix: "Lei y acepto el ",
+          acceptPrivacyLink: "Aviso de Privacidad",
+          acceptTermsPrefix: "Lei y acepto los ",
+          acceptTermsLink: "Terminos de Uso",
+          acceptMarketing: "Quiero recibir comunicaciones y novedades (opcional).",
+        }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -215,6 +240,11 @@ export default function PortalCadastroPage() {
 
     if (formData.password !== formData.confirmPassword) {
       setError(t.errors.passMatch)
+      return
+    }
+
+    if (!consents.acceptPrivacy || !consents.acceptTerms) {
+      setError(consentText.requiredError)
       return
     }
 
@@ -243,6 +273,9 @@ export default function PortalCadastroPage() {
           country,
           documentNumber: onlyDigits(formData.documentNumber),
           password: formData.password,
+          acceptPrivacy: consents.acceptPrivacy,
+          acceptTerms: consents.acceptTerms,
+          acceptMarketing: consents.acceptMarketing,
         }),
       })
 
@@ -527,6 +560,67 @@ export default function PortalCadastroPage() {
                       {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
+                </div>
+
+                <div className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-cyan-300">{consentText.title}</p>
+
+                  <label className="flex items-start gap-2 text-sm text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={consents.acceptPrivacy}
+                      onChange={(e) =>
+                        setConsents((prev) => ({
+                          ...prev,
+                          acceptPrivacy: e.target.checked,
+                        }))
+                      }
+                      className="mt-0.5 h-4 w-4 rounded border-white/20 bg-slate-900"
+                    />
+                    <span>
+                      {consentText.acceptPrivacyPrefix}
+                      <Link href="/privacidade" target="_blank" className="text-cyan-300 hover:text-cyan-200 underline">
+                        {consentText.acceptPrivacyLink}
+                      </Link>
+                      .
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2 text-sm text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={consents.acceptTerms}
+                      onChange={(e) =>
+                        setConsents((prev) => ({
+                          ...prev,
+                          acceptTerms: e.target.checked,
+                        }))
+                      }
+                      className="mt-0.5 h-4 w-4 rounded border-white/20 bg-slate-900"
+                    />
+                    <span>
+                      {consentText.acceptTermsPrefix}
+                      <Link href="/termos" target="_blank" className="text-cyan-300 hover:text-cyan-200 underline">
+                        {consentText.acceptTermsLink}
+                      </Link>
+                      .
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={consents.acceptMarketing}
+                      onChange={(e) =>
+                        setConsents((prev) => ({
+                          ...prev,
+                          acceptMarketing: e.target.checked,
+                        }))
+                      }
+                      className="mt-0.5 h-4 w-4 rounded border-white/20 bg-slate-900"
+                    />
+                    <span>{consentText.acceptMarketing}</span>
+                  </label>
                 </div>
 
                 {error && (

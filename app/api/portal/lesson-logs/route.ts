@@ -172,6 +172,7 @@ export async function POST(req: NextRequest) {
 
   const notes = typeof body.notes === "string" ? body.notes : ""
   const observations = typeof body.observations === "string" ? body.observations : ""
+  const hasGrades = body.has_grades === false ? false : true
 
   const school_year = normalizeSchoolYear(body.school_year)
   if (school_year === null) {
@@ -196,7 +197,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const incomingEntries = Array.isArray(body.entries) ? body.entries : []
+  const incomingEntries = hasGrades && Array.isArray(body.entries) ? body.entries : []
   const parsedEntries: Array<{
     student_id: string
     attendance: "present" | "absent"
@@ -223,6 +224,7 @@ export async function POST(req: NextRequest) {
       SELECT id
       FROM teacher_class_students
       WHERE class_id = ${class_id}
+        AND COALESCE(enrollment_at, created_at::date) <= ${lesson_date}::date
         AND id = ANY(${ids}::uuid[])
     `
     if (validStudents.length !== ids.length) {
@@ -285,6 +287,7 @@ export async function POST(req: NextRequest) {
           bimester,
           lesson_number,
           lesson_date,
+          has_grades,
           notes
         )
         VALUES (
@@ -294,17 +297,24 @@ export async function POST(req: NextRequest) {
           ${bimester},
           ${nextNumber},
           ${lesson_date},
+          ${hasGrades},
           ${notes || null}
         )
         ON CONFLICT (class_id, school_year, bimester, lesson_number)
         DO UPDATE SET
           lesson_date = EXCLUDED.lesson_date,
+          has_grades = EXCLUDED.has_grades,
           notes = EXCLUDED.notes,
           updated_at = NOW()
         RETURNING *
       `
 
-      if (parsedEntries.length > 0) {
+      if (!hasGrades) {
+        await sql`
+          DELETE FROM teacher_grade_entries
+          WHERE lesson_id = ${gradeLesson.id}
+        `
+      } else if (parsedEntries.length > 0) {
         for (const entry of parsedEntries) {
           await sql`
             INSERT INTO teacher_grade_entries (
@@ -347,6 +357,7 @@ export async function POST(req: NextRequest) {
           FROM teacher_class_students s
           WHERE s.class_id = ${class_id}
             AND s.active = TRUE
+            AND COALESCE(s.enrollment_at, s.created_at::date) <= ${lesson_date}::date
           ON CONFLICT (lesson_id, student_id) DO NOTHING
         `
       }
@@ -362,6 +373,7 @@ export async function POST(req: NextRequest) {
         bimester,
         lesson_number,
         lesson_date,
+        has_grades,
         notes,
         observations
       )
@@ -374,6 +386,7 @@ export async function POST(req: NextRequest) {
         ${bimesterToPersist},
         ${nextNumber},
         ${lesson_date},
+        ${hasGrades},
         ${notes},
         ${observations}
       )
@@ -402,6 +415,7 @@ export async function POST(req: NextRequest) {
       schedule_id,
       school_year,
       bimester: bimester ?? null,
+      has_grades: hasGrades,
       grade_entry_count: parsedEntries.length,
       has_notes: notes.length > 0,
       has_observations: observations.length > 0,

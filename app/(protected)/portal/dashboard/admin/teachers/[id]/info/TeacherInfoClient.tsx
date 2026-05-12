@@ -1,825 +1,620 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import { AlertTriangle, CalendarRange, CheckCircle2, CircleHelp, Clock3, RefreshCcw, Target } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { Teacher, TeacherLessonLog, TeacherSchedule } from "@/app/types/portal"
-import {
-  ArrowLeft,
-  CalendarDays,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  ClipboardList,
-  FileText,
-  Lock,
-  Pencil,
-  RefreshCcw,
-  RotateCcw,
-  Ban,
-  Trash,
-  Video,
-} from "lucide-react"
-import { TIMEZONE_OPTIONS, getDefaultTimezone, getTimezoneLabel } from "@/lib/timezones"
-import { getTurmaYearLabel } from "@/lib/turma-years"
+import { Button } from "@/components/ui/button"
 
-type Country = Teacher["country"]
-
-type AuditLog = {
-  id: string
-  action: string
-  status?: string | null
-  request_path?: string | null
-  created_at: string
-}
-
-type VideoSummary = {
-  total_videos: number
-  started_videos: number
-  watched_videos: number
-  avg_progress: number
-}
-
-type VideoProgress = {
-  id: string
-  title: string
-  progress_percent: number
-  updated_at?: string | null
-}
-
-type LessonSummary = {
-  total_logs: number
-  class_count: number
-  last_lesson_date?: string | null
-}
-
-type LessonClass = {
-  class_label: string
-  last_lesson: number
-  last_date?: string | null
-  next_lesson: number
-}
-
-type GradebookStudent = {
-  student_id: string
-  full_name: string
-  active: boolean
-  entries_count: number
-  presence_count: number
-  absence_count: number
-  attendance_percent?: number | null
-  b1_final_grade?: number | null
-  b2_final_grade?: number | null
-  b3_final_grade?: number | null
-  b4_final_grade?: number | null
-}
-
-type GradebookClassBimester = {
-  bimester: number
-  students_with_final: number
-  total_students: number
-  closed: boolean
-  locked_at?: string | null
-}
-
-type GradebookClass = {
-  id: string
-  name: string
-  student_year?: number | null
-  school_year: number
-  active: boolean
-  student_count: number
-  active_student_count: number
-  lesson_count: number
-  last_lesson_date?: string | null
-  last_lesson_number?: number | null
-  students: GradebookStudent[]
-  bimesters: GradebookClassBimester[]
-}
-
-type GradebookRecentLesson = {
-  id: string
-  class_id: string
-  class_name: string
-  bimester: number
-  lesson_number: number
-  lesson_date?: string | null
-  notes?: string | null
-  entries_count: number
-  absences_count: number
-}
-
-type GradebookOverview = {
-  school_year: number
-  class_count: number
-  active_class_count: number
-  student_count: number
-  active_student_count: number
-  lesson_count: number
-}
-
-type TeacherInsights = {
-  logs: AuditLog[]
-  videoSummary: VideoSummary
-  recentProgress: VideoProgress[]
-  lessonSummary: LessonSummary
-  lessonClasses: LessonClass[]
-  gradebook?: {
+type DashboardResponse = {
+  teacher: {
+    id: string
+    name: string
+    email: string
+    country: "BR" | "UY" | "PY"
+    locale: "pt-BR" | "es"
+    approved: boolean
+    active: boolean
+    categories: Array<{ id: number; name: string }>
+    student_years: number[]
+  }
+  period: {
+    from: string
+    to: string
+    days: number
     school_year: number
-    overview: GradebookOverview
-    classes: GradebookClass[]
-    recent_lessons: GradebookRecentLesson[]
+  }
+  kpis: {
+    performance_index: number
+    performance_level: "excelente" | "bom" | "atencao" | "critico"
+    lesson_diary_coverage_percent: number
+    launch_completion_percent: number
+    attendance_coverage_percent: number
+    final_grades_coverage_percent: number
+    freshness_score: number
+    alerts: string[]
+  }
+  access: {
+    last_login_at: string | null
+    login_count_period: number
+    active_sessions: number
+    last_session: { created_at: string; ip: string | null; user_agent: string | null } | null
+    last_activity_at: string | null
+    last_operational_activity_at: string | null
+  }
+  activity: {
+    summary: {
+      total_actions: number
+      success_actions: number
+      failed_actions: number
+      unique_actions: number
+      unique_paths: number
+      last_activity_in_period: string | null
+      last_operational_activity_in_period: string | null
+      login_actions: number
+      operational_actions: number
+    }
+    top_actions: Array<{ action: string; total: number }>
+  }
+  agenda: {
+    total_slots: number
+    active_slots: number
+    class_slots: number
+    event_slots: number
+    recurring_slots: number
+    one_off_slots: number
+    one_off_in_period: number
+  }
+  lessons: {
+    total_lessons: number
+    classes_touched: number
+    lessons_with_grades: number
+    lessons_without_grades: number
+    lessons_with_notes: number
+    lessons_with_observations: number
+    last_lesson_date: string | null
+    by_class: Array<{ class_name: string; lessons_count: number; last_lesson_date: string | null }>
+    recent: Array<{
+      id: string
+      class_name: string
+      lesson_date: string
+      lesson_number: number
+      bimester: number | null
+      has_grades: boolean
+      notes: string | null
+      observations: string | null
+    }>
+  }
+  gradebook: {
+    overview: {
+      class_count: number
+      active_class_count: number
+      student_count: number
+      active_student_count: number
+      lesson_count: number
+    }
+    progress_period: {
+      grade_lessons_count: number
+      expected_students_total: number
+      completed_students_total: number
+      attendance_marked_total: number
+      absences_total: number
+      fully_completed_lessons: number
+      no_grade_lessons: number
+    }
+    final_coverage: {
+      total_targets: number
+      completed_targets: number
+      by_bimester: Array<{
+        bimester: number
+        total_targets: number
+        completed_targets: number
+        class_count: number
+        closed_class_count: number
+      }>
+    }
+    classes: Array<{
+      id: string
+      name: string
+      student_year: number | null
+      active: boolean
+      lessons_count: number
+      expected_students_total: number
+      completed_students_total: number
+      completion_percent: number
+      absences_total: number
+      last_lesson_date: string | null
+    }>
+  }
+  reminders: {
+    total: number
+    done: number
+    pending: number
+    created_in_period: number
+    last_update_at: string | null
+  }
+  video: {
+    all_time: {
+      tracked_videos: number
+      started_videos: number
+      watched_videos: number
+      avg_progress: number
+    }
+    in_period: {
+      tracked_videos: number
+      started_videos: number
+      watched_videos: number
+      avg_progress: number
+    }
   }
 }
 
-const scheduleDays = [1, 2, 3, 4, 5]
-const weekdayLabelMap: Record<number, string> = {
-  1: "Segunda-feira",
-  2: "Terça-feira",
-  3: "Quarta-feira",
-  4: "Quinta-feira",
-  5: "Sexta-feira",
-  6: "Sábado",
-  7: "Domingo",
-}
+type PresetDays = 7 | 15 | 30 | 90
 
-function weekdayLabel(value: number) {
-  return weekdayLabelMap[value] ?? `Dia ${value}`
-}
-
-function timeLabel(value: string) {
-  if (!value) return ""
-  return String(value).slice(0, 5)
-}
-
-function countryLabel(c: Country) {
-  if (c === "BR") return "Brasil"
-  if (c === "UY") return "Uruguai"
+function countryLabel(value: "BR" | "UY" | "PY") {
+  if (value === "BR") return "Brasil"
+  if (value === "UY") return "Uruguai"
   return "Paraguai"
 }
 
-function docLabel(t: Teacher) {
-  if (t.document_type === "CPF") return "CPF"
-  return "CI"
+function formatDate(value: string | null | undefined) {
+  if (!value) return "-"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString("pt-BR")
 }
 
-function localeBadge(locale: Teacher["locale"]) {
-  return locale === "pt-BR"
-    ? { label: "PT", cls: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/20" }
-    : { label: "ES", cls: "bg-amber-500/15 text-amber-300 border border-amber-500/20" }
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return "-"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString("pt-BR")
 }
 
-function statusBadge(teacher: Teacher) {
-  if (!teacher.approved) {
-    return { label: "Pendente", cls: "bg-yellow-500/15 text-yellow-300 border border-yellow-500/20" }
+function toIsoDate(value: Date) {
+  return value.toISOString().slice(0, 10)
+}
+
+function todayIsoDate() {
+  const now = new Date()
+  const utc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  return toIsoDate(utc)
+}
+
+function daysAgoIsoDate(days: number) {
+  const now = new Date()
+  const utc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  utc.setUTCDate(utc.getUTCDate() - days + 1)
+  return toIsoDate(utc)
+}
+
+function pctLabel(value: number) {
+  return `${Number(value ?? 0).toFixed(1).replace(".", ",")}%`
+}
+
+function scoreTone(level: DashboardResponse["kpis"]["performance_level"]) {
+  if (level === "excelente") return "text-emerald-300 border-emerald-500/30 bg-emerald-500/15"
+  if (level === "bom") return "text-cyan-200 border-cyan-500/30 bg-cyan-500/15"
+  if (level === "atencao") return "text-amber-200 border-amber-500/30 bg-amber-500/15"
+  return "text-rose-200 border-rose-500/30 bg-rose-500/15"
+}
+
+function mapPreset(days: PresetDays) {
+  return {
+    from: daysAgoIsoDate(days),
+    to: todayIsoDate(),
   }
-  if (teacher.active === false) {
-    return { label: "Desativado", cls: "bg-red-500/15 text-red-300 border border-red-500/20" }
-  }
-  return { label: "Aprovado", cls: "bg-green-500/15 text-green-300 border border-green-500/20" }
-}
-
-function formatDate(dt?: any) {
-  if (!dt) return "-"
-  if (typeof dt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dt)) {
-    const d = new Date(`${dt}T00:00:00Z`)
-    if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleDateString("pt-BR", { timeZone: "UTC" })
-    }
-  }
-  const d = new Date(dt)
-  if (Number.isNaN(d.getTime())) return String(dt)
-  return d.toLocaleString("pt-BR")
-}
-
-function maskPhone(phone?: string) {
-  const p = String(phone ?? "").replace(/\D/g, "")
-  if (p.length < 10) return phone ?? "-"
-  const ddd = p.slice(0, 2)
-  const mid = p.length === 11 ? p.slice(2, 7) : p.slice(2, 6)
-  const end = p.length === 11 ? p.slice(7) : p.slice(6)
-  return `(${ddd}) ${mid}-${end}`
-}
-
-function formatScore(value: number | null | undefined) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return "-"
-  return Number(value).toFixed(2).replace(".", ",")
-}
-
-function formatPercent(value: number | null | undefined) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return "-"
-  return `${Number(value).toFixed(1).replace(".", ",")}%`
 }
 
 export default function TeacherInfoClient({ teacherId }: { teacherId: string }) {
-  const [teacher, setTeacher] = useState<Teacher | null>(null)
-  const [schedules, setSchedules] = useState<TeacherSchedule[]>([])
-  const [logs, setLogs] = useState<TeacherLessonLog[]>([])
-  const [insights, setInsights] = useState<TeacherInsights | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState("")
-  const [openClasses, setOpenClasses] = useState<Record<string, boolean>>({})
-  const [openGradebookClasses, setOpenGradebookClasses] = useState<Record<string, boolean>>({})
-  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
-  const [scheduleSaving, setScheduleSaving] = useState(false)
-  const [scheduleError, setScheduleError] = useState("")
-  const [gradebookLockSavingKey, setGradebookLockSavingKey] = useState("")
-  const [gradebookLockError, setGradebookLockError] = useState("")
-  const [scheduleForm, setScheduleForm] = useState({
-    teacher_id: "",
-    class_label: "",
-    weekday: 1,
-    start_time: "10:00",
-    end_time: "10:55",
-    timezone: "",
-    active: true,
-  })
+  const [data, setData] = useState<DashboardResponse | null>(null)
+  const [fromDate, setFromDate] = useState(daysAgoIsoDate(30))
+  const [toDate, setToDate] = useState(todayIsoDate())
+  const [schoolYear, setSchoolYear] = useState(new Date().getFullYear())
 
-  const schedulesByWeekday = useMemo(() => {
-    const map: Record<number, TeacherSchedule[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] }
-    for (const schedule of schedules) {
-      if (map[schedule.weekday]) map[schedule.weekday].push(schedule)
-    }
-    for (const day of scheduleDays) {
-      map[day].sort((a, b) => timeLabel(a.start_time).localeCompare(timeLabel(b.start_time)))
-    }
-    return map
-  }, [schedules])
+  const topCards = useMemo(() => {
+    if (!data) return []
+    return [
+      {
+        label: "Indice de desempenho",
+        value: data.kpis.performance_index.toFixed(1).replace(".", ","),
+        hint: data.kpis.performance_level.toUpperCase(),
+        info: "Score composto: diário (25%), lançamento de notas (35%), notas finais (30%) e atividade recente (10%).",
+      },
+      {
+        label: "Ultimo acesso",
+        value: formatDateTime(data.access.last_login_at),
+        hint: `${data.access.active_sessions} sessoes ativas`,
+        info: "Mostra o último login válido do professor no portal e quantas sessões ainda estão abertas.",
+      },
+      {
+        label: "Acoes no periodo",
+        value: String(data.activity.summary.total_actions),
+        hint: `${data.activity.summary.operational_actions} operacionais / ${data.activity.summary.login_actions} logins`,
+        info: "Total de ações registradas no período filtrado (auditoria e, quando necessário, eventos operacionais derivados).",
+      },
+      {
+        label: "Aulas no periodo",
+        value: String(data.lessons.total_lessons),
+        hint: `${data.lessons.classes_touched} turmas com atividade`,
+        info: "Quantidade de aulas registradas no período e em quantas turmas houve movimentação.",
+      },
+      {
+        label: "Cobertura de diario",
+        value: pctLabel(data.kpis.lesson_diary_coverage_percent),
+        hint: `${data.lessons.lessons_with_notes} aulas com diario`,
+        info: "Percentual de aulas que possuem diário/notes preenchido.",
+      },
+      {
+        label: "Cobertura de lancamento",
+        value: pctLabel(data.kpis.launch_completion_percent),
+        hint: `${data.gradebook.progress_period.fully_completed_lessons} aulas 100%`,
+        info: "Percentual de lançamentos completos por aluno nas aulas com nota (presença + critérios C1-C4).",
+      },
+      {
+        label: "Cobertura de notas finais",
+        value: pctLabel(data.kpis.final_grades_coverage_percent),
+        hint: `${data.gradebook.final_coverage.completed_targets}/${data.gradebook.final_coverage.total_targets}`,
+        info: "Percentual de notas finais bimestrais concluídas (incluindo C5 e Prova/Atividade conforme regra).",
+      },
+      {
+        label: "Presenca registrada",
+        value: pctLabel(data.kpis.attendance_coverage_percent),
+        hint: `${data.gradebook.progress_period.absences_total} faltas no periodo`,
+        info: "Percentual de presença/falta efetivamente lançada para os alunos esperados nas aulas.",
+      },
+    ]
+  }, [data])
 
-  const timezoneOptions = useMemo(() => {
-    if (!teacher) return []
-    return TIMEZONE_OPTIONS[teacher.country] ?? []
-  }, [teacher])
-
-  const groupedLogs = useMemo(() => {
-    const groups: Record<string, TeacherLessonLog[]> = {}
-    for (const log of logs) {
-      const key = log.class_label || "Sem turma"
-      if (!groups[key]) groups[key] = []
-      groups[key].push(log)
-    }
-    for (const key of Object.keys(groups)) {
-      groups[key].sort((a, b) => {
-        const dateA = String(a.lesson_date ?? "")
-        const dateB = String(b.lesson_date ?? "")
-        if (dateA !== dateB) return dateB.localeCompare(dateA)
-        return (b.lesson_number ?? 0) - (a.lesson_number ?? 0)
-      })
-    }
-    return groups
-  }, [logs])
-
-  useEffect(() => {
-    if (Object.keys(openClasses).length > 0) return
-    const keys = Object.keys(groupedLogs)
-    if (keys.length === 0) return
-    // Mantém tudo fechado por padrão.
-    setOpenClasses(Object.fromEntries(keys.map((key) => [key, false])))
-  }, [groupedLogs, openClasses])
-
-  async function loadAll() {
+  async function loadDashboard() {
     if (!teacherId) return
+    const params = new URLSearchParams()
+    params.set("from", fromDate)
+    params.set("to", toDate)
+    params.set("schoolYear", String(schoolYear))
+
+    const res = await fetch(`/api/admin/teachers/${teacherId}/dashboard?${params.toString()}`, {
+      cache: "no-store",
+    })
+
+    const json = await res.json().catch(() => null)
+    if (!res.ok) {
+      throw new Error(String(json?.error ?? "Nao foi possivel carregar indicadores."))
+    }
+    setData(json)
+  }
+
+  async function initialLoad() {
     setLoading(true)
     setError("")
     try {
-      const [tRes, sRes, iRes, lRes] = await Promise.all([
-        fetch(`/api/admin/teachers/${teacherId}`, { cache: "no-store" }),
-        fetch(`/api/admin/teacher-schedules?teacherId=${teacherId}`, { cache: "no-store" }),
-        fetch(`/api/admin/teachers/${teacherId}/insights`, { cache: "no-store" }),
-        fetch(`/api/admin/teacher-lesson-logs?teacherId=${teacherId}`, { cache: "no-store" }),
-      ])
-
-      if (!tRes.ok) {
-        setTeacher(null)
-        setSchedules([])
-        setInsights(null)
-        setLogs([])
-        setError("Professor não encontrado.")
-        return
-      }
-
-      const teacherData = await tRes.json()
-      const schedulesData = await sRes.json()
-      const insightsData = await iRes.json()
-      const logsData = await lRes.json()
-
-      setTeacher(teacherData ?? null)
-      setSchedules(Array.isArray(schedulesData) ? schedulesData : [])
-      setInsights(insightsData ?? null)
-      setLogs(Array.isArray(logsData) ? logsData : [])
+      await loadDashboard()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao carregar.")
+      setData(null)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadAll()
+    initialLoad()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teacherId])
 
-  useEffect(() => {
-    if (!teacher) return
-    resetScheduleForm(teacher)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teacher?.id])
-
   async function refresh() {
     setRefreshing(true)
-    await loadAll()
-    setRefreshing(false)
-  }
-
-  async function loadSchedulesOnly() {
-    if (!teacherId) return
-    const res = await fetch(`/api/admin/teacher-schedules?teacherId=${teacherId}`, { cache: "no-store" })
-    const data = await res.json()
-    setSchedules(Array.isArray(data) ? data : [])
-  }
-
-  async function loadLogsOnly() {
-    if (!teacherId) return
-    const res = await fetch(`/api/admin/teacher-lesson-logs?teacherId=${teacherId}`, { cache: "no-store" })
-    const data = await res.json()
-    setLogs(Array.isArray(data) ? data : [])
-  }
-
-  function resetScheduleForm(forTeacher = teacher) {
-    const tz = forTeacher ? getDefaultTimezone(forTeacher.country) : ""
-    setScheduleForm({
-      teacher_id: forTeacher?.id ?? "",
-      class_label: "",
-      weekday: 1,
-      start_time: "10:00",
-      end_time: "10:55",
-      timezone: tz,
-      active: true,
-    })
-    setEditingScheduleId(null)
-    setScheduleError("")
-  }
-
-  function startEditSchedule(item: TeacherSchedule) {
-    setEditingScheduleId(item.id)
-    setScheduleForm({
-      teacher_id: item.teacher_id,
-      class_label: item.class_label,
-      weekday: item.weekday,
-      start_time: timeLabel(item.start_time),
-      end_time: timeLabel(item.end_time),
-      timezone: item.timezone,
-      active: item.active,
-    })
-    setScheduleError("")
-  }
-
-  async function submitSchedule(e: React.FormEvent) {
-    e.preventDefault()
-    if (!teacher) return
-    setScheduleSaving(true)
-    setScheduleError("")
-
-    const url = editingScheduleId
-      ? `/api/admin/teacher-schedules/${editingScheduleId}`
-      : "/api/admin/teacher-schedules"
-    const method = editingScheduleId ? "PUT" : "POST"
-
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...scheduleForm, teacher_id: teacher.id }),
-    })
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      setScheduleError(err?.error ?? "Erro ao salvar")
-      setScheduleSaving(false)
-      return
-    }
-
-    resetScheduleForm(teacher)
-    await loadSchedulesOnly()
-    setScheduleSaving(false)
-  }
-
-  async function deleteSchedule(id: string) {
-    if (!confirm("Deseja excluir este horário?")) return
-    const res = await fetch(`/api/admin/teacher-schedules/${id}`, { method: "DELETE" })
-    if (res.ok) {
-      await loadSchedulesOnly()
+    setError("")
+    try {
+      await loadDashboard()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao atualizar.")
+    } finally {
+      setRefreshing(false)
     }
   }
 
-  async function deleteLog(id: string) {
-    if (!confirm("Deseja excluir este registro do diário?")) return
-    const res = await fetch(`/api/admin/teacher-lesson-logs/${id}`, { method: "DELETE" })
-    if (res.ok) {
-      await loadLogsOnly()
-    }
+  function applyPreset(days: PresetDays) {
+    const range = mapPreset(days)
+    setFromDate(range.from)
+    setToDate(range.to)
   }
-
-  async function approve() {
-    if (!teacher) return
-    await fetch(`/api/admin/teachers/${teacher.id}/approve`, { method: "PATCH" })
-    refresh()
-  }
-
-  async function disable() {
-    if (!teacher) return
-    await fetch(`/api/admin/teachers/${teacher.id}/disable`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ active: false }),
-    })
-    refresh()
-  }
-
-  async function enable() {
-    if (!teacher) return
-    await fetch(`/api/admin/teachers/${teacher.id}/disable`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ active: true }),
-    })
-    refresh()
-  }
-
-  async function toggleBimesterLock(
-    classId: string,
-    schoolYear: number,
-    bimester: number,
-    closed: boolean,
-  ) {
-    const confirmMessage = closed
-      ? `Reabrir o bimestre ${bimester} desta turma?`
-      : `Fechar o bimestre ${bimester} desta turma?`
-    if (!confirm(confirmMessage)) return
-
-    const key = `${classId}:${schoolYear}:${bimester}`
-    setGradebookLockSavingKey(key)
-    setGradebookLockError("")
-
-    const res = await fetch("/api/portal/gradebook/bimester-lock", {
-      method: closed ? "DELETE" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        class_id: classId,
-        school_year: schoolYear,
-        bimester,
-      }),
-    })
-
-    const data = await res.json().catch(() => ({}))
-    setGradebookLockSavingKey("")
-
-    if (!res.ok) {
-      setGradebookLockError(String(data?.error ?? "Nao foi possivel atualizar o status do bimestre."))
-      return
-    }
-
-    await refresh()
-  }
-
-  function toggleClass(label: string) {
-    setOpenClasses((prev) => ({ ...prev, [label]: !prev[label] }))
-  }
-
-  function toggleGradebookClass(classId: string) {
-    setOpenGradebookClasses((prev) => ({ ...prev, [classId]: !prev[classId] }))
-  }
-
-  useEffect(() => {
-    const gradebookClasses = insights?.gradebook?.classes ?? []
-    if (gradebookClasses.length === 0) {
-      setOpenGradebookClasses({})
-      return
-    }
-    setOpenGradebookClasses((prev) => {
-      const next: Record<string, boolean> = {}
-      for (const item of gradebookClasses) {
-        next[item.id] = prev[item.id] ?? false
-      }
-      return next
-    })
-  }, [insights?.gradebook?.classes])
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 text-white space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/portal/dashboard/admin/teachers"
-            className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Voltar
-          </Link>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">
-              {teacher ? teacher.name : "Detalhes do professor"}
-            </h1>
-            {teacher && <p className="text-slate-400 text-sm">{teacher.email}</p>}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={refresh}
-            className="bg-white/10 hover:bg-white/15 border border-white/10"
-            disabled={refreshing || loading}
-          >
-            <RefreshCcw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-            Atualizar
-          </Button>
-          {teacher && (
-            <Link href={`/portal/dashboard/admin/teachers/${teacher.id}`}>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Pencil className="w-4 h-4 mr-2" />
-                Editar
-              </Button>
-            </Link>
-          )}
-          {teacher && !teacher.approved && (
-            <Button className="bg-green-600 hover:bg-green-700" onClick={approve}>
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              Aprovar
-            </Button>
-          )}
-          {teacher && teacher.approved && teacher.active !== false && (
-            <Button className="bg-red-600 hover:bg-red-700" onClick={disable}>
-              <Ban className="w-4 h-4 mr-2" />
-              Desativar
-            </Button>
-          )}
-          {teacher && teacher.approved && teacher.active === false && (
-            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={enable}>
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Reativar
-            </Button>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold">Dashboard de desempenho</h1>
+          {data?.teacher ? (
+            <p className="text-sm text-slate-300 mt-1">
+              {data.teacher.name} • {data.teacher.email} • {countryLabel(data.teacher.country)}
+            </p>
+          ) : (
+            <p className="text-sm text-slate-300 mt-1">Visao executiva de KPIs do professor.</p>
           )}
         </div>
+        <Button onClick={refresh} className="bg-white/10 hover:bg-white/15 border border-white/10" disabled={loading || refreshing}>
+          <RefreshCcw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+          Atualizar
+        </Button>
       </div>
 
-      {loading && <p className="text-slate-400">Carregando...</p>}
+      <Card className="bg-slate-900/30 backdrop-blur-md border border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white text-base flex items-center gap-2">
+            <CalendarRange className="w-4 h-4 text-cyan-300" />
+            Parametros da analise
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <label className="text-xs text-white/70 space-y-1">
+              <span>Data inicial</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(event) => setFromDate(event.target.value)}
+                className="w-full rounded-md border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <label className="text-xs text-white/70 space-y-1">
+              <span>Data final</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(event) => setToDate(event.target.value)}
+                className="w-full rounded-md border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <label className="text-xs text-white/70 space-y-1">
+              <span>Ano letivo</span>
+              <input
+                type="number"
+                min={2020}
+                max={2100}
+                value={schoolYear}
+                onChange={(event) => setSchoolYear(Number(event.target.value) || new Date().getFullYear())}
+                className="w-full rounded-md border border-white/15 bg-slate-950/60 px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <div className="flex items-end">
+              <Button onClick={refresh} className="w-full bg-cyan-600 hover:bg-cyan-700" disabled={loading || refreshing}>
+                Aplicar periodo
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => applyPreset(7)}
+              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white hover:bg-white/10"
+            >
+              Ultimos 7 dias
+            </button>
+            <button
+              type="button"
+              onClick={() => applyPreset(15)}
+              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white hover:bg-white/10"
+            >
+              Ultimos 15 dias
+            </button>
+            <button
+              type="button"
+              onClick={() => applyPreset(30)}
+              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white hover:bg-white/10"
+            >
+              Ultimos 30 dias
+            </button>
+            <button
+              type="button"
+              onClick={() => applyPreset(90)}
+              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white hover:bg-white/10"
+            >
+              Ultimos 90 dias
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {loading && <p className="text-slate-400">Carregando indicadores...</p>}
       {!loading && error && <p className="text-rose-300">{error}</p>}
 
-      {!loading && teacher && (
+      {!loading && !error && data && (
         <>
-          <Card className="bg-slate-900/30 border border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white text-base">Dados do professor</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2 mb-4">
-                <span className={`text-xs rounded-full px-3 py-1 ${localeBadge(teacher.locale).cls}`}>
-                  {localeBadge(teacher.locale).label}
-                </span>
-                <span className={`text-xs rounded-full px-3 py-1 ${statusBadge(teacher).cls}`}>
-                  {statusBadge(teacher).label}
-                </span>
-                <span className="text-xs text-white/70 bg-white/10 border border-white/10 rounded-full px-3 py-1">
-                  {countryLabel(teacher.country)}
-                </span>
-              </div>
-
-              <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
-                <p className="text-white/60 text-xs mb-2">Categorias vinculadas</p>
-                {(teacher.categories ?? []).length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {(teacher.categories ?? []).map((category) => (
-                      <span
-                        key={category.id}
-                        className="text-xs rounded-full px-2.5 py-1 bg-cyan-500/15 text-cyan-200 border border-cyan-500/30"
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            {topCards.map((card) => (
+              <Card key={card.label} className="bg-slate-900/30 backdrop-blur-md border border-white/10">
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-1.5 text-xs text-white/60">
+                    <span>{card.label}</span>
+                    <span className="relative inline-flex group">
+                      <button
+                        type="button"
+                        className="text-white/45 hover:text-cyan-300 transition-colors"
+                        aria-label={`Explicação de ${card.label}`}
+                        title={card.info}
                       >
-                        {category.name}
+                        <CircleHelp className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 w-64 -translate-x-1/2 rounded-md border border-white/15 bg-slate-950/95 px-2 py-1.5 text-[11px] leading-relaxed text-slate-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                        {card.info}
                       </span>
+                    </span>
+                  </div>
+                  <p className="text-xl font-semibold text-white mt-1">{card.value}</p>
+                  <p className="text-[11px] text-white/45 mt-1">{card.hint}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <Card className="bg-slate-900/30 backdrop-blur-md border border-white/10 xl:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-white text-base flex items-center gap-2">
+                  <Target className="w-4 h-4 text-cyan-300" />
+                  Qualidade operacional
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-white/75">Score geral</span>
+                  <span className={`rounded-full border px-2.5 py-1 text-xs ${scoreTone(data.kpis.performance_level)}`}>
+                    {data.kpis.performance_level.toUpperCase()} • {data.kpis.performance_index.toFixed(1).replace(".", ",")}
+                  </span>
+                  <span className="text-xs text-white/50">
+                    Periodo: {formatDate(data.period.from)} a {formatDate(data.period.to)} ({data.period.days} dias)
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-white/70 mb-1">
+                      <span>Cobertura de diario</span>
+                      <span>{pctLabel(data.kpis.lesson_diary_coverage_percent)}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                      <div className="h-full bg-cyan-500" style={{ width: `${Math.max(0, Math.min(100, data.kpis.lesson_diary_coverage_percent))}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-white/70 mb-1">
+                      <span>Cobertura de lancamento de notas</span>
+                      <span>{pctLabel(data.kpis.launch_completion_percent)}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                      <div className="h-full bg-emerald-500" style={{ width: `${Math.max(0, Math.min(100, data.kpis.launch_completion_percent))}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-white/70 mb-1">
+                      <span>Cobertura de notas finais</span>
+                      <span>{pctLabel(data.kpis.final_grades_coverage_percent)}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                      <div className="h-full bg-violet-500" style={{ width: `${Math.max(0, Math.min(100, data.kpis.final_grades_coverage_percent))}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-white/70 mb-1">
+                      <span>Frequencia de atividade recente</span>
+                      <span>{pctLabel(data.kpis.freshness_score)}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                      <div className="h-full bg-amber-500" style={{ width: `${Math.max(0, Math.min(100, data.kpis.freshness_score))}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-900/30 backdrop-blur-md border border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white text-base flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-300" />
+                  Alertas gerenciais
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.kpis.alerts.length === 0 ? (
+                  <p className="text-sm text-emerald-300">Sem alertas no periodo selecionado.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {data.kpis.alerts.map((alert) => (
+                      <li key={alert} className="text-xs text-amber-100 border border-amber-500/30 bg-amber-500/10 rounded-lg px-3 py-2">
+                        {alert}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <Card className="bg-slate-900/30 backdrop-blur-md border border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white text-base flex items-center gap-2">
+                  <Clock3 className="w-4 h-4 text-cyan-300" />
+                  Acesso e uso do portal
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/70">Ultimo login</span>
+                  <span className="text-white">{formatDateTime(data.access.last_login_at)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/70">Ultima atividade (sem login)</span>
+                  <span className="text-white">{formatDateTime(data.access.last_operational_activity_at)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/70">Logins no periodo</span>
+                  <span className="text-white">{data.access.login_count_period}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-white/70">Sessoes ativas</span>
+                  <span className="text-white">{data.access.active_sessions}</span>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-white/70">
+                  <p>Ultima sessao: {formatDateTime(data.access.last_session?.created_at)}</p>
+                  <p className="truncate mt-1">IP: {data.access.last_session?.ip || "-"}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-900/30 backdrop-blur-md border border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white text-base flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-cyan-300" />
+                  Operacao por turma (periodo)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.gradebook.classes.length === 0 ? (
+                  <p className="text-sm text-slate-400">Sem turmas para o ano selecionado.</p>
+                ) : (
+                  <div className="space-y-2 max-h-[360px] overflow-auto pr-1">
+                    {data.gradebook.classes.map((item) => (
+                      <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm text-white truncate">{item.name}</p>
+                          <span className="text-[11px] text-white/70">{pctLabel(item.completion_percent)}</span>
+                        </div>
+                        <p className="text-[11px] text-white/55 mt-1">
+                          {item.lessons_count} aulas • {item.completed_students_total}/{item.expected_students_total} lancamentos • {item.absences_total} faltas
+                        </p>
+                      </div>
                     ))}
                   </div>
-                ) : (
-                  <p className="text-slate-400 text-sm">Nenhuma categoria vinculada.</p>
                 )}
-              </div>
+              </CardContent>
+            </Card>
+          </div>
 
-              <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
-                <p className="text-white/60 text-xs mb-2">Turmas (Ano) vinculadas</p>
-                {(teacher.student_years ?? []).length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {(teacher.student_years ?? []).map((studentYear) => (
-                      <span
-                        key={studentYear}
-                        className="text-xs rounded-full px-2.5 py-1 bg-amber-500/15 text-amber-200 border border-amber-500/30"
-                      >
-                        {getTurmaYearLabel(Number(studentYear))}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-slate-400 text-sm">Nenhuma turma (ano) vinculada.</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-white/60 text-xs">Nome</p>
-                  <p className="text-white mt-1">{teacher.name}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-white/60 text-xs">Telefone</p>
-                  <p className="text-white mt-1">{maskPhone(teacher.phone)}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-white/60 text-xs">Documento</p>
-                  <p className="text-white mt-1">
-                    {docLabel(teacher)}: {teacher.document_number}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-white/60 text-xs">Locale</p>
-                  <p className="text-white mt-1">{teacher.locale}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-white/60 text-xs">País</p>
-                  <p className="text-white mt-1">{teacher.country}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-white/60 text-xs">Criado em</p>
-                  <p className="text-white mt-1">{formatDate((teacher as any).created_at)}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-white/60 text-xs">Atualizado em</p>
-                  <p className="text-white mt-1">{formatDate((teacher as any).updated_at)}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4 sm:col-span-2 xl:col-span-1">
-                  <p className="text-white/60 text-xs">ID</p>
-                  <p className="text-white mt-1 font-mono text-xs break-all">{teacher.id}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/30 border border-white/10">
+          <Card className="bg-slate-900/30 backdrop-blur-md border border-white/10">
             <CardHeader>
-              <CardTitle className="text-white text-base flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-cyan-300" />
-                Agenda (horários fixos)
-              </CardTitle>
+              <CardTitle className="text-white text-base">Cobertura final por bimestre</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={submitSchedule} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="md:col-span-2">
-                  <label className="text-xs text-slate-400">Turma / Aula</label>
-                  <input
-                    value={scheduleForm.class_label}
-                    onChange={(e) => setScheduleForm((prev) => ({ ...prev, class_label: e.target.value }))}
-                    placeholder="Ex: Aula para 1º Ano"
-                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400">Dia da semana</label>
-                  <select
-                    value={scheduleForm.weekday}
-                    onChange={(e) => setScheduleForm((prev) => ({ ...prev, weekday: Number(e.target.value) }))}
-                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white"
-                  >
-                    {scheduleDays.map((day) => (
-                      <option key={day} value={day} className="text-white">
-                        {weekdayLabel(day)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400">Início</label>
-                  <input
-                    type="time"
-                    value={scheduleForm.start_time}
-                    onChange={(e) => setScheduleForm((prev) => ({ ...prev, start_time: e.target.value }))}
-                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400">Fim</label>
-                  <input
-                    type="time"
-                    value={scheduleForm.end_time}
-                    onChange={(e) => setScheduleForm((prev) => ({ ...prev, end_time: e.target.value }))}
-                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400">Fuso horário</label>
-                  <select
-                    value={scheduleForm.timezone}
-                    onChange={(e) => setScheduleForm((prev) => ({ ...prev, timezone: e.target.value }))}
-                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white"
-                  >
-                    {timezoneOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="text-white">
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2 mt-6 md:mt-7">
-                  <input
-                    id="schedule-active"
-                    type="checkbox"
-                    checked={scheduleForm.active}
-                    onChange={(e) => setScheduleForm((prev) => ({ ...prev, active: e.target.checked }))}
-                    className="rounded border-white/20"
-                  />
-                  <label htmlFor="schedule-active" className="text-sm text-white/80">
-                    Ativo
-                  </label>
-                </div>
-
-                {scheduleError && (
-                  <p className="text-xs text-rose-300 md:col-span-2">{scheduleError}</p>
-                )}
-
-                <div className="md:col-span-2 flex flex-wrap gap-2 pt-2">
-                  <Button type="submit" className="bg-cyan-600 hover:bg-cyan-700" disabled={scheduleSaving}>
-                    {editingScheduleId ? "Salvar" : "Adicionar"}
-                  </Button>
-                  {editingScheduleId && (
-                    <Button
-                      type="button"
-                      onClick={() => resetScheduleForm(teacher)}
-                      className="bg-white/10 hover:bg-white/15 border border-white/10"
-                    >
-                      Cancelar
-                    </Button>
-                  )}
-                </div>
-              </form>
-
-              {schedules.length === 0 && <p className="text-slate-400">Nenhum horário cadastrado.</p>}
-              {schedules.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-                  {scheduleDays.map((day) => {
-                    const list = schedulesByWeekday[day] ?? []
+              {data.gradebook.final_coverage.by_bimester.length === 0 ? (
+                <p className="text-sm text-slate-400">Sem dados de fechamento para o ano selecionado.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                  {data.gradebook.final_coverage.by_bimester.map((item) => {
+                    const pct = item.total_targets > 0 ? (item.completed_targets / item.total_targets) * 100 : 0
                     return (
-                      <div key={day} className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
-                        <div className="px-3 py-2 border-b border-white/10 text-xs font-semibold text-white/80">
-                          {weekdayLabel(day)}
-                        </div>
-                        <div className="p-3 space-y-3">
-                          {list.length === 0 && (
-                            <p className="text-xs text-slate-400">Sem horários</p>
-                          )}
-                          {list.map((schedule) => (
-                            <div
-                              key={schedule.id}
-                              className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
-                            >
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-semibold text-white truncate max-w-[14rem] sm:max-w-none">
-                                  {schedule.class_label}
-                                </p>
-                                <span className="text-[11px] font-semibold text-cyan-100 bg-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                                  {timeLabel(schedule.start_time)} - {timeLabel(schedule.end_time)}
-                                </span>
-                                <span
-                                  className={`text-[11px] px-2 py-0.5 rounded-full border ${
-                                    schedule.active
-                                      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                                      : "bg-rose-500/15 text-rose-300 border-rose-500/30"
-                                  }`}
-                                >
-                                  {schedule.active ? "Ativo" : "Inativo"}
-                                </span>
-                              </div>
-                              <div className="text-xs text-white/50">
-                                {getTimezoneLabel(schedule.timezone)}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => startEditSchedule(schedule)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-200"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                  Editar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => deleteSchedule(schedule.id)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-200"
-                                >
-                                  <Trash className="w-3.5 h-3.5" />
-                                  Excluir
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      <div key={item.bimester} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                        <p className="text-sm text-white font-medium">Bimestre {item.bimester}</p>
+                        <p className="text-xs text-white/65 mt-1">
+                          {item.completed_targets}/{item.total_targets} finais • {pctLabel(pct)}
+                        </p>
+                        <p className="text-[11px] text-white/50 mt-1">
+                          Turmas fechadas: {item.closed_class_count}/{item.class_count}
+                        </p>
                       </div>
                     )
                   })}
@@ -828,460 +623,54 @@ export default function TeacherInfoClient({ teacherId }: { teacherId: string }) 
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/30 border border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white text-base flex items-center gap-2">
-                <FileText className="w-4 h-4 text-purple-300" />
-                Diário do professor
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {logs.length === 0 && <p className="text-slate-400">Nenhum registro encontrado.</p>}
-
-              {Object.keys(groupedLogs).map((label) => {
-                const list = groupedLogs[label] ?? []
-                const isOpen = openClasses[label] !== false
-                return (
-                  <div key={label} className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => toggleClass(label)}
-                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{label}</p>
-                        <p className="text-xs text-white/60">{list.length} registros</p>
-                      </div>
-                      {isOpen ? (
-                        <ChevronUp className="w-4 h-4 text-white/70" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-white/70" />
-                      )}
-                    </button>
-
-                    {isOpen && (
-                      <div className="border-t border-white/10 divide-y divide-white/10">
-                        {list.map((log) => (
-                          <div key={log.id} className="px-4 py-3 space-y-2">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-[11px] text-white/80 bg-white/10 border border-white/10 px-2 py-0.5 rounded-full">
-                                  Aula {log.lesson_number}
-                                </span>
-                                <span className="text-xs text-white/60">
-                                  {formatDate(log.lesson_date)}
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => deleteLog(log.id)}
-                                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-200"
-                              >
-                                <Trash className="w-3.5 h-3.5" />
-                                Excluir
-                              </button>
-                            </div>
-                            {log.notes && (
-                              <div>
-                                <p className="text-[11px] text-white/50">Notas</p>
-                                <p className="text-sm text-white/80 whitespace-pre-wrap">{log.notes}</p>
-                              </div>
-                            )}
-                            {log.observations && (
-                              <div>
-                                <p className="text-[11px] text-white/50">Observações</p>
-                                <p className="text-sm text-white/70 whitespace-pre-wrap">
-                                  {log.observations}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/30 border border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white text-base flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-cyan-300" />
-                Notas, turmas e alunos
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!insights && <p className="text-slate-400">Carregando informaÃ§Ãµes...</p>}
-              {insights && (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                      <p className="text-xs text-white/60">Ano letivo</p>
-                      <p className="text-white mt-1 text-base font-semibold">
-                        {insights.gradebook?.overview?.school_year ?? "-"}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                      <p className="text-xs text-white/60">Turmas</p>
-                      <p className="text-white mt-1 text-base font-semibold">
-                        {insights.gradebook?.overview?.class_count ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                      <p className="text-xs text-white/60">Turmas ativas</p>
-                      <p className="text-white mt-1 text-base font-semibold">
-                        {insights.gradebook?.overview?.active_class_count ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                      <p className="text-xs text-white/60">Alunos</p>
-                      <p className="text-white mt-1 text-base font-semibold">
-                        {insights.gradebook?.overview?.student_count ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                      <p className="text-xs text-white/60">Aulas lancadas</p>
-                      <p className="text-white mt-1 text-base font-semibold">
-                        {insights.gradebook?.overview?.lesson_count ?? 0}
-                      </p>
-                    </div>
-                  </div>
-
-                  {insights.gradebook?.classes?.length ? (
-                    <div className="space-y-3">
-                      {insights.gradebook.classes.map((item) => {
-                        const isOpen = openGradebookClasses[item.id] === true
-                        const studentYearLabel =
-                          item.student_year === null || item.student_year === undefined
-                            ? "Sem turma (ano)"
-                            : getTurmaYearLabel(Number(item.student_year))
-                        return (
-                          <div key={item.id} className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => toggleGradebookClass(item.id)}
-                              className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold text-white truncate">{item.name}</p>
-                                <p className="text-xs text-white/60">
-                                  {studentYearLabel} | {item.school_year}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[11px] text-white/80 bg-white/10 border border-white/15 px-2 py-0.5 rounded-full">
-                                  {item.active_student_count}/{item.student_count} alunos ativos
-                                </span>
-                                <span className="text-[11px] text-cyan-100 bg-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                                  {item.lesson_count} aulas
-                                </span>
-                                {isOpen ? (
-                                  <ChevronUp className="w-4 h-4 text-white/70" />
-                                ) : (
-                                  <ChevronDown className="w-4 h-4 text-white/70" />
-                                )}
-                              </div>
-                            </button>
-
-                            <div className="px-4 pb-3">
-                              <div className="flex flex-wrap gap-2">
-                                {item.bimesters.map((bim) => (
-                                  <div key={`${item.id}-${bim.bimester}`} className="inline-flex items-center gap-2">
-                                    <span
-                                      className={`text-[11px] px-2 py-1 rounded-full border ${
-                                        bim.closed
-                                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                                          : "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                                      }`}
-                                    >
-                                      B{bim.bimester}: {bim.students_with_final}/{bim.total_students} finais{" "}
-                                      {bim.closed ? "(fechado)" : "(aberto)"}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        toggleBimesterLock(
-                                          item.id,
-                                          item.school_year,
-                                          bim.bimester,
-                                          bim.closed,
-                                        )
-                                      }
-                                      disabled={gradebookLockSavingKey === `${item.id}:${item.school_year}:${bim.bimester}`}
-                                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] ${
-                                        bim.closed
-                                          ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
-                                          : "border-rose-500/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
-                                      } disabled:opacity-60 disabled:cursor-not-allowed`}
-                                    >
-                                      <Lock className="w-3 h-3" />
-                                      {gradebookLockSavingKey === `${item.id}:${item.school_year}:${bim.bimester}`
-                                        ? "Salvando..."
-                                        : bim.closed
-                                          ? "Reabrir"
-                                          : "Fechar"}
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                              {gradebookLockError ? (
-                                <p className="text-[11px] text-rose-300 mt-2">{gradebookLockError}</p>
-                              ) : null}
-                              {item.last_lesson_date && (
-                                <p className="text-[11px] text-white/50 mt-2">
-                                  Ultima aula: {formatDate(item.last_lesson_date)}{" "}
-                                  {item.last_lesson_number ? `| Aula ${item.last_lesson_number}` : ""}
-                                </p>
-                              )}
-                            </div>
-
-                            {isOpen && (
-                              <div className="border-t border-white/10 p-3">
-                                {item.students.length === 0 ? (
-                                  <p className="text-slate-400 text-sm">Sem alunos nesta turma.</p>
-                                ) : (
-                                  <div className="overflow-x-auto">
-                                    <table className="min-w-[760px] w-full text-sm">
-                                      <thead>
-                                        <tr className="text-white/60 text-xs border-b border-white/10">
-                                          <th className="text-left py-2 pr-2 font-medium">Aluno</th>
-                                          <th className="text-right py-2 px-2 font-medium">Pres.</th>
-                                          <th className="text-right py-2 px-2 font-medium">Falt.</th>
-                                          <th className="text-right py-2 px-2 font-medium">Freq.</th>
-                                          <th className="text-right py-2 px-2 font-medium">B1</th>
-                                          <th className="text-right py-2 px-2 font-medium">B2</th>
-                                          <th className="text-right py-2 px-2 font-medium">B3</th>
-                                          <th className="text-right py-2 pl-2 font-medium">B4</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {item.students.map((student) => (
-                                          <tr key={student.student_id} className="border-b border-white/5 text-white/80">
-                                            <td className="py-2 pr-2">
-                                              <div className="flex items-center gap-2">
-                                                <span className="truncate">{student.full_name}</span>
-                                                {!student.active && (
-                                                  <span className="text-[10px] text-rose-300 border border-rose-500/30 bg-rose-500/10 rounded-full px-1.5 py-0.5">
-                                                    Inativo
-                                                  </span>
-                                                )}
-                                              </div>
-                                            </td>
-                                            <td className="py-2 px-2 text-right">{student.presence_count}</td>
-                                            <td className="py-2 px-2 text-right">{student.absence_count}</td>
-                                            <td className="py-2 px-2 text-right">{formatPercent(student.attendance_percent)}</td>
-                                            <td className="py-2 px-2 text-right">{formatScore(student.b1_final_grade)}</td>
-                                            <td className="py-2 px-2 text-right">{formatScore(student.b2_final_grade)}</td>
-                                            <td className="py-2 px-2 text-right">{formatScore(student.b3_final_grade)}</td>
-                                            <td className="py-2 pl-2 text-right">{formatScore(student.b4_final_grade)}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 text-sm">Nenhuma turma de notas encontrada para este professor.</p>
-                  )}
-
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                    <h4 className="text-sm font-semibold text-white mb-3">Aulas recentes (lancamentos)</h4>
-                    {insights.gradebook?.recent_lessons?.length ? (
-                      <div className="space-y-2">
-                        {insights.gradebook.recent_lessons.map((lesson) => (
-                          <div
-                            key={lesson.id}
-                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-slate-900/40 px-3 py-2"
-                          >
-                            <div className="min-w-0">
-                              <p className="text-sm text-white truncate">
-                                {lesson.class_name} | B{lesson.bimester} | Aula {lesson.lesson_number}
-                              </p>
-                              <p className="text-xs text-white/60">
-                                {formatDate(lesson.lesson_date)} | {lesson.entries_count} lancamentos | {lesson.absences_count} faltas
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-slate-400 text-sm">Nenhum lancamento de notas registrado.</p>
-                    )}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/30 border border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white text-base flex items-center gap-2">
-                <Video className="w-4 h-4 text-cyan-300" />
-                Atividade em vídeos
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!insights && <p className="text-slate-400">Carregando informações...</p>}
-              {insights && (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                      <p className="text-white/60 text-xs">Total de aulas</p>
-                      <p className="text-white mt-1 text-lg font-semibold">
-                        {insights.videoSummary?.total_videos ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                      <p className="text-white/60 text-xs">Iniciadas</p>
-                      <p className="text-white mt-1 text-lg font-semibold">
-                        {insights.videoSummary?.started_videos ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                      <p className="text-white/60 text-xs">Assistidas (&gt;=70%)</p>
-                      <p className="text-white mt-1 text-lg font-semibold">
-                        {insights.videoSummary?.watched_videos ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                      <p className="text-white/60 text-xs">Média de progresso</p>
-                      <p className="text-white mt-1 text-lg font-semibold">
-                        {Number(insights.videoSummary?.avg_progress ?? 0).toFixed(1)}%
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                    <h4 className="text-sm font-semibold text-white mb-3">Progresso recente</h4>
-                    {insights.recentProgress?.length ? (
-                      <div className="space-y-3">
-                        {insights.recentProgress.map((item) => {
-                          const pct = Math.max(0, Math.min(100, Number(item.progress_percent ?? 0)))
-                          return (
-                            <div key={item.id} className="space-y-1.5">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="text-sm text-white truncate">{item.title}</p>
-                                  <p className="text-xs text-slate-400">{formatDate(item.updated_at)}</p>
-                                </div>
-                                <span className="text-xs text-white/80">{Math.round(pct)}%</span>
-                              </div>
-                              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                <div className="h-full bg-cyan-500" style={{ width: `${pct}%` }} />
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-slate-400 text-sm">Nenhum progresso registrado.</p>
-                    )}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/30 border border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white text-base flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-cyan-300" />
-                Resumo do diário e logs
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!insights && <p className="text-slate-400">Carregando informações...</p>}
-              {insights && (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                      <p className="text-xs text-white/60">Registros totais</p>
-                      <p className="text-white mt-1 text-base font-semibold">
-                        {insights.lessonSummary?.total_logs ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                      <p className="text-xs text-white/60">Turmas com aulas</p>
-                      <p className="text-white mt-1 text-base font-semibold">
-                        {insights.lessonSummary?.class_count ?? 0}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                      <p className="text-xs text-white/60">Última aula registrada</p>
-                      <p className="text-white mt-1 text-base font-semibold">
-                        {formatDate(insights.lessonSummary?.last_lesson_date)}
-                      </p>
-                    </div>
-                  </div>
-
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <Card className="bg-slate-900/30 backdrop-blur-md border border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white text-base">Top acoes no periodo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.activity.top_actions.length === 0 ? (
+                  <p className="text-sm text-slate-400">Nenhuma acao registrada.</p>
+                ) : (
                   <div className="space-y-2">
-                    {insights.lessonClasses?.length ? (
-                      insights.lessonClasses.map((item) => (
-                        <div
-                          key={item.class_label}
-                          className="flex items-center justify-between gap-3 flex-wrap rounded-lg border border-white/10 bg-slate-900/40 px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-sm text-white truncate">{item.class_label}</p>
-                            {item.last_lesson > 0 ? (
-                              <p className="text-xs text-white/60">
-                                Aula atual: {item.last_lesson} • Última: {formatDate(item.last_date)}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-white/60">Sem registros ainda.</p>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-white/80 bg-emerald-500/15 border border-emerald-500/30 px-2 py-1 rounded-full">
-                            Próxima: {item.next_lesson}
+                    {data.activity.top_actions.map((item) => (
+                      <div key={item.action} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <p className="text-xs text-white truncate">{item.action}</p>
+                        <span className="text-xs text-cyan-200">{item.total}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-900/30 backdrop-blur-md border border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white text-base">Aulas recentes no periodo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.lessons.recent.length === 0 ? (
+                  <p className="text-sm text-slate-400">Sem aulas no periodo.</p>
+                ) : (
+                  <div className="space-y-2 max-h-[320px] overflow-auto pr-1">
+                    {data.lessons.recent.slice(0, 20).map((lesson) => (
+                      <div key={lesson.id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/70">
+                          <span className="rounded-full border border-white/20 bg-white/5 px-2 py-0.5">{lesson.class_name}</span>
+                          <span>Aula {lesson.lesson_number}</span>
+                          <span>{formatDate(lesson.lesson_date)}</span>
+                          <span className={lesson.has_grades ? "text-emerald-300" : "text-amber-300"}>
+                            {lesson.has_grades ? "Com nota" : "Sem nota"}
                           </span>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-slate-400 text-sm">Nenhum diário registrado.</p>
-                    )}
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                    <h4 className="text-sm font-semibold text-white mb-3">Logs recentes</h4>
-                    {insights.logs?.length ? (
-                      <div className="space-y-2">
-                        {insights.logs.map((log) => (
-                          <div key={log.id} className="flex items-center justify-between gap-3 text-xs">
-                            <div className="min-w-0">
-                              <p className="text-white truncate">{log.action}</p>
-                              <p className="text-slate-400 truncate">
-                                {formatDate(log.created_at)}{" "}
-                                {log.request_path ? `- ${log.request_path}` : ""}
-                              </p>
-                            </div>
-                            <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 border ${
-                                log.status === "failed"
-                                  ? "bg-rose-500/15 text-rose-300 border-rose-500/40"
-                                  : "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
-                              }`}
-                            >
-                              {log.status ?? "success"}
-                            </span>
-                          </div>
-                        ))}
+                        <p className="text-xs text-white/80 mt-1 line-clamp-2">{lesson.notes || "Sem diario."}</p>
                       </div>
-                    ) : (
-                      <p className="text-slate-400 text-sm">Nenhum log recente.</p>
-                    )}
+                    ))}
                   </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </>
       )}
     </div>

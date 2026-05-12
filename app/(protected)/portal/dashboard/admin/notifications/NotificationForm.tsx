@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -8,9 +8,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import type { Teacher } from "@/app/types/portal"
 
-type N = {
+type NotificationFormState = {
   title: string
   message: string
+  type: "standard" | "special_modal"
+  special_mode: "once" | "until"
   audience: "all" | "country" | "locale" | "teacher"
   country?: "BR" | "UY" | "PY" | null
   locale?: "pt-BR" | "es" | null
@@ -39,22 +41,28 @@ type ReadSummary = {
 
 function formatDate(value: string | null | undefined) {
   if (!value) return ""
-  try {
-    return new Date(value).toLocaleString("pt-BR")
-  } catch {
-    return value
-  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  return date.toLocaleString("pt-BR")
 }
 
-export default function NotificationForm({ id }: { id?: string }) {
+export default function NotificationForm({
+  id,
+  canManageSpecial = false,
+}: {
+  id?: string
+  canManageSpecial?: boolean
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isEdit = Boolean(id)
 
   const [tab, setTab] = useState<"edit" | "info">("edit")
-  const [form, setForm] = useState<N>({
+  const [form, setForm] = useState<NotificationFormState>({
     title: "",
     message: "",
+    type: "standard",
+    special_mode: "once",
     audience: "all",
     country: null,
     locale: null,
@@ -87,7 +95,7 @@ export default function NotificationForm({ id }: { id?: string }) {
 
     ;(async () => {
       const res = await fetch(`/api/admin/notifications/${id}`, { cache: "no-store" })
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
 
       if (data?.id) {
         const ids =
@@ -96,9 +104,18 @@ export default function NotificationForm({ id }: { id?: string }) {
             : data.teacher_id
               ? [data.teacher_id]
               : []
+
         setForm({
           title: data.title ?? "",
           message: data.message ?? "",
+          type:
+            canManageSpecial && data.type === "special_modal"
+              ? "special_modal"
+              : "standard",
+          special_mode:
+            canManageSpecial && data.special_mode === "until"
+              ? "until"
+              : "once",
           audience: data.audience ?? "all",
           country: data.country ?? null,
           locale: data.locale ?? null,
@@ -109,12 +126,12 @@ export default function NotificationForm({ id }: { id?: string }) {
         })
       }
     })()
-  }, [id, isEdit])
+  }, [canManageSpecial, id, isEdit])
 
   useEffect(() => {
     ;(async () => {
       const res = await fetch("/api/admin/teachers", { cache: "no-store" })
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
       const list = Array.isArray(data?.approved) ? data.approved : []
       list.sort((a: Teacher, b: Teacher) => a.name.localeCompare(b.name))
       setTeachers(list)
@@ -125,7 +142,7 @@ export default function NotificationForm({ id }: { id?: string }) {
     if (!id) return
     setReadsLoading(true)
     const res = await fetch(`/api/admin/notifications/${id}/reads`, { cache: "no-store" })
-    const data = await res.json()
+    const data = await res.json().catch(() => null)
     setReads(data ?? null)
     setReadsLoading(false)
   }
@@ -151,17 +168,15 @@ export default function NotificationForm({ id }: { id?: string }) {
   const filteredTeachers = useMemo(() => {
     const q = teacherQuery.trim().toLowerCase()
     if (!q) return teachers
-    return teachers.filter((t) => {
-      const hay = `${t.name} ${t.email}`.toLowerCase()
-      return hay.includes(q)
-    })
+    return teachers.filter((t) => `${t.name} ${t.email}`.toLowerCase().includes(q))
   }, [teacherQuery, teachers])
 
-  function toggleTeacher(id: string) {
+  function toggleTeacher(teacherId: string) {
     setForm((prev) => {
       const current = new Set(prev.teacher_ids ?? [])
-      if (current.has(id)) current.delete(id)
-      else current.add(id)
+      if (current.has(teacherId)) current.delete(teacherId)
+      else current.add(teacherId)
+
       const nextIds = Array.from(current)
       return {
         ...prev,
@@ -203,11 +218,11 @@ export default function NotificationForm({ id }: { id?: string }) {
   }
 
   return (
-    <div className="p-6 text-white max-w-3xl">
-      <h1 className="text-3xl font-bold mb-6">{isEdit ? "Editar Notificação" : "Nova Notificação"}</h1>
+    <div className="p-6 text-white max-w-4xl">
+      <h1 className="text-3xl font-bold mb-6">{isEdit ? "Editar notificacao" : "Nova notificacao"}</h1>
 
-      {isEdit && (
-        <div className="flex flex-wrap gap-2 mb-6">
+      {isEdit ? (
+        <div className="flex gap-2 mb-6">
           <button
             type="button"
             onClick={() => setTab("edit")}
@@ -217,7 +232,7 @@ export default function NotificationForm({ id }: { id?: string }) {
                 : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
             }`}
           >
-            {"Edição"}
+            Edicao
           </button>
           <button
             type="button"
@@ -228,21 +243,41 @@ export default function NotificationForm({ id }: { id?: string }) {
                 : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
             }`}
           >
-            {"Informações"}
+            Informacoes
           </button>
         </div>
-      )}
+      ) : null}
 
       {(!isEdit || tab === "edit") && (
         <form className="space-y-6" onSubmit={submit}>
-          <div className="space-y-2">
-            <Label>{"Título"}</Label>
-            <Input
-              className="bg-slate-800/50 border-slate-700 text-white"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              required
-            />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2 md:col-span-2">
+              <Label>Titulo</Label>
+              <Input
+                className="bg-slate-800/50 border-slate-700 text-white"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <select
+                className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                value={form.type}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    type: (e.target.value as NotificationFormState["type"]) ?? "standard",
+                    special_mode: e.target.value === "special_modal" ? prev.special_mode : "once",
+                  }))
+                }
+                disabled={!canManageSpecial}
+              >
+                <option value="standard">Padrao</option>
+                {canManageSpecial ? <option value="special_modal">Especial (modal)</option> : null}
+              </select>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -255,14 +290,14 @@ export default function NotificationForm({ id }: { id?: string }) {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label>Audience</Label>
+              <Label>Publico</Label>
               <select
                 className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-white"
                 value={form.audience}
                 onChange={(e) => {
-                  const value = e.target.value as N["audience"]
+                  const value = e.target.value as NotificationFormState["audience"]
                   setForm((prev) => ({
                     ...prev,
                     audience: value,
@@ -275,21 +310,21 @@ export default function NotificationForm({ id }: { id?: string }) {
                 disabled={teacherMode}
               >
                 <option value="all">Todos</option>
-                <option value="country">Por país</option>
+                <option value="country">Por pais</option>
                 <option value="locale">Por idioma</option>
-                <option value="teacher">Professor específico</option>
+                <option value="teacher">Professor especifico</option>
               </select>
             </div>
 
             <div className="space-y-2">
-              <Label>País</Label>
+              <Label>Pais</Label>
               <select
                 className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-white"
                 value={form.country ?? ""}
                 onChange={(e) => setForm({ ...form, country: (e.target.value || null) as any })}
                 disabled={teacherMode || form.audience === "teacher"}
               >
-                <option value="">—</option>
+                <option value="">-</option>
                 <option value="BR">Brasil</option>
                 <option value="UY">Uruguai</option>
                 <option value="PY">Paraguai</option>
@@ -304,27 +339,52 @@ export default function NotificationForm({ id }: { id?: string }) {
                 onChange={(e) => setForm({ ...form, locale: (e.target.value || null) as any })}
                 disabled={teacherMode || form.audience === "teacher"}
               >
-                <option value="">—</option>
+                <option value="">-</option>
                 <option value="pt-BR">pt-BR</option>
                 <option value="es">es</option>
               </select>
             </div>
+
+            {canManageSpecial ? (
+              <div className="space-y-2">
+                <Label>Exibicao especial</Label>
+                <select
+                  className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-white disabled:opacity-60"
+                  value={form.special_mode}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      special_mode: e.target.value === "until" ? "until" : "once",
+                    }))
+                  }
+                  disabled={form.type !== "special_modal"}
+                >
+                  <option value="once">Uma vez</option>
+                  <option value="until">Ate expirar</option>
+                </select>
+              </div>
+            ) : null}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2 md:col-span-2">
-              <Label>Professores (envio específico)</Label>
-              <Input
-                className="bg-slate-800/50 border-slate-700 text-white"
-                placeholder="Buscar professor..."
-                value={teacherQuery}
-                onChange={(e) => setTeacherQuery(e.target.value)}
-              />
-              <div className="mt-2 max-h-52 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900/40">
-                {filteredTeachers.length === 0 && (
-                  <div className="p-3 text-sm text-slate-400">Nenhum professor encontrado.</div>
-                )}
-                {filteredTeachers.map((teacher) => {
+          {canManageSpecial && form.type === "special_modal" ? (
+            <p className="text-xs text-amber-300">
+              Apenas os admins autorizados via .env podem criar/editar notificacoes especiais.
+            </p>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label>Professores (envio especifico)</Label>
+            <Input
+              className="bg-slate-800/50 border-slate-700 text-white"
+              placeholder="Buscar professor..."
+              value={teacherQuery}
+              onChange={(e) => setTeacherQuery(e.target.value)}
+            />
+            <div className="mt-2 max-h-52 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900/40">
+              {filteredTeachers.length === 0 ? (
+                <div className="p-3 text-sm text-slate-400">Nenhum professor encontrado.</div>
+              ) : (
+                filteredTeachers.map((teacher) => {
                   const checked = selectedTeacherIds.includes(teacher.id)
                   return (
                     <label
@@ -346,34 +406,31 @@ export default function NotificationForm({ id }: { id?: string }) {
                       </div>
                     </label>
                   )
-                })}
-              </div>
-              <div className="flex items-center justify-between text-xs text-slate-400 mt-2">
-                <span>Selecionados: {selectedTeacherIds.length}</span>
-                {selectedTeacherIds.length > 0 && (
-                  <button
-                    type="button"
-                    className="text-cyan-300 hover:text-cyan-200"
-                    onClick={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        teacher_ids: [],
-                        teacher_id: null,
-                      }))
-                    }
-                  >
-                    Limpar seleção
-                  </button>
-                )}
-              </div>
-              {selectedTeacherIds.length > 0 && (
-                <p className="text-xs text-amber-300 mt-1">
-                  Audience definido para professor específico. País e idioma foram desativados.
-                </p>
+                })
               )}
             </div>
+            <div className="flex items-center justify-between text-xs text-slate-400 mt-2">
+              <span>Selecionados: {selectedTeacherIds.length}</span>
+              {selectedTeacherIds.length > 0 ? (
+                <button
+                  type="button"
+                  className="text-cyan-300 hover:text-cyan-200"
+                  onClick={() =>
+                    setForm((prev) => ({
+                      ...prev,
+                      teacher_ids: [],
+                      teacher_id: null,
+                    }))
+                  }
+                >
+                  Limpar selecao
+                </button>
+              ) : null}
+            </div>
+          </div>
 
-            <div className="space-y-2 md:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label>Expira em (opcional)</Label>
               <Input
                 type="datetime-local"
@@ -382,18 +439,24 @@ export default function NotificationForm({ id }: { id?: string }) {
                 onChange={(e) => setForm({ ...form, expires_at: e.target.value || null })}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <label className="flex h-10 items-center gap-2 rounded-md border border-slate-700 bg-slate-800/50 px-3 text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                />
+                Ativa
+              </label>
+            </div>
           </div>
 
-          <label className="flex items-center gap-2 text-slate-200">
-            <input
-              type="checkbox"
-              checked={form.active}
-              onChange={(e) => setForm({ ...form, active: e.target.checked })}
-            />
-            Ativa
-          </label>
-
-          <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 py-6" disabled={loading}>
+          <Button
+            className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 py-6"
+            disabled={loading}
+          >
             {loading ? "Salvando..." : "Salvar"}
           </Button>
         </form>
@@ -405,12 +468,7 @@ export default function NotificationForm({ id }: { id?: string }) {
             <div>
               <h2 className="text-xl font-semibold">Leituras</h2>
               <p className="text-xs text-slate-400">
-                {reads?.read ?? 0}
-                {" lidas • "}
-                {reads?.unread ?? 0}
-                {" não lidas • "}
-                {reads?.total ?? 0}
-                {" total"}
+                {reads?.read ?? 0} lidas • {reads?.unread ?? 0} nao lidas • {reads?.total ?? 0} total
               </p>
             </div>
             <Button
@@ -436,25 +494,22 @@ export default function NotificationForm({ id }: { id?: string }) {
             >
               <option value="all">Todas</option>
               <option value="read">Lidas</option>
-              <option value="unread">{"Não lidas"}</option>
+              <option value="unread">Nao lidas</option>
             </select>
           </div>
 
-          {readsLoading && <p className="text-slate-400">Carregando leituras...</p>}
+          {readsLoading ? <p className="text-slate-400">Carregando leituras...</p> : null}
 
           {!readsLoading && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredReads.map((t) => (
-                <div
-                  key={t.id}
-                  className="p-4 rounded-xl bg-slate-800/40 border border-slate-700"
-                >
+                <div key={t.id} className="p-4 rounded-xl bg-slate-800/40 border border-slate-700">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-semibold text-white">{t.name}</div>
                       <div className="text-xs text-slate-400">{t.email}</div>
                       <div className="text-xs text-slate-500">
-                        {t.country} {"•"} {t.locale}
+                        {t.country} • {t.locale}
                       </div>
                     </div>
                     <span
@@ -464,14 +519,12 @@ export default function NotificationForm({ id }: { id?: string }) {
                           : "bg-amber-500/15 text-amber-300 border-amber-500/40"
                       }`}
                     >
-                      {t.is_read ? "Lida" : "Não lida"}
+                      {t.is_read ? "Lida" : "Nao lida"}
                     </span>
                   </div>
-                  {t.is_read && (
-                    <div className="text-xs text-slate-400 mt-2">
-                      Lida em: {formatDate(t.read_at)}
-                    </div>
-                  )}
+                  {t.is_read ? (
+                    <div className="text-xs text-slate-400 mt-2">Lida em: {formatDate(t.read_at)}</div>
+                  ) : null}
                 </div>
               ))}
             </div>

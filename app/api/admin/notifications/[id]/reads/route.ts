@@ -1,27 +1,34 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
+import { canCreateSpecialNotification, ensureNotificationsSchema } from "@/lib/notifications"
 
 type Ctx = { params: Promise<{ id: string }> }
 
-export async function GET(req: NextRequest, ctx: Ctx) {
+export async function GET(_req: NextRequest, ctx: Ctx) {
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
 
+  await ensureNotificationsSchema()
+
   const { id } = await ctx.params
   if (!id) {
-    return NextResponse.json({ error: "ID inv�lido" }, { status: 400 })
+    return NextResponse.json({ error: "ID invalido" }, { status: 400 })
   }
 
   const [notification] = await db`
-    SELECT id, audience, country, locale, teacher_id, teacher_ids
+    SELECT id, audience, country, locale, teacher_id, teacher_ids, type
     FROM notifications
     WHERE id = ${id}
     LIMIT 1
   `
 
   if (!notification) {
-    return NextResponse.json({ error: "Notifica��o n�o encontrada" }, { status: 404 })
+    return NextResponse.json({ error: "Notificacao nao encontrada" }, { status: 404 })
+  }
+
+  if (notification.type === "special_modal" && !canCreateSpecialNotification(admin.teacherId)) {
+    return NextResponse.json({ error: "Sem permissao para notificacao especial." }, { status: 403 })
   }
 
   const audience = notification.audience
@@ -97,7 +104,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     `
   }
 
-  const readCount = teachers.filter((t: any) => t.is_read).length
+  const readCount = teachers.filter((teacher: any) => teacher.is_read).length
   const total = teachers.length
 
   return NextResponse.json({

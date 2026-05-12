@@ -8,21 +8,24 @@ type Locale = "pt-BR" | "es"
 export default function NotasSectionNav({ locale }: { locale: Locale }) {
   const pathname = usePathname()
   const isEs = locale === "es"
+  const normalizedPathname = pathname?.replace(/\/+$/, "") || "/"
 
   const items = [
     { href: "/portal/dashboard/notas", label: isEs ? "Vision general" : "Visao geral" },
     {
       href: "/portal/dashboard/notas/lancamentos",
-      label: isEs ? "Lanzamientos + Agenda" : "Lancamentos + Agenda",
+      label: isEs ? "Clases" : "Aulas",
     },
-    { href: "/portal/dashboard/notas/aulas", label: "Aulas" },
   ]
 
   return (
     <div className="rounded-xl border border-white/10 bg-slate-900/35 p-2">
       <div className="flex flex-wrap gap-2">
         {items.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+          const isOverview = item.href === "/portal/dashboard/notas"
+          const active = isOverview
+            ? normalizedPathname === item.href
+            : normalizedPathname === item.href || normalizedPathname.startsWith(`${item.href}/`)
           return (
             <Link
               key={item.href}

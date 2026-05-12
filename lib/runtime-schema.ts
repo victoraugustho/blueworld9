@@ -1,8 +1,11 @@
 type SchemaEnsureMap = Map<string, Promise<void>>
+type SchemaWarnedKeys = Set<string>
 
 declare global {
   // eslint-disable-next-line no-var
   var __bw9SchemaEnsureMap: SchemaEnsureMap | undefined
+  // eslint-disable-next-line no-var
+  var __bw9SchemaEnsureWarned: SchemaWarnedKeys | undefined
 }
 
 function getSchemaEnsureMap() {
@@ -12,7 +15,35 @@ function getSchemaEnsureMap() {
   return globalThis.__bw9SchemaEnsureMap
 }
 
+function getSchemaWarnedSet() {
+  if (!globalThis.__bw9SchemaEnsureWarned) {
+    globalThis.__bw9SchemaEnsureWarned = new Set<string>()
+  }
+  return globalThis.__bw9SchemaEnsureWarned
+}
+
+function canMutateRuntimeSchema() {
+  if (process.env.NODE_ENV === "production") {
+    return false
+  }
+  const raw = String(process.env.ENABLE_RUNTIME_SCHEMA_WRITES ?? "").trim().toLowerCase()
+  const explicitlyEnabled = raw === "true" || raw === "1" || raw === "yes" || raw === "on"
+  return explicitlyEnabled
+}
+
 export async function ensureRuntimeSchema(key: string, run: () => Promise<void>) {
+  if (!canMutateRuntimeSchema()) {
+    const warned = getSchemaWarnedSet()
+    if (!warned.has(key)) {
+      warned.add(key)
+      console.warn(
+        `[runtime-schema] mutation skipped for "${key}" in production. ` +
+          `Set ENABLE_RUNTIME_SCHEMA_WRITES=true only during controlled maintenance.`,
+      )
+    }
+    return
+  }
+
   const cache = getSchemaEnsureMap()
   const existing = cache.get(key)
   if (existing) {
@@ -33,4 +64,3 @@ export async function ensureRuntimeSchema(key: string, run: () => Promise<void>)
     throw error
   }
 }
-

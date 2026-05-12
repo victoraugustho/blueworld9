@@ -55,42 +55,14 @@ export async function GET(req: NextRequest) {
   const className = String(classRow.name ?? "")
   const isPyScoreScale = getScoreMaxByCountry(classRow.teacher_country ?? auth.teacher.country) <= 5
 
-  await db`
-    DELETE FROM teacher_grade_lessons gl
-    WHERE gl.teacher_id = ${auth.teacherId}
-      AND gl.class_id = ${classId}
-      AND gl.school_year = ${schoolYear}
-      AND gl.bimester = ${bimester}
-      AND NOT EXISTS (
-        SELECT 1
-        FROM teacher_lesson_logs l
-        WHERE l.teacher_id = ${auth.teacherId}
-          AND (
-            l.class_id = ${classId}
-            OR (
-              l.class_id IS NULL
-              AND lower(trim(l.class_label)) = lower(trim(${className}))
-            )
-          )
-          AND COALESCE(l.school_year::int, EXTRACT(YEAR FROM l.lesson_date)::int) = ${schoolYear}
-          AND COALESCE(
-            l.bimester::int,
-            CASE
-              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 1 AND 3 THEN 1
-              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 4 AND 6 THEN 2
-              WHEN EXTRACT(MONTH FROM l.lesson_date)::int BETWEEN 7 AND 9 THEN 3
-              ELSE 4
-            END
-          ) = ${bimester}
-          AND l.lesson_number = gl.lesson_number
-      )
-  `
+  // Intentionally no automatic delete here.
+  // Reconciliation/deletion must be explicit to avoid accidental grade loss.
 
   const lock = await getBimesterLock(classId, schoolYear, bimester)
 
   const rows = await db`
     WITH lesson_scope AS (
-      SELECT l.id
+      SELECT l.id, l.lesson_date
       FROM teacher_grade_lessons l
       WHERE l.class_id = ${classId}
         AND l.school_year = ${schoolYear}
@@ -120,6 +92,10 @@ export async function GET(req: NextRequest) {
       FROM teacher_grade_entries e
       JOIN lesson_scope ls
         ON ls.id = e.lesson_id
+      JOIN teacher_class_students ss
+        ON ss.id = e.student_id
+       AND ss.class_id = ${classId}
+       AND COALESCE(ss.enrollment_at, ss.created_at::date) <= ls.lesson_date::date
       GROUP BY e.student_id
     ),
     base AS (
@@ -198,11 +174,30 @@ export async function GET(req: NextRequest) {
       ) AS lesson_count
   `
 
+  const lockRows = await db`
+    SELECT bimester
+    FROM teacher_gradebook_bimester_locks
+    WHERE class_id = ${classId}
+      AND school_year = ${schoolYear}
+  `
+  const lockedBimesters = new Set(
+    lockRows
+      .map((item: any) => Number(item?.bimester))
+      .filter((value: number) => Number.isFinite(value) && value >= 1 && value <= 4),
+  )
+  const recommendedBimester =
+    ([1, 2, 3, 4] as const).find((value) => !lockedBimesters.has(value)) ?? 4
+
   const scope = {
     ...scopeRaw,
     closed: !!lock,
     locked_at: lock?.locked_at ?? null,
     locked_by_teacher_id: lock?.locked_by_teacher_id ?? null,
+    recommended_bimester: recommendedBimester,
+    bimesters: [1, 2, 3, 4].map((value) => ({
+      bimester: value,
+      closed: lockedBimesters.has(value),
+    })),
   }
 
   return NextResponse.json({

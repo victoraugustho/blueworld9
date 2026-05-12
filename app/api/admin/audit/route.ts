@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
+import { ensureAuditSchema } from "@/lib/audit-schema"
 
 function toInt(value: string | null, fallback: number) {
   const parsed = Number(value)
@@ -11,6 +12,8 @@ function toInt(value: string | null, fallback: number) {
 export async function GET(req: NextRequest) {
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
+
+  await ensureAuditSchema()
 
   const { searchParams } = new URL(req.url)
   const q = (searchParams.get("q") ?? "").trim()
@@ -55,13 +58,13 @@ export async function GET(req: NextRequest) {
 
   const [countRow] = await db`
     SELECT COUNT(*)::int AS count
-    FROM audit_logs
+    FROM public.audit_logs
     ${where}
   `
 
   const rows = await db`
     SELECT *
-    FROM audit_logs
+    FROM public.audit_logs
     ${where}
     ORDER BY created_at DESC
     LIMIT ${limit} OFFSET ${offset}

@@ -180,13 +180,22 @@ export default function AulasClient({ locale }: { locale: Locale }) {
                       <p className="text-xl font-bold text-white">{lesson.lesson_number}</p>
                     </div>
                     <p className="text-sm text-slate-300">
-                      {formatDatePtBr(lesson.lesson_date)} - {isEs ? "Lanzamientos" : "Lancamentos"}: {lesson.entries_count ?? 0}
+                      {formatDatePtBr(lesson.lesson_date)} -{" "}
+                      {lesson.has_grades === false
+                        ? isEs
+                          ? "Sin nota"
+                          : "Sem nota"
+                        : `${isEs ? "Lanzamientos" : "Lancamentos"}: ${lesson.entries_count ?? 0}`}
                     </p>
                     <p className="text-sm text-slate-300">
-                      {isEs ? "Faltas" : "Faltas"}: {lesson.absences_count ?? 0}
+                      {lesson.has_grades === false
+                        ? isEs
+                          ? "Registro solo en diario"
+                          : "Registro apenas em diario"
+                        : `${isEs ? "Faltas" : "Faltas"}: ${lesson.absences_count ?? 0}`}
                     </p>
                     <Link
-                      href={`/portal/dashboard/notas/aulas/${lesson.id}`}
+                      href="/portal/dashboard/notas/lancamentos"
                       className="inline-flex items-center text-cyan-300 hover:text-cyan-200 text-sm"
                     >
                       {isEs ? "Abrir clase" : "Abrir aula"}

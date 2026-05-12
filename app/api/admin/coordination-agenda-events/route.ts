@@ -17,82 +17,11 @@ function isValidDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
-function toDateKey(value: Date) {
-  const y = value.getFullYear()
-  const m = String(value.getMonth() + 1).padStart(2, "0")
-  const d = String(value.getDate()).padStart(2, "0")
-  return `${y}-${m}-${d}`
-}
-
-function startOfWeekMonday(value: Date) {
-  const d = new Date(value)
-  d.setHours(0, 0, 0, 0)
-  const dayIndex = (d.getDay() + 6) % 7
-  d.setDate(d.getDate() - dayIndex)
-  return d
-}
-
-function addDays(value: Date, days: number) {
-  const d = new Date(value)
-  d.setDate(d.getDate() + days)
-  return d
-}
-
-async function seedDefaultVariableEvents() {
-  const monday = startOfWeekMonday(new Date())
-  const items = [
-    {
-      title: "Visita de acompanhamento pedagogico",
-      event_date: toDateKey(addDays(monday, 1)),
-      start_time: "10:00",
-      end_time: "11:30",
-      timezone: "America/Sao_Paulo",
-    },
-    {
-      title: "Reuniao extraordinaria com parceiros",
-      event_date: toDateKey(addDays(monday, 3)),
-      start_time: "15:00",
-      end_time: "16:00",
-      timezone: "America/Sao_Paulo",
-    },
-    {
-      title: "Treinamento interno da equipe",
-      event_date: toDateKey(addDays(monday, 8)),
-      start_time: "09:30",
-      end_time: "11:00",
-      timezone: "America/Sao_Paulo",
-    },
-    {
-      title: "Mutirao de revisao de processos",
-      event_date: toDateKey(addDays(monday, 11)),
-      start_time: "14:30",
-      end_time: "16:30",
-      timezone: "America/Sao_Paulo",
-    },
-  ]
-
-  for (const item of items) {
-    await db`
-      INSERT INTO coordination_agenda_events (title, event_date, start_time, end_time, timezone, active)
-      SELECT ${item.title}, ${item.event_date}, ${item.start_time}, ${item.end_time}, ${item.timezone}, TRUE
-      WHERE NOT EXISTS (
-        SELECT 1
-        FROM coordination_agenda_events e
-        WHERE e.title = ${item.title}
-          AND e.event_date = ${item.event_date}::date
-          AND e.start_time = ${item.start_time}::time
-          AND e.end_time = ${item.end_time}::time
-      )
-    `
-  }
-}
-
 export async function GET(req: NextRequest) {
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
 
   await ensureCoordinationAgendaEventsSchema()
-  await seedDefaultVariableEvents()
 
   const { searchParams } = new URL(req.url)
   const from = String(searchParams.get("from") ?? "").trim()

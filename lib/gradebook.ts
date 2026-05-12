@@ -50,6 +50,17 @@ export function normalizeEnrollmentCode(value: unknown) {
   return code || null
 }
 
+export function normalizeEnrollmentDate(value: unknown) {
+  if (value === null || value === undefined) return null
+  const raw = String(value).trim()
+  if (!raw) return null
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})$/)
+  if (match) return match[1]
+  const isoWithTime = raw.match(/^(\d{4}-\d{2}-\d{2})T/)
+  if (isoWithTime) return isoWithTime[1]
+  return null
+}
+
 export function normalizeStudentYear(value: unknown) {
   if (value === null || value === undefined || value === "") return null
   const parsed = Number(value)
@@ -64,7 +75,7 @@ export function isUuid(value: unknown) {
 }
 
 export async function ensureGradebookSchema() {
-  await ensureRuntimeSchema("schema:gradebook:v9", async () => {
+  await ensureRuntimeSchema("schema:gradebook:v10", async () => {
     await db`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`
 
     await db`
@@ -113,10 +124,27 @@ export async function ensureGradebookSchema() {
         class_id UUID NOT NULL REFERENCES public.teacher_classes(id) ON DELETE CASCADE,
         full_name TEXT NOT NULL,
         enrollment_code TEXT NULL,
+        enrollment_at DATE NULL DEFAULT CURRENT_DATE,
         active BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `
+
+    await db`
+      ALTER TABLE public.teacher_class_students
+      ADD COLUMN IF NOT EXISTS enrollment_at DATE NULL
+    `
+
+    await db`
+      UPDATE public.teacher_class_students
+      SET enrollment_at = created_at::date
+      WHERE enrollment_at IS NULL
+    `
+
+    await db`
+      ALTER TABLE public.teacher_class_students
+      ALTER COLUMN enrollment_at SET DEFAULT CURRENT_DATE
     `
 
     await db`
@@ -127,6 +155,11 @@ export async function ensureGradebookSchema() {
     await db`
       CREATE INDEX IF NOT EXISTS teacher_class_students_active_idx
       ON public.teacher_class_students(active)
+    `
+
+    await db`
+      CREATE INDEX IF NOT EXISTS teacher_class_students_class_active_enrollment_idx
+      ON public.teacher_class_students(class_id, active, enrollment_at)
     `
 
     await db`
@@ -144,10 +177,16 @@ export async function ensureGradebookSchema() {
         bimester SMALLINT NOT NULL CHECK (bimester BETWEEN 1 AND 4),
         lesson_number INTEGER NOT NULL CHECK (lesson_number > 0),
         lesson_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        has_grades BOOLEAN NOT NULL DEFAULT TRUE,
         notes TEXT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `
+
+    await db`
+      ALTER TABLE public.teacher_grade_lessons
+      ADD COLUMN IF NOT EXISTS has_grades BOOLEAN NOT NULL DEFAULT TRUE
     `
 
     await db`
@@ -539,6 +578,11 @@ export async function ensureGradebookSchema() {
     await db`
       ALTER TABLE public.teacher_lesson_logs
       ADD COLUMN IF NOT EXISTS bimester SMALLINT
+    `
+
+    await db`
+      ALTER TABLE public.teacher_lesson_logs
+      ADD COLUMN IF NOT EXISTS has_grades BOOLEAN NOT NULL DEFAULT TRUE
     `
 
     await db`

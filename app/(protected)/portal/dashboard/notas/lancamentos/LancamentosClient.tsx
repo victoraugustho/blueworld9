@@ -1,6 +1,5 @@
 ﻿"use client"
 
-import Link from "next/link"
 import {
   useEffect,
   useMemo,
@@ -113,6 +112,7 @@ type StudentInsightModalData = {
 type QuickLaunchSnapshotData = {
   lessonDate: string
   bimester: number
+  hasGrades: boolean
   notes: string
   observations: string
   entries: Array<{
@@ -211,6 +211,7 @@ function buildQuickLaunchSnapshot(data: QuickLaunchSnapshotData) {
   return JSON.stringify({
     lessonDate: normalizeLessonDate(data.lessonDate),
     bimester: Number(data.bimester),
+    hasGrades: data.hasGrades !== false,
     notes: String(data.notes ?? "").trim(),
     observations: String(data.observations ?? "").trim(),
     entries: data.entries.map((entry) => ({
@@ -308,6 +309,7 @@ export default function LancamentosClient({
   const [selectedLessonId, setSelectedLessonId] = useState("")
   const [entries, setEntries] = useState<TeacherGradeLessonEntry[]>([])
   const [lessonDate, setLessonDate] = useState(todayIsoDate())
+  const [lessonHasGrades, setLessonHasGrades] = useState(true)
   const [lessonNotes, setLessonNotes] = useState("")
   const [openLogGroups, setOpenLogGroups] = useState<Record<string, boolean>>({})
   const [viewingLog, setViewingLog] = useState<
@@ -340,9 +342,13 @@ export default function LancamentosClient({
   const [quickLaunchSaving, setQuickLaunchSaving] = useState(false)
   const [quickLaunchDate, setQuickLaunchDate] = useState(todayIsoDate())
   const [quickLaunchBimester, setQuickLaunchBimester] = useState(1)
+  const [quickLaunchHasGrades, setQuickLaunchHasGrades] = useState(true)
   const [quickLaunchNotes, setQuickLaunchNotes] = useState("")
   const [quickLaunchObservations, setQuickLaunchObservations] = useState("")
   const [quickLaunchEntries, setQuickLaunchEntries] = useState<TeacherGradeLessonEntry[]>([])
+  const lessonScoreInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const [lessonModalOpen, setLessonModalOpen] = useState(false)
+  const [lessonModalLoading, setLessonModalLoading] = useState(false)
   const quickLaunchScoreInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
   const quickLaunchInitialSnapshotRef = useRef("")
   const [turmaRows, setTurmaRows] = useState<TurmaSummaryRow[]>([])
@@ -353,12 +359,19 @@ export default function LancamentosClient({
   const [turmaClosed, setTurmaClosed] = useState(false)
   const [studentDetailsLoading, setStudentDetailsLoading] = useState(false)
   const [studentDetailsModal, setStudentDetailsModal] = useState<StudentInsightModalData | null>(null)
+  const [exportingFormat, setExportingFormat] = useState<"" | "xlsx" | "pdf">("")
+  const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [pendingExportFormat, setPendingExportFormat] = useState<"" | "xlsx" | "pdf">("")
+  const [exportBimesterChoice, setExportBimesterChoice] = useState(1)
+  const [resolvingClassBimester, setResolvingClassBimester] = useState(false)
+  const autoBimesterKeyRef = useRef("")
 
   const quickLaunchSnapshotNow = useMemo(
     () =>
       buildQuickLaunchSnapshot({
         lessonDate: quickLaunchDate,
         bimester: quickLaunchBimester,
+        hasGrades: quickLaunchHasGrades,
         notes: quickLaunchNotes,
         observations: quickLaunchObservations,
         entries: quickLaunchEntries.map((entry) => ({
@@ -371,7 +384,14 @@ export default function LancamentosClient({
           comment: entry.comment ?? null,
         })),
       }),
-    [quickLaunchDate, quickLaunchBimester, quickLaunchNotes, quickLaunchObservations, quickLaunchEntries],
+    [
+      quickLaunchDate,
+      quickLaunchBimester,
+      quickLaunchHasGrades,
+      quickLaunchNotes,
+      quickLaunchObservations,
+      quickLaunchEntries,
+    ],
   )
 
   const hasQuickLaunchChanges =
@@ -448,6 +468,65 @@ export default function LancamentosClient({
 
     event.preventDefault()
     focusQuickLaunchScoreCell(targetRow, scoreFieldOrder[targetCol])
+  }
+
+  function lessonScoreRefKey(studentId: string, field: ScoreField) {
+    return `${studentId}:${field}`
+  }
+
+  function setLessonScoreInputRef(studentId: string, field: ScoreField, el: HTMLInputElement | null) {
+    lessonScoreInputRefs.current[lessonScoreRefKey(studentId, field)] = el
+  }
+
+  function focusLessonScoreCell(rowIndex: number, field: ScoreField) {
+    const row = entries[rowIndex]
+    if (!row) return
+    const input = lessonScoreInputRefs.current[lessonScoreRefKey(row.student_id, field)]
+    input?.focus()
+    input?.select()
+  }
+
+  function handleLessonScoreKeyDown(
+    event: ReactKeyboardEvent<HTMLInputElement>,
+    rowIndex: number,
+    field: ScoreField,
+  ) {
+    const colIndex = scoreFieldOrder.indexOf(field)
+    if (colIndex < 0) return
+
+    let targetRow = rowIndex
+    let targetCol = colIndex
+
+    if (event.key === "Enter" || event.key === "ArrowRight") {
+      if (colIndex < scoreFieldOrder.length - 1) {
+        targetCol = colIndex + 1
+      } else if (rowIndex < entries.length - 1) {
+        targetRow = rowIndex + 1
+        targetCol = 0
+      } else {
+        return
+      }
+    } else if (event.key === "ArrowLeft") {
+      if (colIndex > 0) {
+        targetCol = colIndex - 1
+      } else if (rowIndex > 0) {
+        targetRow = rowIndex - 1
+        targetCol = scoreFieldOrder.length - 1
+      } else {
+        return
+      }
+    } else if (event.key === "ArrowDown") {
+      if (rowIndex >= entries.length - 1) return
+      targetRow = rowIndex + 1
+    } else if (event.key === "ArrowUp") {
+      if (rowIndex <= 0) return
+      targetRow = rowIndex - 1
+    } else {
+      return
+    }
+
+    event.preventDefault()
+    focusLessonScoreCell(targetRow, scoreFieldOrder[targetCol])
   }
 
   function turmaScoreRefKey(studentId: string, field: TurmaScoreField) {
@@ -704,16 +783,32 @@ export default function LancamentosClient({
     if (!lessonId) {
       setEntries([])
       setLessonDate(todayIsoDate())
+      setLessonHasGrades(true)
       setLessonNotes("")
+      setLessonModalLoading(false)
       return
     }
-    const res = await fetch(`/api/portal/gradebook/lessons/${lessonId}`, {
-      cache: "no-store",
-    })
-    const data = await res.json().catch(() => ({}))
-    setEntries(Array.isArray(data?.entries) ? data.entries : [])
-    setLessonDate(normalizeLessonDate(String(data?.lesson?.lesson_date ?? "")))
-    setLessonNotes(String(data?.lesson?.notes ?? ""))
+    setLessonModalLoading(true)
+    try {
+      const res = await fetch(`/api/portal/gradebook/lessons/${lessonId}`, {
+        cache: "no-store",
+      })
+      const data = await res.json().catch(() => ({}))
+      setEntries(Array.isArray(data?.entries) ? data.entries : [])
+      setLessonDate(normalizeLessonDate(String(data?.lesson?.lesson_date ?? "")))
+      setLessonHasGrades(data?.lesson?.has_grades === false ? false : true)
+      setLessonNotes(String(data?.lesson?.notes ?? ""))
+    } finally {
+      setLessonModalLoading(false)
+    }
+  }
+
+  function openLessonFromList(lessonId: string) {
+    if (!lessonId) return
+    setError("")
+    setSelectedLessonId(lessonId)
+    setWorkspaceTab("lancamentos")
+    setLessonModalOpen(true)
   }
 
   function clampTurmaField(
@@ -737,7 +832,36 @@ export default function LancamentosClient({
     })
   }
 
-  async function loadTurmaSummary(classId: string) {
+  function resolveNextOpenBimesterFromScope(
+    scope: any,
+    fallbackCurrentBimester: number,
+  ) {
+    const current = Number(scope?.bimester ?? fallbackCurrentBimester)
+    const bimesterItems = Array.isArray(scope?.bimesters) ? scope.bimesters : []
+    const normalized = bimesterItems
+      .map((item: any) => ({
+        bimester: Number(item?.bimester ?? 0),
+        closed: item?.closed === true,
+      }))
+      .filter((item: any) => Number.isFinite(item.bimester) && item.bimester >= 1 && item.bimester <= 4)
+      .sort((a: any, b: any) => a.bimester - b.bimester)
+
+    const openAfter = normalized.find((item: any) => item.bimester > current && item.closed === false)
+    if (openAfter) return openAfter.bimester
+
+    const openAny = normalized.find((item: any) => item.closed === false)
+    if (openAny) return openAny.bimester
+
+    const recommended = Number(scope?.recommended_bimester ?? 0)
+    if (Number.isFinite(recommended) && recommended >= 1 && recommended <= 4) return recommended
+
+    return current
+  }
+
+  async function loadTurmaSummary(
+    classId: string,
+    options?: { autoSwitchClosed?: boolean },
+  ) {
     if (!classId) {
       setTurmaRows([])
       setTurmaGradeForm({})
@@ -766,7 +890,17 @@ export default function LancamentosClient({
         throw new Error(String((gradesData as any)?.error ?? "Erro ao carregar notas da turma."))
       }
 
-      setTurmaClosed(summaryData?.scope?.closed === true)
+      const scope = summaryData?.scope ?? {}
+      const isClosed = scope?.closed === true
+      setTurmaClosed(isClosed)
+
+      if (isClosed && options?.autoSwitchClosed !== false) {
+        const nextOpenBimester = resolveNextOpenBimesterFromScope(scope, bimester)
+        if (nextOpenBimester !== bimester) {
+          setBimester(nextOpenBimester)
+          return
+        }
+      }
 
       const summaryRowsRaw = Array.isArray(summaryData?.students) ? summaryData.students : []
       const nextRows: TurmaSummaryRow[] = summaryRowsRaw.map((row: any) => ({
@@ -876,7 +1010,7 @@ export default function LancamentosClient({
       return
     }
 
-    await loadTurmaSummary(selectedClassId)
+    await loadTurmaSummary(selectedClassId, { autoSwitchClosed: true })
   }
 
   async function openStudentDetails(studentId: string) {
@@ -914,6 +1048,93 @@ export default function LancamentosClient({
     }
   }
 
+  async function exportClassGrades(
+    format: "xlsx" | "pdf",
+    targetBimesterOverride?: number,
+  ) {
+    if (!selectedClassId) return false
+    const targetExportBimester = Math.max(
+      1,
+      Math.min(4, Number(targetBimesterOverride ?? bimester ?? 1)),
+    )
+    setExportingFormat(format)
+    setError("")
+    try {
+      const res = await fetch(
+        `/api/portal/gradebook/classes/${selectedClassId}/export?format=${format}&bimester=${targetExportBimester}&schoolYear=${schoolYear}`,
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setError(
+          String(
+            data?.error ??
+              (isEs ? "No se pudo exportar la turma." : "Nao foi possivel exportar a turma."),
+          ),
+        )
+        return false
+      }
+
+      const blob = await res.blob()
+      const contentDisposition = res.headers.get("content-disposition") || ""
+      const match = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
+      const fallback = `turma-b${targetExportBimester}-${schoolYear}.${format}`
+      const filename = match?.[1] || fallback
+
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      return true
+    } finally {
+      setExportingFormat("")
+    }
+  }
+
+  function openExportModal(format: "xlsx" | "pdf") {
+    if (!selectedClassId) return
+    setPendingExportFormat(format)
+    setExportBimesterChoice(Math.max(1, Math.min(4, Number(bimester || 1))))
+    setExportModalOpen(true)
+  }
+
+  async function confirmExportFromModal() {
+    if (!pendingExportFormat) return
+    const ok = await exportClassGrades(pendingExportFormat, exportBimesterChoice)
+    if (ok) {
+      setExportModalOpen(false)
+      setPendingExportFormat("")
+    }
+  }
+
+  async function syncPreferredBimesterForClass(
+    classId: string,
+    targetSchoolYear = schoolYear,
+  ) {
+    if (!classId) return null
+
+    const res = await fetch(
+      `/api/portal/gradebook/bimester-scope?classId=${classId}&schoolYear=${targetSchoolYear}`,
+      { cache: "no-store" },
+    )
+    const data = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(String(data?.error ?? "Erro ao carregar bimestre da turma."))
+    }
+
+    const recommended = Number(data?.recommended_bimester ?? 0)
+    if (!Number.isFinite(recommended) || recommended < 1 || recommended > 4) {
+      return null
+    }
+
+    setBimester((prev) => (prev === recommended ? prev : recommended))
+    return recommended
+  }
+
   useEffect(() => {
     let active = true
     setLoading(true)
@@ -938,9 +1159,34 @@ export default function LancamentosClient({
 
   useEffect(() => {
     if (loading) return
+    if (!selectedClassId) return
+
+    const key = `${selectedClassId}:${schoolYear}`
+    if (autoBimesterKeyRef.current === key) return
+    autoBimesterKeyRef.current = key
+
+    let active = true
+    setResolvingClassBimester(true)
+
+    syncPreferredBimesterForClass(selectedClassId, schoolYear)
+      .catch(() =>
+        setError(isEs ? "Error al definir bimestre da turma." : "Erro ao definir bimestre da turma."),
+      )
+      .finally(() => {
+        if (active) setResolvingClassBimester(false)
+      })
+
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClassId, schoolYear, loading])
+
+  useEffect(() => {
+    if (loading || resolvingClassBimester) return
     loadLessons(selectedClassId).catch(() => setError(isEs ? "Error al cargar clases." : "Erro ao carregar aulas."))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClassId, bimester, schoolYear, loading])
+  }, [selectedClassId, bimester, schoolYear, loading, resolvingClassBimester])
 
   useEffect(() => {
     if (loading) return
@@ -1069,8 +1315,10 @@ export default function LancamentosClient({
       ? normalizeLessonDate(String(schedule.event_date))
       : todayIsoDate()
     const defaultBimester = bimester
+    const defaultHasGrades = true
     setQuickLaunchDate(defaultDate)
     setQuickLaunchBimester(defaultBimester)
+    setQuickLaunchHasGrades(defaultHasGrades)
     setQuickLaunchNotes("")
     setQuickLaunchObservations("")
     setQuickLaunchEntries([])
@@ -1101,6 +1349,7 @@ export default function LancamentosClient({
       quickLaunchInitialSnapshotRef.current = buildQuickLaunchSnapshot({
         lessonDate: defaultDate,
         bimester: defaultBimester,
+        hasGrades: defaultHasGrades,
         notes: "",
         observations: "",
         entries: preparedEntries.map((entry) => ({
@@ -1118,6 +1367,7 @@ export default function LancamentosClient({
       quickLaunchInitialSnapshotRef.current = buildQuickLaunchSnapshot({
         lessonDate: defaultDate,
         bimester: defaultBimester,
+        hasGrades: defaultHasGrades,
         notes: "",
         observations: "",
         entries: [],
@@ -1137,6 +1387,7 @@ export default function LancamentosClient({
     setQuickLaunchObservations("")
     setQuickLaunchDate(todayIsoDate())
     setQuickLaunchBimester(1)
+    setQuickLaunchHasGrades(true)
     quickLaunchInitialSnapshotRef.current = ""
   }
 
@@ -1160,17 +1411,20 @@ export default function LancamentosClient({
         school_year: schoolYear,
         bimester: quickLaunchBimester,
         lesson_date: safeDate,
+        has_grades: quickLaunchHasGrades,
         notes: quickLaunchNotes,
         observations: quickLaunchObservations,
-        entries: quickLaunchEntries.map((entry) => ({
-          student_id: entry.student_id,
-          attendance: entry.attendance,
-          c1: entry.c1 ?? null,
-          c2: entry.c2 ?? null,
-          c3: entry.c3 ?? null,
-          c4: entry.c4 ?? null,
-          comment: entry.comment ?? null,
-        })),
+        entries: quickLaunchHasGrades
+          ? quickLaunchEntries.map((entry) => ({
+              student_id: entry.student_id,
+              attendance: entry.attendance,
+              c1: entry.c1 ?? null,
+              c2: entry.c2 ?? null,
+              c3: entry.c3 ?? null,
+              c4: entry.c4 ?? null,
+              comment: entry.comment ?? null,
+            }))
+          : [],
       }),
     })
 
@@ -1215,6 +1469,7 @@ export default function LancamentosClient({
       quickLaunchInitialSnapshotRef.current = buildQuickLaunchSnapshot({
         lessonDate: safeDate,
         bimester: quickLaunchBimester,
+        hasGrades: quickLaunchHasGrades,
         notes: quickLaunchNotes,
         observations: quickLaunchObservations,
         entries: quickLaunchEntries.map((entry) => ({
@@ -1267,16 +1522,19 @@ export default function LancamentosClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         lesson_date: safeDate,
+        has_grades: lessonHasGrades,
         notes: lessonNotes,
-        entries: entries.map((item) => ({
-          student_id: item.student_id,
-          attendance: item.attendance,
-          c1: item.c1 ?? null,
-          c2: item.c2 ?? null,
-          c3: item.c3 ?? null,
-          c4: item.c4 ?? null,
-          comment: item.comment ?? null,
-        })),
+        entries: lessonHasGrades
+          ? entries.map((item) => ({
+              student_id: item.student_id,
+              attendance: item.attendance,
+              c1: item.c1 ?? null,
+              c2: item.c2 ?? null,
+              c3: item.c3 ?? null,
+              c4: item.c4 ?? null,
+              comment: item.comment ?? null,
+            }))
+          : [],
       }),
     })
     setSaving(false)
@@ -1454,7 +1712,7 @@ export default function LancamentosClient({
 
       <Card className="bg-slate-900/35 border border-white/10 backdrop-blur-sm">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
             <div>
               <Label className="text-white">{isEs ? "Ano lectivo" : "Ano letivo"}</Label>
               <Input
@@ -1492,11 +1750,45 @@ export default function LancamentosClient({
                 ))}
               </select>
             </div>
-            <div className="md:self-end">
-              <Button onClick={refreshAll} disabled={syncing} className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
-                <RefreshCcw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-                {isEs ? "Actualizar" : "Atualizar"}
-              </Button>
+            <div className="md:col-span-2 md:self-end">
+              <div className="flex flex-wrap gap-2 md:justify-end">
+                <Button
+                  onClick={refreshAll}
+                  disabled={syncing}
+                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                >
+                  <RefreshCcw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+                  {isEs ? "Actualizar" : "Atualizar"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => openExportModal("xlsx")}
+                  disabled={exportingFormat !== "" || !selectedClassId}
+                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                >
+                  {exportingFormat === "xlsx"
+                    ? isEs
+                      ? "Exportando XLSX..."
+                      : "Exportando XLSX..."
+                    : isEs
+                      ? "Exportar XLSX"
+                      : "Exportar XLSX"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => openExportModal("pdf")}
+                  disabled={exportingFormat !== "" || !selectedClassId}
+                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                >
+                  {exportingFormat === "pdf"
+                    ? isEs
+                      ? "Exportando PDF..."
+                      : "Exportando PDF..."
+                    : isEs
+                      ? "Exportar PDF"
+                      : "Exportar PDF"}
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -1539,7 +1831,7 @@ export default function LancamentosClient({
               }`}
             >
               <Users className="w-4 h-4 mr-2" />
-              {isEs ? "Turmas" : "Turmas"}
+              {isEs ? "Notas finales" : "Notas Finais"}
             </Button>
           </div>
         </CardContent>
@@ -1755,17 +2047,27 @@ export default function LancamentosClient({
               <div className="rounded-lg border border-white/10 overflow-hidden">
                 <div className="max-h-[520px] overflow-y-auto space-y-2 p-2">
                   {orderedLessons.map((lesson) => {
+                    const noGrades = lesson.has_grades === false
                     const totalStudents = Number(lesson.total_students ?? 0)
+                    const totalActiveStudents = Number(lesson.total_active_students ?? totalStudents)
+                    const nonEligibleStudents = Number(
+                      lesson.non_eligible_students ?? Math.max(totalActiveStudents - totalStudents, 0),
+                    )
                     const gradedEntries = Number(lesson.graded_entries_count ?? 0)
                     const completionPercentRaw =
-                      lesson.completion_percent === null || lesson.completion_percent === undefined
+                      noGrades
+                        ? 100
+                        : lesson.completion_percent === null || lesson.completion_percent === undefined
                         ? totalStudents > 0
                           ? (gradedEntries / totalStudents) * 100
                           : 0
                         : Number(lesson.completion_percent)
                     const completionPercent = Math.max(0, Math.min(100, completionPercentRaw))
                     const isComplete =
-                      lesson.fully_launched === true || (totalStudents > 0 && gradedEntries >= totalStudents)
+                      noGrades ||
+                      lesson.fully_launched === true ||
+                      totalStudents === 0 ||
+                      (totalStudents > 0 && gradedEntries >= totalStudents)
 
                     return (
                       <div
@@ -1792,20 +2094,35 @@ export default function LancamentosClient({
                               }`}
                             >
                               {isComplete
-                                ? isEs
+                                ? noGrades
+                                  ? isEs
+                                    ? "Sin nota (completa)"
+                                    : "Sem nota (completa)"
+                                  : totalStudents === 0
+                                    ? isEs
+                                      ? "Sin alumnos elegibles"
+                                      : "Sem alunos elegiveis"
+                                  : isEs
                                   ? "100% completo"
                                   : "100% completo"
                                 : `${completionPercent.toFixed(0)}% ${isEs ? "completo" : "completo"}`}
                             </span>
                             <span className="text-[11px] px-2 py-1 rounded-full border border-white/15 bg-white/5 text-slate-200">
-                              {gradedEntries}/{totalStudents} {isEs ? "alumnos con notas" : "alunos com notas"}
+                              {noGrades
+                                ? isEs
+                                  ? "Diario sin notas"
+                                  : "Diario sem notas"
+                                : `${gradedEntries}/${totalStudents} ${
+                                    isEs ? "alumnos con notas" : "alunos com notas"
+                                  }${nonEligibleStudents > 0 ? ` • N/A ${nonEligibleStudents}` : ""}`}
                             </span>
-                            <Link
-                              href={`/portal/dashboard/notas/aulas/${lesson.id}`}
+                            <Button
+                              type="button"
+                              onClick={() => openLessonFromList(lesson.id)}
                               className="h-8 inline-flex items-center rounded-md border border-cyan-500/30 bg-cyan-500/20 px-3 text-xs text-cyan-100 hover:bg-cyan-500/30"
                             >
                               {isEs ? "Abrir clase" : "Abrir aula"}
-                            </Link>
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -1818,6 +2135,11 @@ export default function LancamentosClient({
                   ) : null}
                 </div>
               </div>
+              <p className="text-xs text-slate-300">
+                {isEs
+                  ? 'Use "Abrir clase" para editar en modal.'
+                  : 'Use "Abrir aula" para editar em modal.'}
+              </p>
             </CardContent>
           </Card>
         ) : (
@@ -2045,6 +2367,256 @@ export default function LancamentosClient({
             </CardContent>
           </Card>
         )
+      ) : null}
+
+      {lessonModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4">
+          <button
+            type="button"
+            onClick={() => {
+              if (saving) return
+              setLessonModalOpen(false)
+            }}
+            className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
+            aria-label={isEs ? "Cerrar" : "Fechar"}
+          />
+          <Card className="relative z-10 w-full max-w-6xl max-h-[92vh] overflow-hidden bg-slate-900/95 border border-white/10 text-white">
+            <CardHeader className="border-b border-white/10">
+              <CardTitle className="flex items-center justify-between gap-3">
+                <span>
+                  {selectedLesson
+                    ? `${isEs ? "Edicion de clase" : "Edicao da aula"} ${selectedLesson.lesson_number}`
+                    : isEs
+                      ? "Edicion de clase"
+                      : "Edicao da aula"}
+                </span>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (saving) return
+                    setLessonModalOpen(false)
+                  }}
+                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  {isEs ? "Cerrar" : "Fechar"}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-y-auto max-h-[calc(92vh-78px)] space-y-4 pt-4">
+              {lessonModalLoading ? (
+                <p className="text-sm text-slate-300">
+                  {isEs ? "Cargando clase..." : "Carregando aula..."}
+                </p>
+              ) : selectedLesson ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-white">{isEs ? "Fecha de la clase" : "Data da aula"}</Label>
+                      <Input
+                        type="date"
+                        value={lessonDate}
+                        onChange={(e) => setLessonDate(normalizeLessonDate(e.target.value))}
+                        onBlur={() => setLessonDate((prev) => normalizeLessonDate(prev))}
+                        className="bg-slate-800/70 border-slate-700 text-white"
+                      />
+                    </div>
+                    <div className="md:col-span-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 self-end">
+                      <label className="inline-flex items-center gap-2 text-sm text-white cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-cyan-500"
+                          checked={lessonHasGrades}
+                          onChange={(e) => setLessonHasGrades(e.target.checked)}
+                        />
+                        {isEs ? "Clase con nota" : "Aula com nota"}
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-white">{isEs ? "Texto libre (diario)" : "Texto livre (diario)"}</Label>
+                    <textarea
+                      rows={3}
+                      value={lessonNotes}
+                      onChange={(e) => setLessonNotes(e.target.value)}
+                      className="w-full rounded-md border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  {lessonHasGrades ? (
+                    entries.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <p className="mb-2 text-xs text-slate-300">
+                          {isEs
+                            ? "Atajo: Enter avanza C1 a C4 y al siguiente alumno. Flechas tambien navegan."
+                            : "Atalho: Enter avanca C1 a C4 e para o proximo aluno. Setas tambem navegam."}
+                        </p>
+                        <table className="min-w-[980px] w-full text-sm text-slate-100">
+                          <thead>
+                            <tr className="text-slate-200 border-b border-white/10">
+                              <th className="text-left py-2 px-3">{isEs ? "Alumno" : "Aluno"}</th>
+                              <th className="text-left py-2 px-2">{isEs ? "Asistencia" : "Presenca"}</th>
+                              <th className="text-left py-2 px-2">C1</th>
+                              <th className="text-left py-2 px-2">C2</th>
+                              <th className="text-left py-2 px-2">C3</th>
+                              <th className="text-left py-2 px-2">C4</th>
+                              <th className="text-left py-2 px-2">{isEs ? "Observacion" : "Observacao"}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {entries.map((entry, rowIndex) => (
+                              <tr key={entry.student_id} className="border-b border-white/10 last:border-b-0 odd:bg-white/[0.02]">
+                                <td className="py-2 px-3 text-white max-w-[240px] truncate">{entry.full_name}</td>
+                                <td className="py-2 px-2">
+                                  <label className="inline-flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 accent-cyan-500 cursor-pointer"
+                                      checked={entry.attendance !== "absent"}
+                                      onChange={(e) =>
+                                        updateEntry(entry.student_id, {
+                                          attendance: e.target.checked ? "present" : "absent",
+                                        })
+                                      }
+                                    />
+                                  </label>
+                                </td>
+                                <td className="py-2 px-2">
+                                  <Input
+                                    ref={(el) => setLessonScoreInputRef(entry.student_id, "c1", el)}
+                                    type="number"
+                                    min={0}
+                                    max={scoreMax}
+                                    step={0.01}
+                                    value={entry.c1 ?? ""}
+                                    onChange={(e) =>
+                                      updateEntry(entry.student_id, {
+                                        c1: parseNumericInput(e.target.value, scoreMax),
+                                      })
+                                    }
+                                    onBlur={() => clampEntryScore(entry.student_id, "c1", scoreMax)}
+                                    onKeyDown={(e) => handleLessonScoreKeyDown(e, rowIndex, "c1")}
+                                    className={scoreInputClass}
+                                  />
+                                </td>
+                                <td className="py-2 px-2">
+                                  <Input
+                                    ref={(el) => setLessonScoreInputRef(entry.student_id, "c2", el)}
+                                    type="number"
+                                    min={0}
+                                    max={scoreMax}
+                                    step={0.01}
+                                    value={entry.c2 ?? ""}
+                                    onChange={(e) =>
+                                      updateEntry(entry.student_id, {
+                                        c2: parseNumericInput(e.target.value, scoreMax),
+                                      })
+                                    }
+                                    onBlur={() => clampEntryScore(entry.student_id, "c2", scoreMax)}
+                                    onKeyDown={(e) => handleLessonScoreKeyDown(e, rowIndex, "c2")}
+                                    className={scoreInputClass}
+                                  />
+                                </td>
+                                <td className="py-2 px-2">
+                                  <Input
+                                    ref={(el) => setLessonScoreInputRef(entry.student_id, "c3", el)}
+                                    type="number"
+                                    min={0}
+                                    max={scoreMax}
+                                    step={0.01}
+                                    value={entry.c3 ?? ""}
+                                    onChange={(e) =>
+                                      updateEntry(entry.student_id, {
+                                        c3: parseNumericInput(e.target.value, scoreMax),
+                                      })
+                                    }
+                                    onBlur={() => clampEntryScore(entry.student_id, "c3", scoreMax)}
+                                    onKeyDown={(e) => handleLessonScoreKeyDown(e, rowIndex, "c3")}
+                                    className={scoreInputClass}
+                                  />
+                                </td>
+                                <td className="py-2 px-2">
+                                  <Input
+                                    ref={(el) => setLessonScoreInputRef(entry.student_id, "c4", el)}
+                                    type="number"
+                                    min={0}
+                                    max={scoreMax}
+                                    step={0.01}
+                                    value={entry.c4 ?? ""}
+                                    onChange={(e) =>
+                                      updateEntry(entry.student_id, {
+                                        c4: parseNumericInput(e.target.value, scoreMax),
+                                      })
+                                    }
+                                    onBlur={() => clampEntryScore(entry.student_id, "c4", scoreMax)}
+                                    onKeyDown={(e) => handleLessonScoreKeyDown(e, rowIndex, "c4")}
+                                    className={scoreInputClass}
+                                  />
+                                </td>
+                                <td className="py-2 px-2">
+                                  <Input
+                                    value={entry.comment ?? ""}
+                                    onChange={(e) =>
+                                      updateEntry(entry.student_id, {
+                                        comment: e.target.value || null,
+                                      })
+                                    }
+                                    className="h-8 bg-slate-800/80 border-slate-700 text-white text-xs"
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-300">
+                        {isEs ? "Sin alumnos para esta clase." : "Sem alunos para esta aula."}
+                      </p>
+                    )
+                  ) : (
+                    <p className="text-sm text-slate-300">
+                      {isEs
+                        ? "Esta clase no requiere C1-C4. Puede guardar solo con diario."
+                        : "Esta aula nao exige C1-C4. Pode salvar apenas com o diario."}
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => setLessonModalOpen(false)}
+                      className="bg-white/10 hover:bg-white/15 border border-white/10"
+                      disabled={saving}
+                    >
+                      {isEs ? "Cancelar" : "Cancelar"}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void saveLesson()}
+                      disabled={saving || !selectedLessonId}
+                      className="bg-cyan-600 hover:bg-cyan-700"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {saving
+                        ? isEs
+                          ? "Guardando..."
+                          : "Salvando..."
+                        : isEs
+                          ? "Guardar clase"
+                          : "Salvar aula"}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-slate-400">
+                  {isEs ? "Seleccione una clase." : "Selecione uma aula."}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       ) : null}
 
       {studentDetailsLoading ? (
@@ -2431,6 +3003,26 @@ export default function LancamentosClient({
                       <option value={4}>4</option>
                     </select>
                   </div>
+                  <div className="md:col-span-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                    <label className="inline-flex items-center gap-2 text-sm text-white cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-cyan-500"
+                        checked={quickLaunchHasGrades}
+                        onChange={(e) => setQuickLaunchHasGrades(e.target.checked)}
+                      />
+                      {isEs ? "Clase con nota" : "Aula com nota"}
+                    </label>
+                    <p className="text-xs text-slate-300 mt-1">
+                      {quickLaunchHasGrades
+                        ? isEs
+                          ? "Se lanzan presencia y C1 a C4 para todos los alumnos."
+                          : "Lanca presenca e C1 a C4 para todos os alunos."
+                        : isEs
+                          ? "Solo registra diario/observaciones. Esta clase cuenta como completa para cierre."
+                          : "Registra apenas diario/observacoes. Esta aula conta como completa para fechamento."}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2457,7 +3049,13 @@ export default function LancamentosClient({
                 <div className="rounded-xl border border-white/10 bg-slate-950/40 overflow-hidden">
                   <div className="px-3 py-2 border-b border-white/10">
                     <p className="text-sm text-slate-200">
-                      {isEs ? "Notas y asistencia por alumno" : "Notas e presenca por aluno"}
+                      {quickLaunchHasGrades
+                        ? isEs
+                          ? "Notas y asistencia por alumno"
+                          : "Notas e presenca por aluno"
+                        : isEs
+                          ? "Clase sin nota en este dia"
+                          : "Aula sem nota neste dia"}
                     </p>
                   </div>
                   {quickLaunchLoadingStudents ? (
@@ -2467,6 +3065,12 @@ export default function LancamentosClient({
                   ) : quickLaunchEntries.length === 0 ? (
                     <p className="p-3 text-sm text-slate-400">
                       {isEs ? "Sin alumnos activos." : "Sem alunos ativos."}
+                    </p>
+                  ) : !quickLaunchHasGrades ? (
+                    <p className="p-3 text-sm text-slate-300">
+                      {isEs
+                        ? "No es necesario completar C1-C4 hoy. Puede guardar solo con el diario."
+                        : "Nao e necessario preencher C1-C4 hoje. Pode salvar apenas com o diario."}
                     </p>
                   ) : (
                     <div className="overflow-x-auto">
@@ -2616,6 +3220,100 @@ export default function LancamentosClient({
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {exportModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4">
+          <button
+            type="button"
+            onClick={() => {
+              if (exportingFormat) return
+              setExportModalOpen(false)
+              setPendingExportFormat("")
+            }}
+            className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
+            aria-label={isEs ? "Cerrar" : "Fechar"}
+          />
+          <Card className="relative z-10 w-full max-w-md bg-slate-900/95 border border-white/10 text-white">
+            <CardHeader className="border-b border-white/10">
+              <CardTitle className="flex items-center justify-between gap-3">
+                <span>{isEs ? "Exportar turma" : "Exportar turma"}</span>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (exportingFormat) return
+                    setExportModalOpen(false)
+                    setPendingExportFormat("")
+                  }}
+                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                  disabled={!!exportingFormat}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  {isEs ? "Cerrar" : "Fechar"}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <div className="space-y-1">
+                <p className="text-sm text-slate-200">
+                  {selectedClass?.name ?? (isEs ? "Turma seleccionada" : "Turma selecionada")}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {pendingExportFormat === "pdf"
+                    ? isEs
+                      ? "Formato: PDF"
+                      : "Formato: PDF"
+                    : isEs
+                      ? "Formato: XLSX"
+                      : "Formato: XLSX"}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-white">{isEs ? "Bimestre para exportar" : "Bimestre para exportar"}</Label>
+                <select
+                  value={exportBimesterChoice}
+                  onChange={(e) => setExportBimesterChoice(Number(e.target.value || 1))}
+                  className="w-full h-10 rounded-md border border-slate-700 bg-slate-800/70 px-3 text-white"
+                >
+                  <option value={1}>{isEs ? "Bimestre 1" : "Bimestre 1"}</option>
+                  <option value={2}>{isEs ? "Bimestre 2" : "Bimestre 2"}</option>
+                  <option value={3}>{isEs ? "Bimestre 3" : "Bimestre 3"}</option>
+                  <option value={4}>{isEs ? "Bimestre 4" : "Bimestre 4"}</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (exportingFormat) return
+                    setExportModalOpen(false)
+                    setPendingExportFormat("")
+                  }}
+                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                  disabled={!!exportingFormat}
+                >
+                  {isEs ? "Cancelar" : "Cancelar"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void confirmExportFromModal()}
+                  className="bg-cyan-600 hover:bg-cyan-700"
+                  disabled={!pendingExportFormat || !!exportingFormat}
+                >
+                  {exportingFormat
+                    ? isEs
+                      ? "Exportando..."
+                      : "Exportando..."
+                    : isEs
+                      ? "Exportar"
+                      : "Exportar"}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

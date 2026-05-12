@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server"
 import { db } from "@/lib/db"
+import { ensureAuditSchema } from "@/lib/audit-schema"
+import { SESSION_COOKIE } from "@/lib/auth/constants"
+import { hashSessionToken } from "@/lib/auth/session"
 
 type AuditStatus = "success" | "failed"
 
@@ -88,6 +91,51 @@ function getIp(req: NextRequest | undefined) {
   return null
 }
 
+async function inferActorFromRequest(req?: NextRequest): Promise<AuditActor | null> {
+  if (!req) return null
+
+  const token = req.cookies.get(SESSION_COOKIE)?.value
+  if (!token) return null
+
+  try {
+    const tokenHash = hashSessionToken(token)
+    const [row] = await db`
+      SELECT
+        s.id AS session_id,
+        t.id,
+        t.email,
+        t.name,
+        t.role,
+        t.is_admin
+      FROM teacher_sessions s
+      JOIN teachers t ON t.id = s.teacher_id
+      WHERE s.token_hash = ${tokenHash}
+        AND s.revoked_at IS NULL
+        AND s.expires_at > NOW()
+      LIMIT 1
+    `
+
+    if (!row) return null
+
+    const role =
+      row.is_admin === true
+        ? "admin"
+        : row.role
+          ? String(row.role)
+          : "teacher"
+
+    return {
+      id: row.id ? String(row.id) : null,
+      email: row.email ? String(row.email) : null,
+      name: row.name ? String(row.name) : null,
+      role,
+      sessionId: row.session_id ? String(row.session_id) : null,
+    }
+  } catch {
+    return null
+  }
+}
+
 async function maybePurgeOldLogs() {
   const now = Date.now()
   if (now - lastPurgeAt < PURGE_INTERVAL_MS) return
@@ -95,7 +143,7 @@ async function maybePurgeOldLogs() {
 
   try {
     await db`
-      DELETE FROM audit_logs
+      DELETE FROM public.audit_logs
       WHERE created_at < (NOW() - make_interval(months => ${RETENTION_MONTHS}))
     `
   } catch (err) {
@@ -105,12 +153,15 @@ async function maybePurgeOldLogs() {
 
 export async function writeAuditLog(input: AuditInput) {
   try {
+    await ensureAuditSchema()
+
     const status = input.status ?? "success"
-    const actorId = input.actor?.id ?? null
-    const actorEmail = input.actor?.email ?? null
-    const actorName = input.actor?.name ?? null
-    const actorRole = input.actor?.role ?? null
-    const sessionId = input.actor?.sessionId ?? null
+    const inferredActor = await inferActorFromRequest(input.req)
+    const actorId = input.actor?.id ?? inferredActor?.id ?? null
+    const actorEmail = input.actor?.email ?? inferredActor?.email ?? null
+    const actorName = input.actor?.name ?? inferredActor?.name ?? null
+    const actorRole = input.actor?.role ?? inferredActor?.role ?? null
+    const sessionId = input.actor?.sessionId ?? inferredActor?.sessionId ?? null
     const targetType = input.target?.type ?? null
     const targetId =
       input.target?.id === null || input.target?.id === undefined
@@ -125,7 +176,7 @@ export async function writeAuditLog(input: AuditInput) {
     const metadata = input.metadata ? sanitize(input.metadata) : null
 
     await db`
-      INSERT INTO audit_logs (
+      INSERT INTO public.audit_logs (
         actor_id,
         actor_email,
         actor_name,

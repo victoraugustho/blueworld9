@@ -57,20 +57,37 @@ function normalizeStatus(value: unknown): BugReportStatus | null {
 export async function GET(req: NextRequest) {
   const auth = await requireRestrictedAdminApi()
   if (!auth.ok) return auth.response
-  await ensureBugReportsStatusSchema()
 
   const searchParams = new URL(req.url).searchParams
   const summaryOnly = searchParams.get("summary") === "1"
+  const [statusColumn] = await db`
+    SELECT 1 AS ok
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'bug_reports'
+      AND column_name = 'status'
+    LIMIT 1
+  `
+  const hasStatus = !!statusColumn
 
   if (summaryOnly) {
-    const [summary] = await db`
-      SELECT
-        COUNT(*)::int AS total,
-        COUNT(*) FILTER (WHERE COALESCE(status, 'pending') = 'pending')::int AS pending,
-        COUNT(*) FILTER (WHERE COALESCE(status, 'pending') = 'resolving')::int AS resolving,
-        COUNT(*) FILTER (WHERE COALESCE(status, 'pending') = 'resolved')::int AS resolved
-      FROM bug_reports
-    `
+    const [summary] = hasStatus
+      ? await db`
+          SELECT
+            COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE COALESCE(status, 'pending') = 'pending')::int AS pending,
+            COUNT(*) FILTER (WHERE COALESCE(status, 'pending') = 'resolving')::int AS resolving,
+            COUNT(*) FILTER (WHERE COALESCE(status, 'pending') = 'resolved')::int AS resolved
+          FROM bug_reports
+        `
+      : await db`
+          SELECT
+            COUNT(*)::int AS total,
+            COUNT(*)::int AS pending,
+            0::int AS resolving,
+            0::int AS resolved
+          FROM bug_reports
+        `
 
     return NextResponse.json({
       total: Number(summary?.total ?? 0),
@@ -80,22 +97,33 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  const rows = await db`
-    SELECT
-      r.*,
-      COALESCE(r.status, 'pending') AS status,
-      t.name AS teacher_name,
-      t.email AS teacher_email
-    FROM bug_reports r
-    JOIN teachers t ON t.id = r.teacher_id
-    ORDER BY
-      CASE COALESCE(r.status, 'pending')
-        WHEN 'pending' THEN 1
-        WHEN 'resolving' THEN 2
-        ELSE 3
-      END ASC,
-      r.created_at DESC
-  `
+  const rows = hasStatus
+    ? await db`
+        SELECT
+          r.*,
+          COALESCE(r.status, 'pending') AS status,
+          t.name AS teacher_name,
+          t.email AS teacher_email
+        FROM bug_reports r
+        JOIN teachers t ON t.id = r.teacher_id
+        ORDER BY
+          CASE COALESCE(r.status, 'pending')
+            WHEN 'pending' THEN 1
+            WHEN 'resolving' THEN 2
+            ELSE 3
+          END ASC,
+          r.created_at DESC
+      `
+    : await db`
+        SELECT
+          r.*,
+          'pending'::text AS status,
+          t.name AS teacher_name,
+          t.email AS teacher_email
+        FROM bug_reports r
+        JOIN teachers t ON t.id = r.teacher_id
+        ORDER BY r.created_at DESC
+      `
 
   return NextResponse.json(rows)
 }

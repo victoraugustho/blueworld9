@@ -5,6 +5,7 @@ import {
   ensureGradebookSchema,
   isUuid,
   normalizeEnrollmentCode,
+  normalizeEnrollmentDate,
   normalizeStudentName,
 } from "@/lib/gradebook"
 
@@ -49,6 +50,10 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   const fullName = body.full_name !== undefined ? normalizeStudentName(body.full_name) : current.full_name
   const enrollmentCode =
     body.enrollment_code !== undefined ? normalizeEnrollmentCode(body.enrollment_code) : current.enrollment_code
+  const enrollmentAt =
+    body.enrollment_at !== undefined
+      ? normalizeEnrollmentDate(body.enrollment_at)
+      : current.enrollment_at
   const active = body.active !== undefined ? body.active === true : current.active === true
 
   if (!fullName) {
@@ -61,6 +66,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       SET
         full_name = ${fullName},
         enrollment_code = ${enrollmentCode},
+        enrollment_at = COALESCE(${enrollmentAt}, CURRENT_DATE),
         active = ${active}
       WHERE id = ${studentId}
       RETURNING *

@@ -65,6 +65,7 @@ export default function AulaDetalheClient({
   const [lesson, setLesson] = useState<TeacherGradeLesson | null>(null)
   const [entries, setEntries] = useState<TeacherGradeLessonEntry[]>([])
   const [lessonDate, setLessonDate] = useState(todayIsoDate())
+  const [lessonHasGrades, setLessonHasGrades] = useState(true)
   const [lessonDiaryNotes, setLessonDiaryNotes] = useState("")
   const [lessonObservations, setLessonObservations] = useState("")
   const [className, setClassName] = useState("")
@@ -142,6 +143,7 @@ export default function AulaDetalheClient({
       setLesson(data?.lesson ?? null)
       setEntries(Array.isArray(data?.entries) ? data.entries : [])
       setLessonDate(normalizeLessonDate(String(data?.lesson?.lesson_date ?? "")))
+      setLessonHasGrades(data?.lesson?.has_grades === false ? false : true)
       setLessonDiaryNotes(String(data?.lesson?.diary_notes ?? data?.lesson?.notes ?? ""))
       setLessonObservations(String(data?.lesson?.observations ?? ""))
       setClassName(String(data?.lesson?.class_name ?? ""))
@@ -187,17 +189,20 @@ export default function AulaDetalheClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         lesson_date: safeDate,
+        has_grades: lessonHasGrades,
         notes: lessonDiaryNotes,
         observations: lessonObservations,
-        entries: entries.map((item) => ({
-          student_id: item.student_id,
-          attendance: item.attendance,
-          c1: item.c1 ?? null,
-          c2: item.c2 ?? null,
-          c3: item.c3 ?? null,
-          c4: item.c4 ?? null,
-          comment: item.comment ?? null,
-        })),
+        entries: lessonHasGrades
+          ? entries.map((item) => ({
+              student_id: item.student_id,
+              attendance: item.attendance,
+              c1: item.c1 ?? null,
+              c2: item.c2 ?? null,
+              c3: item.c3 ?? null,
+              c4: item.c4 ?? null,
+              comment: item.comment ?? null,
+            }))
+          : [],
       }),
     })
     setSaving(false)
@@ -228,7 +233,7 @@ export default function AulaDetalheClient({
       return
     }
 
-    router.push("/portal/dashboard/notas/aulas")
+    router.push("/portal/dashboard/notas/lancamentos")
   }
 
   return (
@@ -243,7 +248,7 @@ export default function AulaDetalheClient({
           </p>
         </div>
         <Link
-          href="/portal/dashboard/notas/aulas"
+          href="/portal/dashboard/notas/lancamentos"
           className="inline-flex items-center px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -302,6 +307,19 @@ export default function AulaDetalheClient({
                 />
               </div>
 
+              <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                <label className="inline-flex items-center gap-2 text-sm text-white cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-cyan-500"
+                    checked={lessonHasGrades}
+                    onChange={(e) => setLessonHasGrades(e.target.checked)}
+                  />
+                  {isEs ? "Clase con nota" : "Aula com nota"}
+                </label>
+              </div>
+
+              {lessonHasGrades ? (
               <div className="overflow-x-auto">
                 <p className="mb-2 text-xs text-slate-300">
                   {isEs
@@ -410,6 +428,13 @@ export default function AulaDetalheClient({
                   </tbody>
                 </table>
               </div>
+              ) : (
+                <p className="text-sm text-slate-300">
+                  {isEs
+                    ? "Esta clase no requiere C1-C4. Solo diario y observaciones."
+                    : "Esta aula nao exige C1-C4. Apenas diario e observacoes."}
+                </p>
+              )}
 
               <div className="flex flex-wrap gap-2">
                 <Button onClick={saveLesson} disabled={saving} className="bg-cyan-600 hover:bg-cyan-700">

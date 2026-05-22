@@ -87,12 +87,20 @@ export interface TeacherLessonLog {
   teacher_id: string
   schedule_id?: string | null
   class_id?: string | null
+  resolved_class_id?: string | null
+  resolved_class_label?: string | null
   class_label: string
   school_year?: number | null
   bimester?: number | null
   lesson_number: number
   lesson_date: string
   has_grades?: boolean
+  grade_lesson_id?: string | null
+  grade_has_grades?: boolean | null
+  total_students?: number
+  graded_students?: number
+  completion_percent?: number
+  fully_completed?: boolean
   notes?: string | null
   observations?: string | null
   created_at?: string

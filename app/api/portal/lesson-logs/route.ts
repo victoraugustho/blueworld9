@@ -6,12 +6,12 @@ import { getDefaultTimezone } from "@/lib/timezones"
 import {
   ensureGradebookSchema,
   getScoreMaxByCountry,
-  getBimesterLock,
   isUuid,
   normalizeAttendance,
   normalizeBimester,
   normalizeSchoolYear,
   normalizeScore,
+  validateBimesterLaunchFlow,
 } from "@/lib/gradebook"
 
 function isValidDate(value: string) {
@@ -188,11 +188,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Bimestre invalido" }, { status: 400 })
   }
   if (class_id && bimester !== null) {
-    const lock = await getBimesterLock(class_id, school_year, bimester)
-    if (lock) {
+    const flowValidation = await validateBimesterLaunchFlow(class_id, school_year, bimester)
+    if (!flowValidation.ok) {
+      if (flowValidation.reason === "target_closed") {
+        return NextResponse.json(
+          {
+            error: "Este bimestre esta fechado e nao permite novos lancamentos.",
+            code: "BIMESTER_CLOSED",
+            target_bimester: bimester,
+          },
+          { status: 409 },
+        )
+      }
+
       return NextResponse.json(
-        { error: "Este bimestre esta fechado e nao permite novos lancamentos." },
-        { status: 400 },
+        {
+          error: `Para lancar no B${bimester}, feche antes o(s) bimestre(s): ${flowValidation.missingPrevious.join(", ")}.`,
+          code: "PREVIOUS_BIMESTER_NOT_CLOSED",
+          target_bimester: bimester,
+          missing_previous_bimesters: flowValidation.missingPrevious,
+        },
+        { status: 409 },
       )
     }
   }

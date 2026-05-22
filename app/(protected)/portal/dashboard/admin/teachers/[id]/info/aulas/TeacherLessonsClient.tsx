@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { BookOpenCheck, Eye, RefreshCcw, Search, X } from "lucide-react"
@@ -20,6 +20,7 @@ type LessonDetailsResponse = {
     full_name: string
     enrollment_code?: string | null
     active: boolean
+    eligible_for_lesson?: boolean
     attendance?: string | null
     c1?: number | null
     c2?: number | null
@@ -46,6 +47,50 @@ function preview(value: string | null | undefined, max = 120) {
 function score(value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "-"
   return Number(value).toFixed(2).replace(".", ",")
+}
+
+function lessonClassLabel(log: TeacherLessonLog) {
+  return String(log.resolved_class_label || log.class_label || "Sem turma")
+}
+
+function lessonClassValue(log: TeacherLessonLog) {
+  const classId = String(log.resolved_class_id ?? "").trim()
+  if (classId) return `id:${classId}`
+  return `label:${lessonClassLabel(log).toLocaleLowerCase("pt-BR")}`
+}
+
+function classValueDisplayLabel(value: string, fallbackLabel: string) {
+  if (value.startsWith("id:")) {
+    return `${fallbackLabel} | ID ${value.slice(3, 11)}`
+  }
+  return fallbackLabel
+}
+
+function getCompletionState(log: TeacherLessonLog) {
+  const noGrades = (log.grade_has_grades ?? log.has_grades) === false
+  const totalStudents = Number(log.total_students ?? 0)
+  const gradedStudents = Number(log.graded_students ?? 0)
+  const completionPercentRaw =
+    noGrades
+      ? 100
+      : log.completion_percent === null || log.completion_percent === undefined
+        ? totalStudents > 0
+          ? (gradedStudents / totalStudents) * 100
+          : 0
+        : Number(log.completion_percent)
+  const completionPercent = Math.max(0, Math.min(100, completionPercentRaw))
+  const isComplete =
+    noGrades ||
+    log.fully_completed === true ||
+    (totalStudents > 0 && gradedStudents >= totalStudents)
+
+  return {
+    noGrades,
+    totalStudents,
+    gradedStudents,
+    completionPercent,
+    isComplete,
+  }
 }
 
 export default function TeacherLessonsClient({ teacherId }: { teacherId: string }) {
@@ -87,18 +132,25 @@ export default function TeacherLessonsClient({ teacherId }: { teacherId: string 
   }, [teacherId])
 
   const classOptions = useMemo(() => {
-    const names = new Set<string>()
+    const optionsMap = new Map<string, string>()
     for (const log of logs) {
-      names.add(String(log.class_label || "Sem turma"))
+      const label = lessonClassLabel(log)
+      const value = lessonClassValue(log)
+      if (!optionsMap.has(value)) {
+        optionsMap.set(value, classValueDisplayLabel(value, label))
+      }
     }
-    return Array.from(names).sort((a, b) => a.localeCompare(b, "pt-BR"))
+    return Array.from(optionsMap.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"))
   }, [logs])
 
   const filteredLogs = useMemo(() => {
     const query = search.trim().toLowerCase()
     return logs.filter((log) => {
-      const label = String(log.class_label || "Sem turma")
-      if (classFilter !== "all" && label !== classFilter) return false
+      const label = lessonClassLabel(log)
+      const filterValue = lessonClassValue(log)
+      if (classFilter !== "all" && filterValue !== classFilter) return false
       if (!query) return true
 
       const date = formatDate(log.lesson_date).toLowerCase()
@@ -110,23 +162,37 @@ export default function TeacherLessonsClient({ teacherId }: { teacherId: string 
   }, [classFilter, logs, search])
 
   const groupedLogs = useMemo(() => {
-    const groups = new Map<string, TeacherLessonLog[]>()
+    const groups = new Map<
+      string,
+      {
+        label: string
+        value: string
+        items: TeacherLessonLog[]
+      }
+    >()
+
     for (const log of filteredLogs) {
-      const key = String(log.class_label || "Sem turma")
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key)?.push(log)
+      const label = lessonClassLabel(log)
+      const value = lessonClassValue(log)
+      if (!groups.has(value)) {
+        groups.set(value, { label, value, items: [] })
+      }
+      groups.get(value)?.items.push(log)
     }
 
-    for (const [key, items] of groups.entries()) {
+    for (const [key, group] of groups.entries()) {
+      const items = group.items
       items.sort((a, b) => {
         const dateDiff = String(b.lesson_date ?? "").localeCompare(String(a.lesson_date ?? ""))
         if (dateDiff !== 0) return dateDiff
         return Number(b.lesson_number ?? 0) - Number(a.lesson_number ?? 0)
       })
-      groups.set(key, items)
+      groups.set(key, group)
     }
 
-    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], "pt-BR"))
+    return Array.from(groups.values()).sort((a, b) =>
+      classValueDisplayLabel(a.value, a.label).localeCompare(classValueDisplayLabel(b.value, b.label), "pt-BR"),
+    )
   }, [filteredLogs])
 
   async function openDetails(logId: string) {
@@ -175,9 +241,9 @@ export default function TeacherLessonsClient({ teacherId }: { teacherId: string 
             className="rounded-lg border border-white/10 bg-slate-800/80 px-3 py-2 text-white"
           >
             <option value="all">Todas as turmas</option>
-            {classOptions.map((name) => (
-              <option key={name} value={name}>
-                {name}
+            {classOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>
@@ -216,52 +282,74 @@ export default function TeacherLessonsClient({ teacherId }: { teacherId: string 
             <p className="text-sm text-slate-400">Sem registros para os filtros escolhidos.</p>
           ) : (
             <div className="space-y-4">
-              {groupedLogs.map(([classLabel, items]) => (
-                <details key={classLabel} className="rounded-xl border border-white/10 bg-white/5">
+              {groupedLogs.map((group) => (
+                <details key={group.value} className="rounded-xl border border-white/10 bg-white/5">
                   <summary className="cursor-pointer list-none px-4 py-3 border-b border-white/10">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{classLabel}</p>
-                        <p className="text-xs text-slate-300">{items.length} aulas registradas</p>
+                        <p className="text-sm font-semibold text-white truncate">
+                          {classValueDisplayLabel(group.value, group.label)}
+                        </p>
+                        <p className="text-xs text-slate-300">
+                          {group.items.length} aulas registradas |{" "}
+                          {group.items.filter((item) => getCompletionState(item).isComplete).length} completas |{" "}
+                          {group.items.filter((item) => !getCompletionState(item).isComplete).length} pendentes
+                        </p>
                       </div>
                     </div>
                   </summary>
                   <div className="space-y-2 p-3">
-                    {items.map((log) => (
-                      <div
-                        key={log.id}
-                        className="rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="rounded-full border border-cyan-500/35 bg-cyan-500/10 px-2 py-0.5 text-cyan-100">
-                              Aula {log.lesson_number}
-                            </span>
-                            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-white/80">
-                              B{log.bimester ?? "-"}
-                            </span>
-                            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-white/80">
-                              {formatDate(log.lesson_date)}
-                            </span>
-                            {log.has_grades === false ? (
-                              <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 text-amber-100">
-                                Sem nota
+                    {group.items.map((log) => {
+                      const state = getCompletionState(log)
+
+                      return (
+                        <div key={log.id} className="rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="rounded-full border border-cyan-500/35 bg-cyan-500/10 px-2 py-0.5 text-cyan-100">
+                                Aula {log.lesson_number}
                               </span>
-                            ) : null}
+                              <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-white/80">
+                                B{log.bimester ?? "-"}
+                              </span>
+                              <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-white/80">
+                                {formatDate(log.lesson_date)}
+                              </span>
+                              {(log.grade_has_grades ?? log.has_grades) === false ? (
+                                <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 text-amber-100">
+                                  Sem nota
+                                </span>
+                              ) : null}
+                              <span
+                                className={`rounded-full px-2 py-0.5 ${
+                                  state.isComplete
+                                    ? "border border-emerald-500/35 bg-emerald-500/10 text-emerald-100"
+                                    : "border border-rose-500/35 bg-rose-500/10 text-rose-100"
+                                }`}
+                              >
+                                {state.isComplete ? "100% completo" : "Pendente"}
+                              </span>
+                              {!state.noGrades ? (
+                                <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-white/80">
+                                  {state.gradedStudents}/{state.totalStudents} com notas |{" "}
+                                  {state.completionPercent.toFixed(0)}%
+                                </span>
+                              ) : null}
+                            </div>
+                            <Button
+                              type="button"
+                              onClick={() => void openDetails(log.id)}
+                              className="h-8 bg-white/10 hover:bg-white/15 border border-white/10"
+                            >
+                              <Eye className="w-4 h-4 mr-1.5" />
+                              Detalhes
+                            </Button>
                           </div>
-                          <Button
-                            type="button"
-                            onClick={() => void openDetails(log.id)}
-                            className="h-8 bg-white/10 hover:bg-white/15 border border-white/10"
-                          >
-                            <Eye className="w-4 h-4 mr-1.5" />
-                            Detalhes
-                          </Button>
+                          <p className="text-xs text-slate-300 mt-2">Diario: {preview(log.notes)}</p>
+                          <p className="text-xs text-slate-400 mt-1">Observacoes: {preview(log.observations)}</p>
                         </div>
-                        <p className="text-xs text-slate-300 mt-2">Diario: {preview(log.notes)}</p>
-                        <p className="text-xs text-slate-400 mt-1">Observacoes: {preview(log.observations)}</p>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </details>
               ))}
@@ -366,6 +454,11 @@ export default function TeacherLessonsClient({ teacherId }: { teacherId: string 
                           <td className="py-2 px-3 text-white">
                             <div className="flex items-center gap-2">
                               <span>{entry.full_name}</span>
+                              {entry.eligible_for_lesson === false ? (
+                                <span className="text-[10px] rounded-full border border-amber-500/35 bg-amber-500/10 px-1.5 py-0.5 text-amber-100">
+                                  N/A
+                                </span>
+                              ) : null}
                               {!entry.active ? (
                                 <span className="text-[10px] rounded-full border border-rose-500/35 bg-rose-500/10 px-1.5 py-0.5 text-rose-200">
                                   Inativo

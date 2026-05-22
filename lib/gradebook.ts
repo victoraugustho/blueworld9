@@ -737,3 +737,69 @@ export async function getBimesterLock(
   `
   return lock ?? null
 }
+
+export type BimesterFlowValidation =
+  | {
+      ok: true
+      lockedBimesters: number[]
+    }
+  | {
+      ok: false
+      reason: "target_closed" | "previous_not_closed"
+      targetBimester: number
+      lockedBimesters: number[]
+      missingPrevious: number[]
+    }
+
+export async function validateBimesterLaunchFlow(
+  classId: string,
+  schoolYear: number,
+  targetBimester: number,
+): Promise<BimesterFlowValidation> {
+  const rows = await db`
+    SELECT bimester
+    FROM teacher_gradebook_bimester_locks
+    WHERE class_id = ${classId}
+      AND school_year = ${schoolYear}
+      AND bimester BETWEEN 1 AND 4
+  `
+
+  const lockedBimesters = rows
+    .map((row: any) => Number(row?.bimester))
+    .filter((value: number) => Number.isInteger(value) && value >= 1 && value <= 4)
+    .sort((a: number, b: number) => a - b)
+
+  const lockedSet = new Set<number>(lockedBimesters)
+
+  if (lockedSet.has(targetBimester)) {
+    return {
+      ok: false,
+      reason: "target_closed",
+      targetBimester,
+      lockedBimesters,
+      missingPrevious: [],
+    }
+  }
+
+  const missingPrevious: number[] = []
+  for (let current = 1; current < targetBimester; current += 1) {
+    if (!lockedSet.has(current)) {
+      missingPrevious.push(current)
+    }
+  }
+
+  if (missingPrevious.length > 0) {
+    return {
+      ok: false,
+      reason: "previous_not_closed",
+      targetBimester,
+      lockedBimesters,
+      missingPrevious,
+    }
+  }
+
+  return {
+    ok: true,
+    lockedBimesters,
+  }
+}

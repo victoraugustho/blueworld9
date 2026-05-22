@@ -4,10 +4,10 @@ import { requireTeacherApi } from "@/lib/auth/require"
 import { getDefaultTimezone } from "@/lib/timezones"
 import {
   ensureGradebookSchema,
-  getBimesterLock,
   isUuid,
   normalizeBimester,
   normalizeSchoolYear,
+  validateBimesterLaunchFlow,
 } from "@/lib/gradebook"
 
 function isValidDate(value: string) {
@@ -200,10 +200,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Turma nao encontrada" }, { status: 404 })
   }
 
-  const lock = await getBimesterLock(classId, schoolYear, bimester)
-  if (lock) {
+  const flowValidation = await validateBimesterLaunchFlow(classId, schoolYear, bimester)
+  if (!flowValidation.ok) {
+    if (flowValidation.reason === "target_closed") {
+      return NextResponse.json(
+        {
+          error: "Este bimestre esta fechado e nao permite novos lancamentos.",
+          code: "BIMESTER_CLOSED",
+          target_bimester: bimester,
+        },
+        { status: 409 },
+      )
+    }
+
     return NextResponse.json(
-      { error: "Este bimestre esta fechado e nao permite novos lancamentos." },
+      {
+        error: `Para lancar no B${bimester}, feche antes o(s) bimestre(s): ${flowValidation.missingPrevious.join(", ")}.`,
+        code: "PREVIOUS_BIMESTER_NOT_CLOSED",
+        target_bimester: bimester,
+        missing_previous_bimesters: flowValidation.missingPrevious,
+      },
       { status: 409 },
     )
   }

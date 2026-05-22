@@ -2105,7 +2105,7 @@ export default function LancamentosClient({
                                   : isEs
                                   ? "100% completo"
                                   : "100% completo"
-                                : `${completionPercent.toFixed(0)}% ${isEs ? "completo" : "completo"}`}
+                                : `${isEs ? "Pendiente" : "Pendente"} • ${completionPercent.toFixed(0)}%`}
                             </span>
                             <span className="text-[11px] px-2 py-1 rounded-full border border-white/15 bg-white/5 text-slate-200">
                               {noGrades

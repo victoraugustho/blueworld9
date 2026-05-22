@@ -94,8 +94,10 @@ export async function POST(req: NextRequest) {
       )
     `
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-    const resetUrl = `${baseUrl}/portal/reset-password?token=${rawToken}`
+    const configuredBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+    const normalizedBaseUrl =
+      configuredBaseUrl.replace(/\/+$/, "").replace(/\/portal$/i, "") || "http://localhost:3000"
+    const resetUrl = `${normalizedBaseUrl}/reset-password?token=${rawToken}`
 
     /**
      * ENVIO DE EMAIL

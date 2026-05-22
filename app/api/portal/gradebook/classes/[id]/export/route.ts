@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import * as XLSX from "xlsx"
+import ExcelJS from "exceljs"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
@@ -311,6 +311,46 @@ async function buildPdfBuffer(params: {
   return Buffer.from(await pdf.save())
 }
 
+async function buildXlsxBuffer(rows: any[]) {
+  const workbook = new ExcelJS.Workbook()
+  const worksheet = workbook.addWorksheet("Notas")
+
+  worksheet.columns = [
+    { header: "Aluno", key: "full_name", width: 34 },
+    { header: "Presencas", key: "presence_count", width: 10 },
+    { header: "Faltas", key: "absence_count", width: 9 },
+    { header: "Frequencia", key: "attendance_percent", width: 12 },
+    { header: "Aulas avaliadas", key: "graded_lessons", width: 14 },
+    { header: "Nota 1", key: "note1", width: 10 },
+    { header: "Prova/Atividade", key: "exam_score", width: 14 },
+    { header: "C5", key: "c5_score", width: 8 },
+    { header: "Nota 2", key: "note2", width: 10 },
+    { header: "Nota Final", key: "final_grade", width: 12 },
+    { header: "Observacoes", key: "observations", width: 34 },
+  ]
+
+  const headerRow = worksheet.getRow(1)
+  headerRow.font = { bold: true }
+
+  for (const row of rows) {
+    worksheet.addRow({
+      full_name: String(row.full_name ?? ""),
+      presence_count: Number(row.presence_count ?? 0),
+      absence_count: Number(row.absence_count ?? 0),
+      attendance_percent: formatPercent(row.attendance_percent),
+      graded_lessons: Number(row.graded_lessons ?? 0),
+      note1: row.note1 === null || row.note1 === undefined ? "" : Number(row.note1),
+      exam_score: row.exam_score === null || row.exam_score === undefined ? "" : Number(row.exam_score),
+      c5_score: row.c5_score === null || row.c5_score === undefined ? "" : Number(row.c5_score),
+      note2: row.note2 === null || row.note2 === undefined ? "" : Number(row.note2),
+      final_grade: row.final_grade === null || row.final_grade === undefined ? "" : Number(row.final_grade),
+      observations: String(row.observations ?? ""),
+    })
+  }
+
+  return Buffer.from(await workbook.xlsx.writeBuffer())
+}
+
 export async function GET(req: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
@@ -358,49 +398,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const filenameBase = `${safeFilenamePart(String(classRow.name ?? "turma"))}-B${bimester}-${schoolYear}`
 
   if (format === "xlsx") {
-    const header = [
-      "Aluno",
-      "Presencas",
-      "Faltas",
-      "Frequencia",
-      "Aulas avaliadas",
-      "Nota 1",
-      "Prova/Atividade",
-      "C5",
-      "Nota 2",
-      "Nota Final",
-      "Observacoes",
-    ]
-    const data = rows.map((row: any) => [
-      String(row.full_name ?? ""),
-      Number(row.presence_count ?? 0),
-      Number(row.absence_count ?? 0),
-      formatPercent(row.attendance_percent),
-      Number(row.graded_lessons ?? 0),
-      row.note1 === null || row.note1 === undefined ? "" : Number(row.note1),
-      row.exam_score === null || row.exam_score === undefined ? "" : Number(row.exam_score),
-      row.c5_score === null || row.c5_score === undefined ? "" : Number(row.c5_score),
-      row.note2 === null || row.note2 === undefined ? "" : Number(row.note2),
-      row.final_grade === null || row.final_grade === undefined ? "" : Number(row.final_grade),
-      String(row.observations ?? ""),
-    ])
-    const worksheet = XLSX.utils.aoa_to_sheet([header, ...data])
-    worksheet["!cols"] = [
-      { wch: 34 },
-      { wch: 10 },
-      { wch: 9 },
-      { wch: 12 },
-      { wch: 14 },
-      { wch: 10 },
-      { wch: 14 },
-      { wch: 8 },
-      { wch: 10 },
-      { wch: 12 },
-      { wch: 34 },
-    ]
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Notas")
-    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" })
+    const buffer = await buildXlsxBuffer(rows)
 
     return new NextResponse(buffer, {
       headers: {

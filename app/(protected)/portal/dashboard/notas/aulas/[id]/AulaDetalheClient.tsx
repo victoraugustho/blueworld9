@@ -61,6 +61,8 @@ export default function AulaDetalheClient({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const [formFeedbackModalOpen, setFormFeedbackModalOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   const [lesson, setLesson] = useState<TeacherGradeLesson | null>(null)
   const [entries, setEntries] = useState<TeacherGradeLessonEntry[]>([])
@@ -159,6 +161,12 @@ export default function AulaDetalheClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId])
 
+  useEffect(() => {
+    if (String(error ?? "").trim()) {
+      setFormFeedbackModalOpen(true)
+    }
+  }, [error])
+
   function updateEntry(studentId: string, patch: Partial<TeacherGradeLessonEntry>) {
     setEntries((prev) =>
       prev.map((item) => (item.student_id === studentId ? { ...item, ...patch } : item)),
@@ -217,9 +225,6 @@ export default function AulaDetalheClient({
   }
 
   async function deleteLesson() {
-    const ok = confirm(isEs ? "Eliminar esta clase?" : "Excluir esta aula?")
-    if (!ok) return
-
     setSaving(true)
     setError("")
     const res = await fetch(`/api/portal/gradebook/lessons/${lessonId}`, {
@@ -234,6 +239,10 @@ export default function AulaDetalheClient({
     }
 
     router.push("/portal/dashboard/notas/lancamentos")
+  }
+
+  function requestDeleteLesson() {
+    setDeleteConfirmOpen(true)
   }
 
   return (
@@ -442,7 +451,7 @@ export default function AulaDetalheClient({
                   {isEs ? "Guardar" : "Salvar"}
                 </Button>
                 {canDeleteLesson ? (
-                  <Button onClick={deleteLesson} disabled={saving} className="bg-rose-600 hover:bg-rose-700">
+                  <Button onClick={requestDeleteLesson} disabled={saving} className="bg-rose-600 hover:bg-rose-700">
                     <Trash2 className="w-4 h-4 mr-2" />
                     {isEs ? "Eliminar" : "Excluir"}
                   </Button>
@@ -453,7 +462,79 @@ export default function AulaDetalheClient({
         </CardContent>
       </Card>
 
-      {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+      {deleteConfirmOpen ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 md:p-4">
+          <button
+            type="button"
+            onClick={() => setDeleteConfirmOpen(false)}
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            aria-label={isEs ? "Cerrar" : "Fechar"}
+          />
+          <Card className="relative z-10 w-full max-w-lg bg-slate-900/95 border border-amber-300/35 text-white">
+            <CardHeader className="border-b border-white/10">
+              <CardTitle className="text-amber-200">{isEs ? "Confirmar exclusión" : "Confirmar exclusão"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <p className="text-sm text-slate-100">
+                {isEs ? "¿Eliminar esta clase?" : "Excluir esta aula?"}
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  onClick={() => setDeleteConfirmOpen(false)}
+                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                >
+                  {isEs ? "Cancelar" : "Cancelar"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setDeleteConfirmOpen(false)
+                    void deleteLesson()
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700"
+                >
+                  {isEs ? "Eliminar" : "Excluir"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {formFeedbackModalOpen && error ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 md:p-4">
+          <button
+            type="button"
+            onClick={() => {
+              setFormFeedbackModalOpen(false)
+              setError("")
+            }}
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            aria-label={isEs ? "Cerrar" : "Fechar"}
+          />
+          <Card className="relative z-10 w-full max-w-lg bg-slate-900/95 border border-rose-300/35 text-white">
+            <CardHeader className="border-b border-white/10">
+              <CardTitle className="text-rose-200">{isEs ? "Error en el formulario" : "Erro no formulário"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <p className="text-sm text-slate-100 whitespace-pre-wrap">{error}</p>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setFormFeedbackModalOpen(false)
+                    setError("")
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700"
+                >
+                  {isEs ? "Entendido" : "Entendi"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </div>
   )
 }

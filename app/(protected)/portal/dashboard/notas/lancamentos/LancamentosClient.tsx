@@ -232,12 +232,6 @@ function getQuickLaunchDirtyText(locale: Locale) {
     : "Voce tem alteracoes sem salvar. Deseja salvar antes de fechar?"
 }
 
-function getQuickLaunchDiscardText(locale: Locale) {
-  return locale === "es"
-    ? "¿Desea cerrar sin guardar?"
-    : "Deseja fechar sem salvar?"
-}
-
 function getQuickLaunchUnloadText(locale: Locale) {
   return locale === "es"
     ? "Hay cambios sin guardar en el lanzamiento de clase."
@@ -364,6 +358,8 @@ export default function LancamentosClient({
   const [pendingExportFormat, setPendingExportFormat] = useState<"" | "xlsx" | "pdf">("")
   const [exportBimesterChoice, setExportBimesterChoice] = useState(1)
   const [resolvingClassBimester, setResolvingClassBimester] = useState(false)
+  const [formFeedbackModalOpen, setFormFeedbackModalOpen] = useState(false)
+  const [quickLaunchCloseWarningOpen, setQuickLaunchCloseWarningOpen] = useState(false)
   const autoBimesterKeyRef = useRef("")
 
   const quickLaunchSnapshotNow = useMemo(
@@ -398,6 +394,12 @@ export default function LancamentosClient({
     quickLaunchOpen &&
     quickLaunchInitialSnapshotRef.current !== "" &&
     quickLaunchSnapshotNow !== quickLaunchInitialSnapshotRef.current
+
+  useEffect(() => {
+    if (String(error ?? "").trim()) {
+      setFormFeedbackModalOpen(true)
+    }
+  }, [error])
 
   useEffect(() => {
     if (!hasQuickLaunchChanges) return
@@ -1498,15 +1500,16 @@ export default function LancamentosClient({
       closeQuickLaunchImmediate()
       return
     }
+    setQuickLaunchCloseWarningOpen(true)
+  }
 
-    const saveBeforeClose = window.confirm(getQuickLaunchDirtyText(locale))
-    if (saveBeforeClose) {
-      await submitQuickLaunchInternal({ closeAfterSave: true })
-      return
-    }
+  async function handleQuickLaunchSaveAndClose() {
+    setQuickLaunchCloseWarningOpen(false)
+    await submitQuickLaunchInternal({ closeAfterSave: true })
+  }
 
-    const discard = window.confirm(getQuickLaunchDiscardText(locale))
-    if (!discard) return
+  function handleQuickLaunchDiscardAndClose() {
+    setQuickLaunchCloseWarningOpen(false)
     closeQuickLaunchImmediate()
   }
 
@@ -3225,6 +3228,48 @@ export default function LancamentosClient({
         </div>
       ) : null}
 
+      {quickLaunchCloseWarningOpen ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 md:p-4">
+          <button
+            type="button"
+            onClick={() => setQuickLaunchCloseWarningOpen(false)}
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            aria-label={isEs ? "Cerrar" : "Fechar"}
+          />
+          <Card className="relative z-10 w-full max-w-lg bg-slate-900/95 border border-amber-300/35 text-white">
+            <CardHeader className="border-b border-white/10">
+              <CardTitle className="text-amber-200">{isEs ? "Aviso" : "Aviso"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <p className="text-sm text-slate-200">{getQuickLaunchDirtyText(locale)}</p>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  onClick={() => setQuickLaunchCloseWarningOpen(false)}
+                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                >
+                  {isEs ? "Seguir editando" : "Continuar editando"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleQuickLaunchDiscardAndClose}
+                  className="bg-rose-600 hover:bg-rose-700"
+                >
+                  {isEs ? "Cerrar sin guardar" : "Fechar sem salvar"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void handleQuickLaunchSaveAndClose()}
+                  className="bg-cyan-600 hover:bg-cyan-700"
+                >
+                  {isEs ? "Guardar y cerrar" : "Salvar e fechar"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
       {exportModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4">
           <button
@@ -3319,7 +3364,39 @@ export default function LancamentosClient({
         </div>
       ) : null}
 
-      {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+      {formFeedbackModalOpen && error ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 md:p-4">
+          <button
+            type="button"
+            onClick={() => {
+              setFormFeedbackModalOpen(false)
+              setError("")
+            }}
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            aria-label={isEs ? "Cerrar" : "Fechar"}
+          />
+          <Card className="relative z-10 w-full max-w-lg bg-slate-900/95 border border-rose-300/35 text-white">
+            <CardHeader className="border-b border-white/10">
+              <CardTitle className="text-rose-200">{isEs ? "Error en el formulario" : "Erro no formulário"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <p className="text-sm text-slate-100 whitespace-pre-wrap">{error}</p>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setFormFeedbackModalOpen(false)
+                    setError("")
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700"
+                >
+                  {isEs ? "Entendido" : "Entendi"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </div>
   )
 }

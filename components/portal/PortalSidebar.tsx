@@ -20,6 +20,7 @@ import {
   CalendarDays,
   Bug,
   GraduationCap,
+  FolderKanban,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -33,6 +34,7 @@ type TeacherMini = {
 export function PortalSidebar({
   isAdmin,
   canAccessRestrictedAdminAreas,
+  canAccessProjectsAdminArea,
   locale,
   teacher,
   systemVersion,
@@ -40,6 +42,7 @@ export function PortalSidebar({
 }: {
   isAdmin: boolean
   canAccessRestrictedAdminAreas: boolean
+  canAccessProjectsAdminArea: boolean
   locale: Locale
   teacher?: TeacherMini
   systemVersion?: string
@@ -67,11 +70,13 @@ export function PortalSidebar({
       aulas: locale === "es" ? "Clases" : "Aulas",
       agenda: locale === "es" ? "Agenda + Notas" : "Agenda + Notas",
       materiais: locale === "es" ? "Materiales" : "Materiais",
+      projetos: locale === "es" ? "Proyectos" : "Projetos",
       notas: locale === "es" ? "Notas" : "Notas",
       notificacoes: locale === "es" ? "Notificaciones" : "Notifica\u00e7\u00f5es",
       reportBug: locale === "es" ? "Reportar problema" : "Relatar problema",
       adminMaterials: locale === "es" ? "Materiales (Admin)" : "Materiais (Admin)",
       adminBlog: locale === "es" ? "Blog (Admin)" : "Blog (Admin)",
+      adminProjects: locale === "es" ? "Proyectos (Admin)" : "Projetos (Admin)",
       adminTurmas: locale === "es" ? "Categorias/Turmas" : "Categorias/Turmas",
       teachers: locale === "es" ? "Profesores" : "Professores",
       adminSchedules: locale === "es" ? "Agenda de Profesores" : "Agenda de Professores",
@@ -90,6 +95,7 @@ export function PortalSidebar({
       { href: "/portal/dashboard/aulas", label: t.menu.aulas, icon: BookOpen },
       { href: "/portal/dashboard/notas/lancamentos", label: t.menu.agenda, icon: CalendarDays },
       { href: "/portal/dashboard/materiais", label: t.menu.materiais, icon: FileText },
+      { href: "/portal/dashboard/projetos", label: t.menu.projetos, icon: FolderKanban },
       { href: "/portal/dashboard/ia", label: t.menu.ai, icon: Sparkles },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -120,12 +126,16 @@ export function PortalSidebar({
             icon: Bug,
           })
         }
+
+        if (canAccessProjectsAdminArea) {
+          items.splice(2, 0, { href: "/portal/dashboard/admin/projetos", label: t.menu.adminProjects, icon: FolderKanban })
+        }
       }
 
       return items
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [locale, isAdmin, canAccessRestrictedAdminAreas]
+    [locale, isAdmin, canAccessRestrictedAdminAreas, canAccessProjectsAdminArea]
   )
 
   // ✅ corrige active do "In\u00edcio" (só ativo quando for exatamente /portal/dashboard)

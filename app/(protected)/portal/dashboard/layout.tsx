@@ -3,11 +3,13 @@ import { PortalSidebar } from "@/components/portal/PortalSidebar"
 import SpecialNotificationModal from "@/components/portal/SpecialNotificationModal"
 import { requireTeacherPage } from "@/lib/auth/server"
 import { isRestrictedAdminUser } from "@/lib/auth/restricted-admin"
+import { canManageProjects } from "@/lib/auth/project-admin"
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const teacher = await requireTeacherPage()
   const isAdmin = teacher.is_admin === true || teacher.role === "admin"
   const canAccessRestrictedAdminAreas = isAdmin && isRestrictedAdminUser(teacher.id)
+  const canAccessProjectsAdminArea = isAdmin && canManageProjects(teacher.id)
   const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
   const systemVersion = process.env.SYSTEM_VERSION ?? "dev"
 
@@ -16,6 +18,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       <PortalSidebar
         isAdmin={isAdmin}
         canAccessRestrictedAdminAreas={canAccessRestrictedAdminAreas}
+        canAccessProjectsAdminArea={canAccessProjectsAdminArea}
         locale={locale}
         systemVersion={systemVersion}
         teacher={{

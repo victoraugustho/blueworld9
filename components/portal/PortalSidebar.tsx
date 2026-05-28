@@ -21,6 +21,8 @@ import {
   Bug,
   GraduationCap,
   FolderKanban,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -30,6 +32,8 @@ type TeacherMini = {
   name: string
   avatarUrl?: string | null
 }
+
+const SIDEBAR_COLLAPSE_KEY = "bw9:sidebar:collapsed"
 
 export function PortalSidebar({
   isAdmin,
@@ -50,6 +54,7 @@ export function PortalSidebar({
 }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
   const [avatarError, setAvatarError] = useState(false)
@@ -143,6 +148,26 @@ export function PortalSidebar({
     if (href === "/portal/dashboard") return pathname === href
     return pathname === href || pathname.startsWith(href + "/")
   }
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(SIDEBAR_COLLAPSE_KEY)
+      if (saved === "1") {
+        setCollapsed(true)
+      }
+    } catch {
+      // ignore localStorage issues
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? "1" : "0")
+    } catch {
+      // ignore localStorage issues
+    }
+    document.documentElement.style.setProperty("--portal-sidebar-width", collapsed ? "104px" : "320px")
+  }, [collapsed])
 
   // Fechar sidebar (mobile) ao clicar fora
   useEffect(() => {
@@ -259,7 +284,7 @@ export function PortalSidebar({
         className={`
           fixed z-40
           top-6 left-4
-          w-72 h-[calc(100vh-3rem)]
+          w-72 ${collapsed ? "md:w-[104px] p-3 md:p-4" : "md:w-72 p-6"} h-[calc(100vh-3rem)]
           transform transition-all duration-300 ease-in-out
           ${open ? "translate-x-0" : "-translate-x-[300px] md:translate-x-0"}
 
@@ -267,33 +292,47 @@ export function PortalSidebar({
           border border-white/20
           rounded-2xl shadow-2xl shadow-black/20
 
-          flex flex-col p-6
+          flex flex-col
         `}
       >
         {/* TOPO: LOGO + PERFIL */}
-        <div className="flex items-center justify-between mb-8">
+        <div className={`flex ${collapsed ? "flex-col items-center" : "items-center justify-between"} mb-8 gap-2`}>
           <Link
               href="/portal/dashboard"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 group"
+              className={`flex items-center gap-3 group ${collapsed ? "justify-center" : ""}`}
+              title="Blue World 9"
             >
               {!logoError ? (
                 <Image
                   src={logoSrc}
                   alt="Blue World 9"
-                  width={140}
-                  height={40}
+                  width={collapsed ? 76 : 140}
+                  height={collapsed ? 24 : 40}
                   priority
-                  className="object-contain max-h-10 sm:max-h-12 w-auto
-                            transition-opacity group-hover:opacity-90"
+                  className={`object-contain w-auto transition-opacity group-hover:opacity-90 ${
+                    collapsed ? "max-h-8" : "max-h-10 sm:max-h-12"
+                  }`}
                   onError={() => setLogoError(true)}
                 />
               ) : (
-                <span className="text-white font-bold text-lg">Blue World 9</span>
+                <span className={`text-white font-bold ${collapsed ? "text-xs" : "text-sm"}`}>
+                  Blue World 9
+                </span>
               )}
             </Link>
 
-          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCollapsed((prev) => !prev)}
+            className="hidden md:inline-flex w-9 h-9 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 items-center justify-center transition-colors"
+            aria-label={collapsed ? "Expandir menu lateral" : "Comprimir menu lateral"}
+            title={collapsed ? "Expandir menu lateral" : "Comprimir menu lateral"}
+          >
+            {collapsed ? <ChevronsRight className="w-4 h-4" /> : <ChevronsLeft className="w-4 h-4" />}
+          </button>
+
+          <div className={`flex items-center ${collapsed ? "flex-col gap-1" : "gap-2"}`}>
             <Link
               href="/portal/dashboard/notificacoes"
               onClick={() => setOpen(false)}
@@ -316,6 +355,7 @@ export function PortalSidebar({
               className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 
               hover:bg-white/10 transition-colors border border-white/10"
               aria-label="Perfil"
+              title={displayName}
             >
               {/* Avatar */}
               <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/15 bg-white/10 flex items-center justify-center">
@@ -332,9 +372,11 @@ export function PortalSidebar({
                 )}
               </div>
 
-              <ChevronDown
-                className={`w-4 h-4 text-white/70 transition-transform ${profileOpen ? "rotate-180" : ""}`}
-              />
+              {!collapsed ? (
+                <ChevronDown
+                  className={`w-4 h-4 text-white/70 transition-transform ${profileOpen ? "rotate-180" : ""}`}
+                />
+              ) : null}
             </button>
 
             {profileOpen && (
@@ -377,7 +419,7 @@ export function PortalSidebar({
         </div>
 
         {/* MENU DO PROFESSOR */}
-        <nav className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto pr-1">
+        <nav className={`flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto ${collapsed ? "" : "pr-1"}`}>
           {teacherMenu.map((item) => {
             const Icon = item.icon
             const active = isActive(item.href)
@@ -387,8 +429,9 @@ export function PortalSidebar({
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
+                title={item.label}
                 className={`
-                  flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium
+                  flex items-center ${collapsed ? "justify-center" : ""} gap-2.5 ${collapsed ? "px-2" : "px-3"} py-2.5 rounded-lg text-[13px] font-medium
                   transition-all duration-300
                   ${
                     active
@@ -398,7 +441,7 @@ export function PortalSidebar({
                 `}
               >
                 <Icon className="w-4 h-4" />
-                {item.label}
+                {!collapsed ? item.label : null}
               </Link>
             )
           })}
@@ -408,9 +451,11 @@ export function PortalSidebar({
             <>
               <div className="my-4 border-t border-white/20" />
 
-              <h3 className="text-xs uppercase tracking-wider text-white/50 mb-2 pl-2">
-                {t.adminSection}
-              </h3>
+              {!collapsed ? (
+                <h3 className="text-xs uppercase tracking-wider text-white/50 mb-2 pl-2">
+                  {t.adminSection}
+                </h3>
+              ) : null}
 
               {adminMenu.map((item) => {
                 const Icon = item.icon
@@ -425,8 +470,9 @@ export function PortalSidebar({
                     key={item.href}
                     href={item.href}
                     onClick={() => setOpen(false)}
+                    title={item.label}
                     className={`
-                      flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium
+                      flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-2.5 ${collapsed ? "px-2" : "px-3"} py-2.5 rounded-lg text-[13px] font-medium
                       transition-all duration-300
                       ${
                         active
@@ -435,11 +481,11 @@ export function PortalSidebar({
                       }
                     `}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`flex items-center gap-2.5 min-w-0 ${collapsed ? "justify-center" : ""}`}>
                       <Icon className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
+                      {!collapsed ? <span className="truncate">{item.label}</span> : null}
                     </div>
-                    {hasPendingRelations && (
+                    {hasPendingRelations && !collapsed && (
                       <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-semibold">
                         {pendingRelationsCount > 99 ? "99+" : pendingRelationsCount}
                       </span>
@@ -451,16 +497,17 @@ export function PortalSidebar({
           )}
         </nav>
 
-        <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between gap-3 text-xs text-white/60">
+        <div className={`mt-4 pt-4 border-t border-white/10 flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-3 text-xs text-white/60`}>
           <Link
             href="/portal/dashboard/relatar-problema"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2 hover:text-white transition-colors"
+            title={t.menu.reportBug}
+            className={`flex items-center ${collapsed ? "justify-center" : ""} gap-2 hover:text-white transition-colors`}
           >
             <Bug className="w-4 h-4" />
-            {t.menu.reportBug}
+            {!collapsed ? t.menu.reportBug : null}
           </Link>
-          <span className="text-[10px] text-white/40">v{systemVersion ?? "dev"}</span>
+          {!collapsed ? <span className="text-[10px] text-white/40">v{systemVersion ?? "dev"}</span> : null}
         </div>
       </aside>
 

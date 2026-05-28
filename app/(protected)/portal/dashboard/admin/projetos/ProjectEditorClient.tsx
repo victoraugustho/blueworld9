@@ -86,6 +86,10 @@ const TYPE_LABEL: Record<ProjectType, string> = {
   custom: "Personalizado",
 }
 
+const COVER_IMAGE_RECOMMENDATION = "Recomendado: 1600 x 900 px (16:9). Minimo: 1280 x 720 px."
+const GALLERY_IMAGE_RECOMMENDATION =
+  "Recomendado: 1200 x 1200 px (1:1) ou 1600 x 900 px (16:9). Minimo: 1080 px no menor lado."
+
 export default function ProjectEditorClient({ projectId }: { projectId?: string } = {}) {
   const router = useRouter()
   const isEditMode = String(projectId ?? "").trim().length > 0
@@ -657,6 +661,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
 
           <div className="space-y-2">
             <Label className="text-slate-200">Imagem de capa</Label>
+            <p className="text-xs text-slate-400">{COVER_IMAGE_RECOMMENDATION}</p>
             <div className="flex flex-wrap items-center gap-2">
               <input
                 id={coverInputId}
@@ -777,6 +782,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
         <CardContent className="space-y-5">
           <div className="space-y-3">
             <p className="text-sm font-semibold text-white">Galeria</p>
+            <p className="text-xs text-slate-400">{GALLERY_IMAGE_RECOMMENDATION}</p>
             <div className="flex flex-wrap items-center gap-2">
               <select
                 className="h-10 rounded-md bg-slate-800/60 border border-slate-700 px-3 text-white"

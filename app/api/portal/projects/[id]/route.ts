@@ -8,6 +8,7 @@ import {
   loadTeacherScopeData,
   normalizeProjectLocale,
 } from "@/lib/projects"
+import { normalizeProjectFileUrl } from "@/lib/project-file-url"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -94,8 +95,13 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     title: locale === "es" ? String(project.title_es ?? "") : String(project.title_pt ?? ""),
     summary: locale === "es" ? String(project.summary_es ?? "") : String(project.summary_pt ?? ""),
     introduction: locale === "es" ? String(project.summary_es ?? "") : String(project.summary_pt ?? ""),
-    gallery_images: assets.filter((item: any) => String(item.asset_type) === "gallery_image"),
-    documents: assets.filter((item: any) => String(item.asset_type) === "document"),
+    cover_image_url: normalizeProjectFileUrl(project.cover_image_url),
+    gallery_images: assets
+      .filter((item: any) => String(item.asset_type) === "gallery_image")
+      .map((item: any) => ({ ...item, file_url: normalizeProjectFileUrl(item.file_url) })),
+    documents: assets
+      .filter((item: any) => String(item.asset_type) === "document")
+      .map((item: any) => ({ ...item, file_url: normalizeProjectFileUrl(item.file_url) })),
     links: links.map((link: any) => ({
       ...link,
       title: locale === "es" ? String(link.title_es ?? "") : String(link.title_pt ?? ""),
@@ -105,4 +111,3 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     teacher_note_updated_at: teacherNote?.updated_at ?? null,
   })
 }
-

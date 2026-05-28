@@ -78,22 +78,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Arquivo excede o limite de ${maxMb}MB.` }, { status: 400 })
   }
 
-  const now = new Date()
-  const year = String(now.getFullYear())
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  const dirRel = path.join("projects", year, month)
-  const baseDir = path.join(process.cwd(), "public", "uploads", dirRel)
-  await fs.mkdir(baseDir, { recursive: true })
+  let publicUrl = ""
+  try {
+    const now = new Date()
+    const year = String(now.getFullYear())
+    const month = String(now.getMonth() + 1).padStart(2, "0")
+    const dirRel = path.join("projects", year, month)
+    const baseDir = path.join(process.cwd(), "public", "uploads", dirRel)
+    await fs.mkdir(baseDir, { recursive: true })
 
-  const safeExt = extension || (kind === "image" ? "png" : "pdf")
-  const generatedName = `${randomUUID()}.${safeExt}`
-  const finalPath = path.join(baseDir, generatedName)
+    const safeExt = extension || (kind === "image" ? "png" : "pdf")
+    const generatedName = `${randomUUID()}.${safeExt}`
+    const finalPath = path.join(baseDir, generatedName)
 
-  const buffer = Buffer.from(await file.arrayBuffer())
-  await fs.writeFile(finalPath, buffer)
+    const buffer = Buffer.from(await file.arrayBuffer())
+    await fs.writeFile(finalPath, buffer)
 
-  const storageKey = path.join(dirRel, generatedName).replaceAll("\\", "/")
-  const publicUrl = `/uploads/${storageKey}`
+    const storageKey = path.join(dirRel, generatedName).replaceAll("\\", "/")
+    publicUrl = `/uploads/${storageKey}`
+  } catch (error) {
+    console.error("[admin.projects.assets.upload] failed to persist file", error)
+    return NextResponse.json(
+      {
+        error:
+          "Nao foi possivel salvar o arquivo no servidor. Verifique permissao de escrita e volume de /app/public/uploads.",
+      },
+      { status: 500 },
+    )
+  }
 
   await writeAuditLog({
     req,
@@ -118,4 +130,3 @@ export async function POST(req: NextRequest) {
     size_bytes: file.size,
   })
 }
-

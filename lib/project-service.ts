@@ -10,6 +10,7 @@ import {
   replaceProjectLinks,
   type ProjectAssetType,
 } from "@/lib/projects"
+import { normalizeProjectFileUrl } from "@/lib/project-file-url"
 
 export async function loadProjectFull(projectId: string) {
   const [project] = await db`
@@ -74,8 +75,13 @@ export async function loadProjectFull(projectId: string) {
 
   return {
     ...project,
-    gallery_images: assets.filter((item: any) => String(item.asset_type) === "gallery_image"),
-    documents: assets.filter((item: any) => String(item.asset_type) === "document"),
+    cover_image_url: normalizeProjectFileUrl(project.cover_image_url),
+    gallery_images: assets
+      .filter((item: any) => String(item.asset_type) === "gallery_image")
+      .map((item: any) => ({ ...item, file_url: normalizeProjectFileUrl(item.file_url) })),
+    documents: assets
+      .filter((item: any) => String(item.asset_type) === "document")
+      .map((item: any) => ({ ...item, file_url: normalizeProjectFileUrl(item.file_url) })),
     links,
     comments_count,
   }

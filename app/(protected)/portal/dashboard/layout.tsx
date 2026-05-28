@@ -28,7 +28,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         logoSrc="/webp/logo-branca-bw9.webp" // garanta em /public
       />
 
-      <main className="px-6 sm:px-8 py-10 ml-0 md:ml-[320px] transition-all">
+      <main
+        className="px-6 sm:px-8 py-10 ml-0 md:ml-[var(--portal-sidebar-width)] transition-all"
+      >
         <header className="mb-10">
           <h1 className="text-3xl font-semibold text-white">
             {locale === "es" ? "Bienvenido(a)," : "Bem-vindo(a),"} {teacher.name}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
 import { canTeacherAccessProject, ensureProjectsSchema, loadTeacherScopeData, normalizeProjectLocale } from "@/lib/projects"
+import { normalizeProjectFileUrl } from "@/lib/project-file-url"
 
 function parsePagination(params: URLSearchParams) {
   const pageRaw = Number(params.get("page") ?? 1)
@@ -88,6 +89,7 @@ export async function GET(req: NextRequest) {
     title: locale === "es" ? String(item.title_es ?? "") : String(item.title_pt ?? ""),
     summary: locale === "es" ? String(item.summary_es ?? "") : String(item.summary_pt ?? ""),
     locale,
+    cover_image_url: normalizeProjectFileUrl(item.cover_image_url),
   }))
 
   return NextResponse.json({

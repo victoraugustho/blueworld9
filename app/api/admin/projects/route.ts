@@ -17,6 +17,7 @@ import {
   replaceProjectLinks,
 } from "@/lib/projects"
 import { loadProjectFull } from "@/lib/project-service"
+import { normalizeProjectFileUrl } from "@/lib/project-file-url"
 
 function parsePagination(params: URLSearchParams) {
   const pageRaw = Number(params.get("page") ?? 1)
@@ -46,55 +47,108 @@ export async function GET(req: NextRequest) {
       ? db`AND p.status = ${status}`
       : db``
 
-  const [countRow] = await db`
-    SELECT COUNT(*)::int AS count
-    FROM public.teacher_projects p
-    WHERE p.deleted_at IS NULL
-      ${qFilter}
-      ${statusFilter}
-  `
+  let count = 0
+  let items: any[] = []
 
-  const items = await db`
-    SELECT
-      p.id,
-      p.locale,
-      p.project_type,
-      p.status,
-      p.title_pt,
-      p.title_es,
-      p.summary_pt,
-      p.summary_es,
-      p.cover_image_url,
-      p.access_scope,
-      p.target_teacher_ids,
-      p.target_countries,
-      p.target_student_years,
-      p.target_class_ids,
-      p.published_at,
-      p.created_at,
-      p.updated_at,
-      creator.name AS created_by_name,
-      updater.name AS updated_by_name,
-      (SELECT COUNT(*)::int FROM public.teacher_project_assets a WHERE a.project_id = p.id AND a.asset_type = 'gallery_image') AS images_count,
-      (SELECT COUNT(*)::int FROM public.teacher_project_assets a WHERE a.project_id = p.id AND a.asset_type = 'document') AS documents_count,
-      (SELECT COUNT(*)::int FROM public.teacher_project_links l WHERE l.project_id = p.id) AS links_count,
-      (SELECT COUNT(*)::int FROM public.teacher_project_comments c WHERE c.project_id = p.id) AS comments_count
-    FROM public.teacher_projects p
-    LEFT JOIN public.teachers creator ON creator.id = p.created_by
-    LEFT JOIN public.teachers updater ON updater.id = p.updated_by
-    WHERE p.deleted_at IS NULL
-      ${qFilter}
-      ${statusFilter}
-    ORDER BY p.updated_at DESC, p.created_at DESC
-    LIMIT ${page_size}
-    OFFSET ${offset}
-  `
+  try {
+    const [countRow] = await db`
+      SELECT COUNT(*)::int AS count
+      FROM public.teacher_projects p
+      WHERE p.deleted_at IS NULL
+        ${qFilter}
+        ${statusFilter}
+    `
+    count = Number(countRow?.count ?? 0)
+
+    items = await db`
+      SELECT
+        p.id,
+        p.locale,
+        p.project_type,
+        p.status,
+        p.title_pt,
+        p.title_es,
+        p.summary_pt,
+        p.summary_es,
+        p.cover_image_url,
+        p.access_scope,
+        p.target_teacher_ids,
+        p.target_countries,
+        p.target_student_years,
+        p.target_class_ids,
+        p.published_at,
+        p.created_at,
+        p.updated_at,
+        creator.name AS created_by_name,
+        updater.name AS updated_by_name,
+        (SELECT COUNT(*)::int FROM public.teacher_project_assets a WHERE a.project_id = p.id AND a.asset_type = 'gallery_image') AS images_count,
+        (SELECT COUNT(*)::int FROM public.teacher_project_assets a WHERE a.project_id = p.id AND a.asset_type = 'document') AS documents_count,
+        (SELECT COUNT(*)::int FROM public.teacher_project_links l WHERE l.project_id = p.id) AS links_count,
+        (SELECT COUNT(*)::int FROM public.teacher_project_comments c WHERE c.project_id = p.id) AS comments_count
+      FROM public.teacher_projects p
+      LEFT JOIN public.teachers creator ON creator.id = p.created_by
+      LEFT JOIN public.teachers updater ON updater.id = p.updated_by
+      WHERE p.deleted_at IS NULL
+        ${qFilter}
+        ${statusFilter}
+      ORDER BY p.updated_at DESC, p.created_at DESC
+      LIMIT ${page_size}
+      OFFSET ${offset}
+    `
+  } catch (error) {
+    console.error("[admin.projects.GET] full query failed, fallbacking to minimal query", error)
+    try {
+      const [countRow] = await db`
+        SELECT COUNT(*)::int AS count
+        FROM public.teacher_projects p
+        WHERE p.deleted_at IS NULL
+          ${qFilter}
+          ${statusFilter}
+      `
+      count = Number(countRow?.count ?? 0)
+
+      const fallbackRows = await db`
+        SELECT p.*, creator.name AS created_by_name, updater.name AS updated_by_name
+        FROM public.teacher_projects p
+        LEFT JOIN public.teachers creator ON creator.id = p.created_by
+        LEFT JOIN public.teachers updater ON updater.id = p.updated_by
+        WHERE p.deleted_at IS NULL
+          ${qFilter}
+          ${statusFilter}
+        ORDER BY p.updated_at DESC, p.created_at DESC
+        LIMIT ${page_size}
+        OFFSET ${offset}
+      `
+
+      items = fallbackRows.map((row: any) => ({
+        ...row,
+        images_count: 0,
+        documents_count: 0,
+        links_count: 0,
+        comments_count: 0,
+      }))
+    } catch (fallbackError) {
+      console.error("[admin.projects.GET] minimal query failed", fallbackError)
+      return NextResponse.json(
+        {
+          error:
+            "Nao foi possivel carregar projetos. Verifique se o schema de projetos foi aplicado no banco e tente novamente.",
+        },
+        { status: 500 },
+      )
+    }
+  }
+
+  const normalizedItems = items.map((item: any) => ({
+    ...item,
+    cover_image_url: normalizeProjectFileUrl(item.cover_image_url),
+  }))
 
   return NextResponse.json({
-    items,
+    items: normalizedItems,
     page,
     page_size,
-    total: Number(countRow?.count ?? 0),
+    total: count,
   })
 }
 

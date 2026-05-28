@@ -74,6 +74,15 @@ function formatDate(value: string | null | undefined) {
   return date.toLocaleString("pt-BR")
 }
 
+function fileNameWithoutExtension(fileName: string | null | undefined) {
+  const raw = String(fileName ?? "").trim()
+  if (!raw) return ""
+  const normalized = raw.replaceAll("\\", "/").split("/").pop() ?? raw
+  const dotIndex = normalized.lastIndexOf(".")
+  if (dotIndex <= 0) return normalized
+  return normalized.slice(0, dotIndex)
+}
+
 const STATUS_LABEL: Record<ProjectStatus, string> = {
   draft: "Rascunho",
   published: "Publicado",
@@ -353,28 +362,45 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
     }
   }
 
-  async function uploadGalleryImage(file: File | null) {
-    if (!file) return
-    const uploaded = await uploadAsset("image", file)
-    if (!uploaded) return
+  async function uploadGalleryImage(files: File[] | FileList | null | undefined) {
+    const selected = Array.isArray(files) ? files : files ? Array.from(files) : []
+    if (selected.length === 0) return
+
     const locale = galleryUploadLocale
-    setGalleryImages((prev) => [
-      ...prev,
-      {
+    const uploadedItems: AssetUI[] = []
+
+    for (const file of selected) {
+      const uploaded = await uploadAsset("image", file)
+      if (!uploaded) continue
+
+      const inferredTitle = fileNameWithoutExtension(uploaded.file_name)
+
+      uploadedItems.push({
         local_id: uid(),
         asset_type: "gallery_image",
         locale,
-        title_pt: null,
-        title_es: null,
+        title_pt: locale === "pt-BR" ? inferredTitle : null,
+        title_es: locale === "es" ? inferredTitle : null,
         description_pt: null,
         description_es: null,
         file_name: uploaded.file_name,
         file_url: uploaded.file_url,
         mime_type: uploaded.mime_type,
         size_bytes: Number(uploaded.size_bytes ?? 0),
-        sort_order: prev.length,
-      },
-    ])
+        sort_order: 0,
+      })
+    }
+
+    if (uploadedItems.length === 0) return
+
+    setGalleryImages((prev) => {
+      const base = prev.length
+      const normalized = uploadedItems.map((item, index) => ({
+        ...item,
+        sort_order: base + index,
+      }))
+      return [...prev, ...normalized]
+    })
   }
 
   async function uploadDocument(file: File | null) {
@@ -796,8 +822,12 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
                 id={galleryInputId}
                 type="file"
                 accept="image/*"
+                multiple
                 className="sr-only"
-                onChange={(event) => void uploadGalleryImage(event.target.files?.[0] ?? null)}
+                onChange={(event) => {
+                  void uploadGalleryImage(event.target.files)
+                  event.currentTarget.value = ""
+                }}
               />
               <label
                 htmlFor={galleryInputId}
@@ -809,6 +839,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
               <span className="text-xs text-slate-400">
                 Limite: {uploadConfig ? `${uploadConfig.image_limit_mb}MB` : "20MB"}
               </span>
+              <span className="text-xs text-slate-500">Selecao multipla habilitada</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {galleryImages.map((asset) => (

@@ -127,14 +127,14 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
   }, [locale])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h2 className="text-3xl font-bold text-white">{labels.title}</h2>
-        <p className="text-sm text-slate-300 mt-1">{labels.subtitle}</p>
+        <h2 className="text-2xl md:text-3xl font-bold text-white">{labels.title}</h2>
+        <p className="text-sm text-slate-300 mt-0.5">{labels.subtitle}</p>
       </div>
 
       <Card className="bg-slate-900/20 border border-white/10 backdrop-blur">
-        <CardContent className="p-4 flex flex-wrap items-center gap-2">
+        <CardContent className="p-3 flex flex-wrap items-center gap-2">
           <Input
             className="bg-slate-800/60 border-slate-700 text-white max-w-xl"
             placeholder={labels.searchPlaceholder}
@@ -147,7 +147,7 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2">
         {items.map((item) => {
           const meta = TYPE_META[item.project_type]
           const Icon = meta.icon
@@ -157,59 +157,61 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
           return (
             <Card key={item.id} className={`group relative overflow-hidden bg-slate-900/35 backdrop-blur ${meta.borderClass}`}>
               <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${meta.glowClass}`} />
-              <CardContent className="relative p-3 space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className={`h-10 w-10 shrink-0 rounded-lg border flex items-center justify-center ${meta.iconClass}`}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex items-center flex-wrap gap-2">
-                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${meta.badgeClass}`}>
-                        {typeLabel}
-                      </span>
-                      <span className="text-[11px] text-slate-400">{labels.shortId}: {shortId}</span>
-                    </div>
-                    <h3 className="text-base font-semibold text-white line-clamp-2">{item.title}</h3>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
+              <CardContent className="relative p-0">
+                <div className="aspect-[21/9] w-full border-b border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/40 flex items-center justify-center overflow-hidden">
                   {item.cover_image_url ? (
                     <img
                       src={item.cover_image_url}
                       alt={item.title}
-                      className="h-24 w-24 rounded-lg border border-white/10 object-cover shrink-0"
+                      className="h-full w-full object-contain"
                     />
                   ) : (
-                    <div className="h-24 w-24 rounded-lg border border-white/10 bg-white/5 shrink-0 flex items-center justify-center">
-                      <ImageIcon className="w-5 h-5 text-slate-400" />
+                    <div className="h-full w-full flex items-center justify-center">
+                      <ImageIcon className="w-7 h-7 text-slate-500" />
                     </div>
                   )}
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <p className="text-sm text-slate-200/95 line-clamp-4">{item.summary || "-"}</p>
-                    <div className="flex flex-wrap gap-1.5 text-[11px]">
-                      <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-slate-200">
-                        <ImageIcon className="w-3 h-3" />
-                        {labels.images}: {item.images_count}
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-slate-200">
-                        <FileText className="w-3 h-3" />
-                        {labels.documents}: {item.documents_count}
-                      </span>
-                    </div>
-                  </div>
                 </div>
 
-                <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
-                  <p className="text-[11px] text-slate-400 line-clamp-1">
-                    {labels.updatedAt}: {formatDate(item.updated_at, locale)}
-                  </p>
-                  <Link href={`/portal/dashboard/projetos/${item.id}`}>
-                    <Button size="sm" className="bg-cyan-600/90 hover:bg-cyan-700 text-white h-8">
-                      <span>{labels.open}</span>
-                      <ChevronRight className="w-4 h-4 ml-1" />
-                    </Button>
-                  </Link>
+                <div className="p-2.5 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <div className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center ${meta.iconClass}`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center flex-wrap gap-2">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${meta.badgeClass}`}>
+                          {typeLabel}
+                        </span>
+                        <span className="text-[11px] text-slate-400">{labels.shortId}: {shortId}</span>
+                      </div>
+                      <h3 className="text-base font-semibold text-white line-clamp-2">{item.title}</h3>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-slate-200/95 line-clamp-3">{item.summary || "-"}</p>
+
+                  <div className="flex flex-wrap gap-1.5 text-[11px]">
+                    <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-0.5 text-slate-200">
+                      <ImageIcon className="w-3 h-3" />
+                      {labels.images}: {item.images_count}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-0.5 text-slate-200">
+                      <FileText className="w-3 h-3" />
+                      {labels.documents}: {item.documents_count}
+                    </span>
+                  </div>
+
+                  <div className="pt-1 border-t border-white/10 flex items-center justify-between gap-2">
+                    <p className="text-[11px] text-slate-400 line-clamp-1">
+                      {labels.updatedAt}: {formatDate(item.updated_at, locale)}
+                    </p>
+                    <Link href={`/portal/dashboard/projetos/${item.id}`}>
+                      <Button size="sm" className="bg-cyan-600/90 hover:bg-cyan-700 text-white h-8">
+                        <span>{labels.open}</span>
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               </CardContent>
             </Card>

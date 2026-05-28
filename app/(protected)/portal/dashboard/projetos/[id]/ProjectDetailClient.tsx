@@ -373,48 +373,54 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
   const introduction = String(project.introduction ?? project.summary ?? "").trim() || labels.noSummary
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-[0.14em] text-cyan-200/90">BlueWorld9 Projects</p>
-          <h2 className="text-3xl font-bold text-white">{project.title}</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-white">{project.title}</h2>
         </div>
         <Link href="/portal/dashboard/projetos">
           <Button className="bg-white/10 hover:bg-white/15 border border-white/10">{labels.back}</Button>
         </Link>
       </div>
 
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur">
-        {project.cover_image_url ? (
-          <img
-            src={project.cover_image_url}
-            alt={project.title}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        ) : null}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-slate-900/75 to-cyan-950/70" />
-        <div className="relative p-5 md:p-8 space-y-4">
-          <p className="text-sm text-slate-100 max-w-3xl whitespace-pre-wrap">{introduction}</p>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-200">
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
-              {labels.type}: {projectTypeLabel}
-            </span>
-            <span className="rounded-full border border-cyan-300/35 bg-cyan-500/20 px-3 py-1 text-cyan-100">
-              {labels.date}: {projectDate}
-            </span>
+      <div className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/40 backdrop-blur">
+        <div className="h-[170px] md:h-[210px] w-full border-b border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/30 flex items-center justify-center overflow-hidden">
+          {project.cover_image_url ? (
+            <img
+              src={project.cover_image_url}
+              alt={project.title}
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <div className="text-sm text-slate-400">Sem imagem de capa</div>
+          )}
+        </div>
+        <div className="relative p-2.5 md:p-3">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_38%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.12),transparent_42%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.86))]" />
+          <div className="relative space-y-1.5">
+            <p className="text-xs md:text-sm text-slate-100 max-w-3xl whitespace-pre-wrap">{introduction}</p>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-200">
+              <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5">
+                {labels.type}: {projectTypeLabel}
+              </span>
+              <span className="rounded-full border border-cyan-300/35 bg-cyan-500/20 px-2.5 py-0.5 text-cyan-100">
+                {labels.date}: {projectDate}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-2.5">
         <Card className="bg-slate-900/30 border border-white/10 backdrop-blur">
-          <CardHeader>
+          <CardHeader className="px-3 py-2.5">
             <CardTitle className="text-base text-white">{labels.notes}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="px-3 pb-3 pt-0 space-y-2.5">
             <Textarea
               className="bg-slate-800/60 border-slate-700 text-white"
-              rows={5}
+              rows={4}
               value={note}
               onChange={(event) => setNote(event.target.value)}
               placeholder={labels.notePlaceholder}
@@ -431,12 +437,12 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
         </Card>
 
         <Card className="bg-slate-900/30 border border-white/10 backdrop-blur">
-          <CardHeader>
+          <CardHeader className="px-3 py-2.5">
             <CardTitle className="text-base text-white">{labels.gallery}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 pb-3 pt-0">
             {project.gallery_images.length === 0 ? <p className="text-sm text-slate-400">{labels.noGallery}</p> : null}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {project.gallery_images.map((item, index) => (
                 <button
                   key={item.id}
@@ -447,7 +453,7 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
                   <img
                     src={item.file_url}
                     alt={locale === "es" ? item.title_es || "Galería" : item.title_pt || "Galeria"}
-                    className="h-52 w-full object-contain bg-slate-950/50 transition duration-300 group-hover:scale-[1.02]"
+                    className="h-40 md:h-44 w-full object-contain bg-slate-950/50 transition duration-300 group-hover:scale-[1.02]"
                   />
                   <div className="p-2 text-xs text-slate-300">
                     {locale === "es" ? item.title_es || "-" : item.title_pt || "-"}
@@ -458,15 +464,15 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-2.5">
           <Card className="bg-slate-900/30 border border-white/10 backdrop-blur">
-            <CardHeader>
+            <CardHeader className="px-3 py-2.5">
               <CardTitle className="text-base text-white">{labels.documents}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="px-3 pb-3 pt-0 space-y-2">
               {project.documents.length === 0 ? <p className="text-sm text-slate-400">{labels.noDocuments}</p> : null}
               {project.documents.map((item) => (
-                <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2">
+                <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 p-2.5 space-y-2">
                   <p className="text-sm text-white font-medium">
                     {locale === "es" ? item.title_es || item.file_name : item.title_pt || item.file_name}
                   </p>
@@ -494,13 +500,13 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
           </Card>
 
           <Card className="bg-slate-900/30 border border-white/10 backdrop-blur">
-            <CardHeader>
+            <CardHeader className="px-3 py-2.5">
               <CardTitle className="text-base text-white">{labels.links}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="px-3 pb-3 pt-0 space-y-2">
               {project.links.length === 0 ? <p className="text-sm text-slate-400">{labels.noLinks}</p> : null}
               {project.links.map((item) => (
-                <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2">
+                <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 p-2.5 space-y-2">
                   <p className="text-sm text-white font-medium">{item.title}</p>
                   {item.description ? <p className="text-xs text-slate-300">{item.description}</p> : null}
                   <p className="text-xs text-cyan-300 break-all">{item.url}</p>
@@ -528,10 +534,10 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
         </div>
 
         <Card className="bg-slate-900/30 border border-white/10 backdrop-blur">
-          <CardHeader>
+          <CardHeader className="px-3 py-2.5">
             <CardTitle className="text-base text-white">{labels.comments}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="px-3 pb-3 pt-0 space-y-2.5">
             <div className="space-y-2">
               <Textarea
                 className="bg-slate-800/60 border-slate-700 text-white"
@@ -547,9 +553,9 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
               </div>
             </div>
 
-            <div className="space-y-3 max-h-[420px] overflow-auto pr-1">
+            <div className="space-y-2.5 max-h-[380px] overflow-auto pr-1">
               {comments.map((comment) => (
-                <div key={comment.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <div key={comment.id} className="rounded-lg border border-white/10 bg-white/5 p-2.5">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2 min-w-0">
                       {comment.teacher_avatar_url ? (
@@ -681,4 +687,3 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
     </div>
   )
 }
-

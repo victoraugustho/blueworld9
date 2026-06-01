@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
 import {
   CalendarDays,
   GraduationCap,
@@ -116,6 +117,7 @@ type StudentDraft = {
 }
 
 export default function AdminSchedulesPage() {
+  const { confirm, confirmDialog } = useConfirmDialog()
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("")
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([])
@@ -462,7 +464,13 @@ export default function AdminSchedulesPage() {
         ? `Esta turma possui ${studentCount} aluno(s). Excluir tambem remove lancamentos, notas e agenda vinculados. Deseja continuar?`
         : "Deseja excluir esta turma?"
 
-    if (!confirm(warningMessage)) return
+    const confirmDeleteClass = await confirm({
+      title: "Excluir turma",
+      description: warningMessage,
+      confirmText: "Excluir",
+      variant: "danger",
+    })
+    if (!confirmDeleteClass) return
 
     setDeletingClassId(item.id)
     setClassError("")
@@ -513,7 +521,13 @@ export default function AdminSchedulesPage() {
         ? `Deseja transferir a turma "${sourceClassName}" para ${targetTeacherName}? Todos os vinculos (agenda, alunos, aulas, notas e registros) serao movidos.`
         : `Deseja duplicar a turma "${sourceClassName}" para ${targetTeacherName}? Todos os vinculos (agenda, alunos, aulas, notas e registros) serao copiados.`
 
-    if (!confirm(confirmationMessage)) return
+    const confirmOwnership = await confirm({
+      title: ownershipMode === "transfer" ? "Transferir turma" : "Duplicar turma",
+      description: confirmationMessage,
+      confirmText: ownershipMode === "transfer" ? "Transferir" : "Duplicar",
+      variant: "danger",
+    })
+    if (!confirmOwnership) return
 
     setOwnershipLoading(true)
     setOwnershipError("")
@@ -667,7 +681,12 @@ export default function AdminSchedulesPage() {
   }
 
   async function handleDeleteStudent(studentId: string) {
-    const ok = confirm("Deseja excluir este aluno da turma?")
+    const ok = await confirm({
+      title: "Excluir aluno",
+      description: "Deseja excluir este aluno da turma?",
+      confirmText: "Excluir",
+      variant: "danger",
+    })
     if (!ok) return
 
     setStudentDeletingId(studentId)
@@ -801,7 +820,13 @@ export default function AdminSchedulesPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Deseja excluir este item da agenda?")) return
+    const ok = await confirm({
+      title: "Excluir item da agenda",
+      description: "Deseja excluir este item da agenda?",
+      confirmText: "Excluir",
+      variant: "danger",
+    })
+    if (!ok) return
     const res = await fetch(`/api/admin/teacher-schedules/${id}`, { method: "DELETE" })
     if (res.ok) {
       if (editingId === id) {
@@ -1830,6 +1855,7 @@ export default function AdminSchedulesPage() {
           )}
         </div>
       </div>
+      {confirmDialog}
     </div>
   )
 }

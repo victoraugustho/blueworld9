@@ -6,12 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Bell,
-  CalendarDays,
   CheckCircle2,
-  ClipboardList,
   FileText,
-  Home,
-  User,
 } from "lucide-react"
 
 type Locale = "pt-BR" | "es"
@@ -22,14 +18,6 @@ type NotificationRow = {
   message: string
   created_at: string
   is_read: boolean
-}
-
-type ReminderRow = {
-  id: string
-  content: string
-  created_at?: string | null
-  class_label?: string | null
-  lesson_number?: number | null
 }
 
 type ScheduleRow = {
@@ -161,16 +149,17 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
       locale === "es"
         ? "Todo lo que necesitas para hoy, en un vistazo."
         : "Tudo o que você precisa para hoje, em um só lugar.",
-    reminders: locale === "es" ? "Recordatorios" : "Lembretes",
     notifications: locale === "es" ? "Notificaciones" : "Notificações",
     nextClass: locale === "es" ? "Próxima clase" : "Próxima aula",
     quickActions: locale === "es" ? "Acciones rápidas" : "Ações rápidas",
+    activeSchedules: locale === "es" ? "Horarios activos" : "Horários ativos",
+    unreadNotifications: locale === "es" ? "No leídas" : "Não lidas",
+    quickOverview: locale === "es" ? "Vista rápida" : "Visão rápida",
     viewAll: locale === "es" ? "Ver tudo" : "Ver tudo",
     openAgenda: locale === "es" ? "Abrir agenda" : "Abrir agenda",
     openMaterials: locale === "es" ? "Materiais" : "Materiais",
     openNotifications: locale === "es" ? "Notificaciones" : "Notificações",
     registerClass: locale === "es" ? "Registrar clase" : "Registrar aula",
-    emptyReminders: locale === "es" ? "Sin recordatorios pendientes." : "Nenhum lembrete pendente.",
     emptyNotifications:
       locale === "es" ? "Sin notificaciones recientes." : "Nenhuma notificação recente.",
     emptySchedules:
@@ -200,22 +189,6 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
     WHERE teacher_id = ${teacher.id}
       AND active = TRUE
     ORDER BY weekday ASC, start_time ASC
-  `
-
-  const [reminderCountRow] = await db`
-    SELECT COUNT(*)::int AS total
-    FROM teacher_reminders
-    WHERE teacher_id = ${teacher.id}
-      AND done = FALSE
-  `
-
-  const reminders: ReminderRow[] = await db`
-    SELECT id, content, created_at, class_label, lesson_number
-    FROM teacher_reminders
-    WHERE teacher_id = ${teacher.id}
-      AND done = FALSE
-    ORDER BY created_at DESC
-    LIMIT 3
   `
 
   const [unreadRow] = await db`
@@ -355,76 +328,38 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
         ? t.tomorrow
         : weekdayLabels[nextSchedule.schedule.weekday] ?? ""
     : ""
+  const activeSchedulesTotal = schedules.length
 
   return (
     <div className="relative min-h-screen rounded-xl bg-cyan-900/10">
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-xl rounded-xl">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-              <User className="w-5 h-5 text-white" />
-            </div>
+      <main className="container mx-auto px-4 py-8 space-y-6">
+        <section className="rounded-2xl border border-white/10 bg-slate-900/45 p-5 backdrop-blur">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h1 className="font-bold text-white">{teacher.name}</h1>
-              <p className="text-sm text-slate-400">{teacher.email}</p>
+              <h2 className="text-3xl font-bold text-white mb-2">{t.title}</h2>
+              <p className="text-slate-300">{t.subtitle}</p>
+            </div>
+            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 xl:w-auto">
+              <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-slate-300">{t.unreadNotifications}</p>
+                <p className="text-xl font-semibold text-white">{unreadRow?.unread ?? 0}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-slate-300">{t.activeSchedules}</p>
+                <p className="text-xl font-semibold text-white">{activeSchedulesTotal}</p>
+              </div>
+              <div className="col-span-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 sm:col-span-1">
+                <p className="text-[11px] uppercase tracking-wide text-slate-300">{t.nextClass}</p>
+                <p className="text-sm font-semibold text-white line-clamp-1">
+                  {nextSchedule ? nextSchedule.schedule.class_label : t.emptySchedules}
+                </p>
+              </div>
             </div>
           </div>
+        </section>
 
-          <Link href="/portal/dashboard" className="text-white/60 text-sm flex items-center gap-2">
-            <Home className="w-4 h-4" />
-            {t.title}
-          </Link>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8 space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold text-white mb-2">{t.title}</h2>
-          <p className="text-slate-300">{t.subtitle}</p>
-        </div>
-
-        {/* Reminders + Notifications */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="bg-slate-900/40 border border-white/10">
-            <CardHeader className="flex items-center justify-between">
-              <CardTitle className="text-white text-base flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-amber-300" />
-                {t.reminders}
-              </CardTitle>
-              <span className="text-xs text-white/60">
-                {(reminderCountRow?.total ?? 0)}
-              </span>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {reminders.length === 0 ? (
-                <p className="text-slate-400 text-sm">{t.emptyReminders}</p>
-              ) : (
-                reminders.map((reminder) => (
-                  <div key={reminder.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
-                    {reminder.class_label && reminder.lesson_number ? (
-                      <p className="text-[11px] text-white/60 mb-1">
-                        {reminder.class_label} • {t.registerClass} {reminder.lesson_number}
-                      </p>
-                    ) : null}
-                    <p className="text-sm text-white/80 line-clamp-2">{reminder.content}</p>
-                    {reminder.created_at && (
-                      <p className="text-[11px] text-white/40 mt-1">
-                        {formatDateTime(reminder.created_at, locale)}
-                      </p>
-                    )}
-                  </div>
-                ))
-              )}
-
-              <Link href="/portal/dashboard/notas/lancamentos">
-                <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
-                  {t.viewAll}
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/40 border border-white/10">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <Card className="xl:col-span-2 bg-slate-900/40 border border-white/10">
             <CardHeader className="flex items-center justify-between">
               <CardTitle className="text-white text-base flex items-center gap-2">
                 <Bell className="w-4 h-4 text-cyan-300" />
@@ -440,9 +375,7 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
                   <div key={notice.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm text-white font-semibold line-clamp-1">{notice.title}</p>
-                      {!notice.is_read && (
-                        <span className="text-[10px] text-amber-200">Novo</span>
-                      )}
+                      {!notice.is_read && <span className="text-[10px] text-amber-200">Novo</span>}
                     </div>
                     <p className="text-xs text-white/60 mt-1 line-clamp-2">{notice.message}</p>
                     <p className="text-[11px] text-white/40 mt-1">
@@ -459,66 +392,52 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
               </Link>
             </CardContent>
           </Card>
-        </div>
-
-        {/* Próxima aula + Ações rápidas */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="bg-slate-900/40 border border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white text-base flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-emerald-300" />
-                {t.nextClass}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!nextSchedule ? (
-                <p className="text-slate-400 text-sm">{t.emptySchedules}</p>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-lg text-white font-semibold">
-                    {nextSchedule.schedule.class_label}
-                  </p>
-                  <p className="text-sm text-white/70">
-                    {nextLabel} • {timeLabel(nextSchedule.schedule.start_time)} - {timeLabel(nextSchedule.schedule.end_time)}
-                  </p>
-                  <Link href="/portal/dashboard/notas/lancamentos">
-                    <Button className="mt-3 bg-cyan-600 hover:bg-cyan-700">
-                      {t.openAgenda}
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           <Card className="bg-slate-900/40 border border-white/10">
             <CardHeader>
               <CardTitle className="text-white text-base flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-sky-300" />
-                {t.quickActions}
+                {t.quickOverview}
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Link href="/portal/dashboard/notas/lancamentos">
-                <Button className="w-full bg-cyan-600 hover:bg-cyan-700">
-                  {t.registerClass}
-                </Button>
-              </Link>
-              <Link href="/portal/dashboard/notas/lancamentos">
-                <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
-                  {t.openAgenda}
-                </Button>
-              </Link>
-              <Link href="/portal/dashboard/materiais">
-                <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
-                  {t.openMaterials}
-                </Button>
-              </Link>
-              <Link href="/portal/dashboard/notificacoes">
-                <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
-                  {t.openNotifications}
-                </Button>
-              </Link>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-slate-300 mb-1">{t.nextClass}</p>
+                {!nextSchedule ? (
+                  <p className="text-slate-400 text-sm">{t.emptySchedules}</p>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-sm text-white font-semibold line-clamp-1">{nextSchedule.schedule.class_label}</p>
+                    <p className="text-xs text-white/70">
+                      {nextLabel} • {timeLabel(nextSchedule.schedule.start_time)} - {timeLabel(nextSchedule.schedule.end_time)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-slate-300 mb-2">{t.quickActions}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2">
+                  <Link href="/portal/dashboard/notas/lancamentos">
+                    <Button className="w-full bg-cyan-600 hover:bg-cyan-700">{t.registerClass}</Button>
+                  </Link>
+                  <Link href="/portal/dashboard/notas/lancamentos">
+                    <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
+                      {t.openAgenda}
+                    </Button>
+                  </Link>
+                  <Link href="/portal/dashboard/materiais">
+                    <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
+                      {t.openMaterials}
+                    </Button>
+                  </Link>
+                  <Link href="/portal/dashboard/notificacoes">
+                    <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
+                      {t.openNotifications}
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

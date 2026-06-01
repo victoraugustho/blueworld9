@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
 
 type BlogStatus = "draft" | "review" | "scheduled" | "published" | "archived"
 type BlogLanguage = "pt-BR" | "es"
@@ -93,6 +94,7 @@ export default function BlogAdminClient() {
   const [tagName, setTagName] = useState("")
   const [tagSlug, setTagSlug] = useState("")
   const [tagSaving, setTagSaving] = useState(false)
+  const { confirm, confirmDialog } = useConfirmDialog()
 
   async function loadMeta() {
     const [categoriesRes, tagsRes] = await Promise.all([
@@ -183,9 +185,12 @@ export default function BlogAdminClient() {
   }
 
   async function deleteCategory(item: BlogCategory) {
-    const ok = window.confirm(
-      `Excluir categoria \"${item.name}\"? Essa acao remove os vinculos dela nos posts.`
-    )
+    const ok = await confirm({
+      title: "Excluir categoria",
+      description: `Excluir categoria "${item.name}"? Essa ação remove os vínculos dela nos posts.`,
+      confirmText: "Excluir",
+      variant: "danger",
+    })
     if (!ok) return
 
     const res = await fetch(`/api/admin/blog/categories/${item.id}`, { method: "DELETE" })
@@ -245,7 +250,12 @@ export default function BlogAdminClient() {
   }
 
   async function deleteTag(item: BlogTag) {
-    const ok = window.confirm(`Excluir tag \"${item.name}\"? Essa acao remove os vinculos dela nos posts.`)
+    const ok = await confirm({
+      title: "Excluir tag",
+      description: `Excluir tag "${item.name}"? Essa ação remove os vínculos dela nos posts.`,
+      confirmText: "Excluir",
+      variant: "danger",
+    })
     if (!ok) return
 
     const res = await fetch(`/api/admin/blog/tags/${item.id}`, { method: "DELETE" })
@@ -523,6 +533,7 @@ export default function BlogAdminClient() {
           </CardContent>
         </Card>
       </div>
+      {confirmDialog}
     </div>
   )
 }

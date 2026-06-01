@@ -32,7 +32,6 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     WHERE p.id = ${id}
       AND p.deleted_at IS NULL
       AND p.status = 'published'
-      AND (p.locale IS NULL OR p.locale = ${locale})
     LIMIT 1
   `
 
@@ -63,7 +62,6 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       sort_order
     FROM public.teacher_project_assets
     WHERE project_id = ${id}
-      AND (locale IS NULL OR locale = ${locale})
     ORDER BY asset_type ASC, sort_order ASC, created_at ASC
   `
 

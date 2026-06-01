@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   const params = req.nextUrl.searchParams
   const { page, page_size, offset } = parsePagination(params)
-  const locale = normalizeProjectLocale(params.get("locale") ?? auth.teacher.locale)
+  const locale = normalizeProjectLocale(auth.teacher.locale)
   const q = String(params.get("q") ?? "").trim()
 
   const qFilter = q
@@ -68,7 +68,6 @@ export async function GET(req: NextRequest) {
     LEFT JOIN public.teachers creator ON creator.id = p.created_by
     WHERE p.deleted_at IS NULL
       AND p.status = 'published'
-      AND (p.locale IS NULL OR p.locale = ${locale})
       ${qFilter}
     ORDER BY COALESCE(p.published_at, p.updated_at, p.created_at) DESC
   `

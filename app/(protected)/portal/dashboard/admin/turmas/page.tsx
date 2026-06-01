@@ -1,10 +1,11 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
 import { Pencil, RefreshCcw, Trash2, Users, BookOpen, Link2, Layers, CalendarRange } from "lucide-react"
 import type { Category, Teacher, TurmaYear } from "@/app/types/portal"
 
@@ -36,6 +37,7 @@ export default function AdminTurmasPage() {
   const [savingYearLinking, setSavingYearLinking] = useState(false)
   const [yearTeacherQuery, setYearTeacherQuery] = useState("")
   const [linkedYearTeacherIds, setLinkedYearTeacherIds] = useState<string[]>([])
+  const { confirm, confirmDialog } = useConfirmDialog()
 
   async function loadAll() {
     setLoading(true)
@@ -68,7 +70,11 @@ export default function AdminTurmasPage() {
     const name = newName.trim()
     if (!name) return
 
-    const ok = confirm(`Confirmar criacao da categoria "${name}"?`)
+    const ok = await confirm({
+      title: "Criar categoria",
+      description: `Confirmar criação da categoria "${name}"?`,
+      confirmText: "Criar",
+    })
     if (!ok) return
 
     setSaving(true)
@@ -103,7 +109,11 @@ export default function AdminTurmasPage() {
     const name = editingName.trim()
     if (!name || editingId !== item.id) return
 
-    const ok = confirm(`Confirmar alteracao da categoria "${item.name}" para "${name}"?`)
+    const ok = await confirm({
+      title: "Salvar alteração",
+      description: `Confirmar alteração da categoria "${item.name}" para "${name}"?`,
+      confirmText: "Salvar",
+    })
     if (!ok) return
 
     setSaving(true)
@@ -132,10 +142,15 @@ export default function AdminTurmasPage() {
       `Tem certeza que deseja excluir a categoria "${item.name}"?`,
       `Materiais vinculados: ${materialCount}`,
       `Professores vinculados: ${teacherCount}`,
-      "Essa acao vai remover os vinculos dessa categoria.",
+      "Essa ação vai remover os vínculos dessa categoria.",
     ].join("\n")
 
-    const ok = confirm(warn)
+    const ok = await confirm({
+      title: "Excluir categoria",
+      description: warn,
+      confirmText: "Excluir",
+      variant: "danger",
+    })
     if (!ok) return
 
     setSaving(true)
@@ -193,9 +208,11 @@ export default function AdminTurmasPage() {
 
   async function saveCategoryLinks(item: Category) {
     const selectedCount = linkedCategoryTeacherIds.length
-    const ok = confirm(
-      `Confirmar vinculo de ${selectedCount} professor${selectedCount === 1 ? "" : "es"} na categoria "${item.name}"?`
-    )
+    const ok = await confirm({
+      title: "Salvar vínculo",
+      description: `Confirmar vínculo de ${selectedCount} professor${selectedCount === 1 ? "" : "es"} na categoria "${item.name}"?`,
+      confirmText: "Salvar",
+    })
     if (!ok) return
 
     setSavingCategoryLinking(true)
@@ -208,7 +225,7 @@ export default function AdminTurmasPage() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      alert(err?.error ?? "Erro ao salvar vinculos de categoria")
+      alert(err?.error ?? "Erro ao salvar vínculos de categoria")
       return
     }
 
@@ -256,9 +273,11 @@ export default function AdminTurmasPage() {
 
   async function saveYearLinks(item: TurmaYear) {
     const selectedCount = linkedYearTeacherIds.length
-    const ok = confirm(
-      `Confirmar vinculo de ${selectedCount} professor${selectedCount === 1 ? "" : "es"} na turma "${item.label}"?`
-    )
+    const ok = await confirm({
+      title: "Salvar vínculo",
+      description: `Confirmar vínculo de ${selectedCount} professor${selectedCount === 1 ? "" : "es"} na turma "${item.label}"?`,
+      confirmText: "Salvar",
+    })
     if (!ok) return
 
     setSavingYearLinking(true)
@@ -271,7 +290,7 @@ export default function AdminTurmasPage() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      alert(err?.error ?? "Erro ao salvar vinculos da turma")
+      alert(err?.error ?? "Erro ao salvar vínculos da turma")
       return
     }
 
@@ -309,7 +328,7 @@ export default function AdminTurmasPage() {
         <div>
           <h1 className="text-3xl font-bold">Categorias e Turmas</h1>
           <p className="text-slate-300 mt-1">
-            Organize visibilidade por categoria, turma (ano) e material especifico.
+            Organize visibilidade por categoria, turma (ano) e material específico.
           </p>
         </div>
         <Button
@@ -368,89 +387,99 @@ export default function AdminTurmasPage() {
             )}
 
             {!loading && filteredCategories.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+                <div className="hidden md:grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto] gap-3 px-4 py-3 border-b border-white/10 bg-white/[0.04] text-[11px] uppercase tracking-wide text-slate-300">
+                  <span>Categoria</span>
+                  <span>Resumo</span>
+                  <span className="text-right">Ações</span>
+                </div>
                 {filteredCategories.map((item) => {
                   const isEditing = editingId === item.id
                   const isLinking = linkingCategoryId === item.id
 
                   return (
-                    <div key={item.id} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <Label className="text-white text-xs">Nome da categoria</Label>
-                          <Input
-                            className="bg-slate-800/60 border-slate-700 text-white"
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                          />
+                    <div key={item.id} className="border-b border-white/10 last:border-b-0">
+                      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto] gap-3 px-4 py-4">
+                        <div className="min-w-0">
+                          {isEditing ? (
+                            <div className="space-y-2">
+                              <Label className="text-white text-xs">Nome da categoria</Label>
+                              <Input
+                                className="bg-slate-800/60 border-slate-700 text-white"
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                              />
+                            </div>
+                          ) : (
+                            <h3 className="text-base font-semibold text-white truncate">{item.name}</h3>
+                          )}
                         </div>
-                      ) : (
-                        <h3 className="text-lg font-semibold text-white">{item.name}</h3>
-                      )}
 
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-cyan-500/15 text-cyan-200 border border-cyan-500/30">
-                          <BookOpen className="w-3.5 h-3.5" />
-                          Materiais: {item.material_count ?? 0}
-                        </span>
-                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-emerald-500/15 text-emerald-200 border border-emerald-500/30">
-                          <Users className="w-3.5 h-3.5" />
-                          Professores: {item.teacher_count ?? 0}
-                        </span>
-                      </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-cyan-500/15 text-cyan-200 border border-cyan-500/30">
+                            <BookOpen className="w-3.5 h-3.5" />
+                            Materiais: {item.material_count ?? 0}
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-emerald-500/15 text-emerald-200 border border-emerald-500/30">
+                            <Users className="w-3.5 h-3.5" />
+                            Professores: {item.teacher_count ?? 0}
+                          </span>
+                        </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        {isEditing ? (
-                          <>
+                        <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                          {isEditing ? (
+                            <>
+                              <Button
+                                type="button"
+                                disabled={saving || !editingName.trim()}
+                                className="bg-blue-600 hover:bg-blue-700"
+                                onClick={() => saveEdit(item)}
+                              >
+                                Salvar
+                              </Button>
+                              <Button
+                                type="button"
+                                className="bg-white/10 hover:bg-white/15 border border-white/10"
+                                onClick={cancelEdit}
+                              >
+                                Cancelar
+                              </Button>
+                            </>
+                          ) : (
                             <Button
                               type="button"
-                              disabled={saving || !editingName.trim()}
-                              className="bg-blue-600 hover:bg-blue-700"
-                              onClick={() => saveEdit(item)}
+                              className="bg-indigo-600 hover:bg-indigo-700"
+                              onClick={() => startEdit(item)}
                             >
-                              Salvar
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Editar
                             </Button>
-                            <Button
-                              type="button"
-                              className="bg-white/10 hover:bg-white/15 border border-white/10"
-                              onClick={cancelEdit}
-                            >
-                              Cancelar
-                            </Button>
-                          </>
-                        ) : (
+                          )}
+
                           <Button
                             type="button"
-                            className="bg-indigo-600 hover:bg-indigo-700"
-                            onClick={() => startEdit(item)}
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                            onClick={() => (isLinking ? cancelCategoryLinking() : startCategoryLinking(item))}
                           >
-                            <Pencil className="w-4 h-4 mr-2" />
-                            Editar
+                            <Link2 className="w-4 h-4 mr-2" />
+                            {isLinking ? "Fechar vínculo" : "Vincular professores"}
                           </Button>
-                        )}
 
-                        <Button
-                          type="button"
-                          className="bg-emerald-600 hover:bg-emerald-700"
-                          onClick={() => (isLinking ? cancelCategoryLinking() : startCategoryLinking(item))}
-                        >
-                          <Link2 className="w-4 h-4 mr-2" />
-                          {isLinking ? "Fechar vinculo" : "Vincular professores"}
-                        </Button>
-
-                        <Button
-                          type="button"
-                          className="bg-rose-600 hover:bg-rose-700"
-                          onClick={() => deleteCategory(item)}
-                          disabled={saving}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Excluir
-                        </Button>
+                          <Button
+                            type="button"
+                            className="bg-rose-600 hover:bg-rose-700"
+                            onClick={() => deleteCategory(item)}
+                            disabled={saving}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Excluir
+                          </Button>
+                        </div>
                       </div>
 
                       {isLinking && (
-                        <div className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-3">
+                        <div className="px-4 pb-4">
+                          <div className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-3">
                           {loadingCategoryLinking ? (
                             <p className="text-sm text-slate-400">Carregando professores vinculados...</p>
                           ) : (
@@ -476,7 +505,7 @@ export default function AdminTurmasPage() {
                                     className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] border bg-white/5 text-white/70 border-white/10 hover:bg-white/10 transition"
                                     onClick={clearCategoryTeachers}
                                   >
-                                    Limpar selecao
+                                    Limpar seleção
                                   </button>
                                 </div>
                               </div>
@@ -516,7 +545,7 @@ export default function AdminTurmasPage() {
                                   className="bg-cyan-600 hover:bg-cyan-700"
                                   onClick={() => saveCategoryLinks(item)}
                                 >
-                                  {savingCategoryLinking ? "Salvando..." : "Salvar vinculos"}
+                                  {savingCategoryLinking ? "Salvando..." : "Salvar vínculos"}
                                 </Button>
 
                                 <Button
@@ -529,6 +558,7 @@ export default function AdminTurmasPage() {
                               </div>
                             </>
                           )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -549,38 +579,48 @@ export default function AdminTurmasPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-slate-300 mb-4">
-            Configure quais professores pertencem a cada turma/ano. Esse vinculo controla materiais por turma.
+            Configure quais professores pertencem a cada turma/ano. Esse vínculo controla materiais por turma.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+            <div className="hidden md:grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3 px-4 py-3 border-b border-white/10 bg-white/[0.04] text-[11px] uppercase tracking-wide text-slate-300">
+              <span>Turma</span>
+              <span>Resumo</span>
+              <span className="text-right">Ações</span>
+            </div>
             {yearGroups.map((item) => {
               const isLinking = linkingYear === item.student_year
               return (
-                <div key={item.student_year} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                  <h3 className="text-lg font-semibold text-white">{item.label}</h3>
+                <div key={item.student_year} className="border-b border-white/10 last:border-b-0">
+                  <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3 px-4 py-4">
+                    <h3 className="text-base font-semibold text-white">{item.label}</h3>
 
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-cyan-500/15 text-cyan-200 border border-cyan-500/30">
-                      <BookOpen className="w-3.5 h-3.5" />
-                      Materiais: {item.material_count ?? 0}
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-emerald-500/15 text-emerald-200 border border-emerald-500/30">
-                      <Users className="w-3.5 h-3.5" />
-                      Professores: {item.teacher_count ?? 0}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-cyan-500/15 text-cyan-200 border border-cyan-500/30">
+                        <BookOpen className="w-3.5 h-3.5" />
+                        Materiais: {item.material_count ?? 0}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-emerald-500/15 text-emerald-200 border border-emerald-500/30">
+                        <Users className="w-3.5 h-3.5" />
+                        Professores: {item.teacher_count ?? 0}
+                      </span>
+                    </div>
+
+                    <div className="md:justify-self-end">
+                      <Button
+                        type="button"
+                        className="bg-amber-600 hover:bg-amber-700"
+                        onClick={() => (isLinking ? cancelYearLinking() : startYearLinking(item))}
+                      >
+                        <Link2 className="w-4 h-4 mr-2" />
+                        {isLinking ? "Fechar vínculo" : "Vincular professores"}
+                      </Button>
+                    </div>
                   </div>
 
-                  <Button
-                    type="button"
-                    className="bg-amber-600 hover:bg-amber-700"
-                    onClick={() => (isLinking ? cancelYearLinking() : startYearLinking(item))}
-                  >
-                    <Link2 className="w-4 h-4 mr-2" />
-                    {isLinking ? "Fechar vinculo" : "Vincular professores"}
-                  </Button>
-
                   {isLinking && (
-                    <div className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-3">
+                    <div className="px-4 pb-4">
+                      <div className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-3">
                       {loadingYearLinking ? (
                         <p className="text-sm text-slate-400">Carregando professores vinculados...</p>
                       ) : (
@@ -606,7 +646,7 @@ export default function AdminTurmasPage() {
                                 className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] border bg-white/5 text-white/70 border-white/10 hover:bg-white/10 transition"
                                 onClick={clearYearTeachers}
                               >
-                                Limpar selecao
+                                Limpar seleção
                               </button>
                             </div>
                           </div>
@@ -646,7 +686,7 @@ export default function AdminTurmasPage() {
                               className="bg-cyan-600 hover:bg-cyan-700"
                               onClick={() => saveYearLinks(item)}
                             >
-                              {savingYearLinking ? "Salvando..." : "Salvar vinculos"}
+                              {savingYearLinking ? "Salvando..." : "Salvar vínculos"}
                             </Button>
 
                             <Button
@@ -659,6 +699,7 @@ export default function AdminTurmasPage() {
                           </div>
                         </>
                       )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -667,6 +708,8 @@ export default function AdminTurmasPage() {
           </div>
         </CardContent>
       </Card>
+      {confirmDialog}
     </div>
   )
 }
+

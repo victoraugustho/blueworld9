@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
 import {
   CalendarDays,
   ChevronLeft,
@@ -141,6 +142,7 @@ function taskPriorityRank(priority: TaskPriority) {
 }
 
 export default function AdminAgendaClient({ locale }: { locale: Locale }) {
+  const { confirm, confirmDialog } = useConfirmDialog()
   const t =
     locale === "es"
       ? {
@@ -544,7 +546,13 @@ export default function AdminAgendaClient({ locale }: { locale: Locale }) {
   }
 
   async function handleDeleteAgenda(id: string) {
-    if (!confirm(t.removeConfirm)) return
+    const ok = await confirm({
+      title: t.remove,
+      description: t.removeConfirm,
+      confirmText: t.remove,
+      variant: "danger",
+    })
+    if (!ok) return
 
     const res = await fetch(`/api/admin/coordinator-schedules/${id}`, { method: "DELETE" })
     if (!res.ok) {
@@ -658,7 +666,13 @@ export default function AdminAgendaClient({ locale }: { locale: Locale }) {
   }
 
   async function handleDeleteEvent(id: string) {
-    if (!confirm(t.eventRemoveConfirm)) return
+    const ok = await confirm({
+      title: t.remove,
+      description: t.eventRemoveConfirm,
+      confirmText: t.remove,
+      variant: "danger",
+    })
+    if (!ok) return
 
     const res = await fetch(`/api/admin/coordination-agenda-events/${id}`, { method: "DELETE" })
     if (!res.ok) {
@@ -687,7 +701,13 @@ export default function AdminAgendaClient({ locale }: { locale: Locale }) {
   }
 
   async function handleDeleteTask(id: string) {
-    if (!confirm(t.taskDeleteConfirm)) return
+    const ok = await confirm({
+      title: t.remove,
+      description: t.taskDeleteConfirm,
+      confirmText: t.remove,
+      variant: "danger",
+    })
+    if (!ok) return
 
     const res = await fetch(`/api/admin/coordination-tasks/${id}`, { method: "DELETE" })
     if (!res.ok) {
@@ -1297,6 +1317,7 @@ export default function AdminAgendaClient({ locale }: { locale: Locale }) {
           </Card>
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }

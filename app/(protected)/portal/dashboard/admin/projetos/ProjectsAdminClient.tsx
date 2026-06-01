@@ -5,13 +5,13 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
 
 type ProjectStatus = "draft" | "published" | "archived"
 type ProjectType = "arduino_mblock" | "programming" | "custom"
 
 type ProjectRow = {
   id: string
-  locale?: "pt-BR" | "es" | null
   project_type: ProjectType
   status: ProjectStatus
   title_pt: string
@@ -58,6 +58,7 @@ export default function ProjectsAdminClient() {
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState<ProjectStatus | "all">("all")
   const [total, setTotal] = useState(0)
+  const { confirm, confirmDialog } = useConfirmDialog()
 
   async function load() {
     setLoading(true)
@@ -90,7 +91,13 @@ export default function ProjectsAdminClient() {
   }, [items])
 
   async function removeProject(id: string, title: string) {
-    if (!window.confirm(`Deseja arquivar o projeto "${title}"?`)) return
+    const ok = await confirm({
+      title: "Arquivar projeto",
+      description: `Deseja arquivar o projeto "${title}"?`,
+      confirmText: "Arquivar",
+      variant: "danger",
+    })
+    if (!ok) return
     const res = await fetch(`/api/admin/projects/${id}`, { method: "DELETE" })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
@@ -106,7 +113,7 @@ export default function ProjectsAdminClient() {
         <div>
           <h1 className="text-3xl font-bold text-white">Projetos (Admin)</h1>
           <p className="text-sm text-slate-300 mt-1">
-            Crie e organize projetos técnicos para os professores, com versões em português e espanhol.
+            Crie e organize projetos técnicos para os professores.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -178,7 +185,6 @@ export default function ProjectsAdminClient() {
                 <tr className="border-b border-white/10 bg-white/5 text-slate-200">
                   <th className="text-left font-semibold px-4 py-3">Projeto</th>
                   <th className="text-left font-semibold px-3 py-3">Status</th>
-                  <th className="text-left font-semibold px-3 py-3">Idioma</th>
                   <th className="text-left font-semibold px-3 py-3">Tipo</th>
                   <th className="text-left font-semibold px-3 py-3">Acesso</th>
                   <th className="text-left font-semibold px-3 py-3">Imgs</th>
@@ -194,18 +200,13 @@ export default function ProjectsAdminClient() {
                   <tr key={item.id} className="border-b border-white/10 hover:bg-white/5 transition-colors">
                     <td className="px-4 py-3 align-top">
                       <p className="text-white font-semibold line-clamp-1">
-                        {(item.locale === "es" ? item.title_es : item.title_pt) || item.title_pt || item.title_es}
+                        {item.title_pt || item.title_es}
                       </p>
                       <p className="text-xs text-slate-400 mt-1">ID: {String(item.id).slice(0, 8).toUpperCase()}</p>
                     </td>
                     <td className="px-3 py-3 align-top">
                       <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${STATUS_BADGE_CLASS[item.status]}`}>
                         {STATUS_LABEL[item.status]}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 align-top">
-                      <span className="inline-flex rounded-full border border-cyan-300/30 px-2 py-1 text-xs bg-cyan-500/10 text-cyan-100">
-                        {item.locale === "es" ? "ES" : "PT-BR"}
                       </span>
                     </td>
                     <td className="px-3 py-3 align-top text-slate-200">{TYPE_LABEL[item.project_type]}</td>
@@ -233,7 +234,7 @@ export default function ProjectsAdminClient() {
                 ))}
                 {!loading && items.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-4 py-8 text-center text-slate-300">
+                    <td colSpan={10} className="px-4 py-8 text-center text-slate-300">
                       Nenhum projeto encontrado.
                     </td>
                   </tr>
@@ -243,6 +244,7 @@ export default function ProjectsAdminClient() {
           </div>
         </CardContent>
       </Card>
+      {confirmDialog}
     </div>
   )
 }

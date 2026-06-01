@@ -126,8 +126,6 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
   const [targetCountries, setTargetCountries] = useState<string[]>([])
   const [targetStudentYears, setTargetStudentYears] = useState<number[]>([])
 
-  const [galleryUploadLocale, setGalleryUploadLocale] = useState<ProjectLocale>("pt-BR")
-  const [documentUploadLocale, setDocumentUploadLocale] = useState<ProjectLocale>("pt-BR")
   const [galleryImages, setGalleryImages] = useState<AssetUI[]>([])
   const [documents, setDocuments] = useState<AssetUI[]>([])
   const [links, setLinks] = useState<LinkUI[]>([])
@@ -366,7 +364,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
     const selected = Array.isArray(files) ? files : files ? Array.from(files) : []
     if (selected.length === 0) return
 
-    const locale = galleryUploadLocale
+    const locale = projectLocale
     const uploadedItems: AssetUI[] = []
 
     for (const file of selected) {
@@ -407,7 +405,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
     if (!file) return
     const uploaded = await uploadAsset("document", file)
     if (!uploaded) return
-    const locale = documentUploadLocale
+    const locale = projectLocale
     setDocuments((prev) => [
       ...prev,
       {
@@ -623,18 +621,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
           <CardTitle className="text-base text-white">Informações principais</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label className="text-slate-200">Idioma do projeto</Label>
-              <select
-                className="h-10 rounded-md bg-slate-800/60 border border-slate-700 px-3 text-white w-full"
-                value={projectLocale}
-                onChange={(event) => setProjectLocale(event.target.value === "es" ? "es" : "pt-BR")}
-              >
-                <option value="pt-BR">Português</option>
-                <option value="es">Español</option>
-              </select>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-slate-200">Tipo</Label>
               <select
@@ -810,14 +797,6 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
             <p className="text-sm font-semibold text-white">Galeria</p>
             <p className="text-xs text-slate-400">{GALLERY_IMAGE_RECOMMENDATION}</p>
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                className="h-10 rounded-md bg-slate-800/60 border border-slate-700 px-3 text-white"
-                value={galleryUploadLocale}
-                onChange={(event) => setGalleryUploadLocale(event.target.value === "es" ? "es" : "pt-BR")}
-              >
-                <option value="pt-BR">Português</option>
-                <option value="es">Español</option>
-              </select>
               <input
                 id={galleryInputId}
                 type="file"
@@ -877,14 +856,6 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
           <div className="space-y-3">
             <p className="text-sm font-semibold text-white">Anexos</p>
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                className="h-10 rounded-md bg-slate-800/60 border border-slate-700 px-3 text-white"
-                value={documentUploadLocale}
-                onChange={(event) => setDocumentUploadLocale(event.target.value === "es" ? "es" : "pt-BR")}
-              >
-                <option value="pt-BR">Português</option>
-                <option value="es">Español</option>
-              </select>
               <input
                 id={documentInputId}
                 type="file"
@@ -958,35 +929,6 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
                     Excluir
                   </Button>
                 </div>
-                <select
-                  className="bg-slate-800/60 border border-slate-700 text-white h-10 rounded-md px-2"
-                  value={link.locale}
-                  onChange={(event) =>
-                    updateLink(link.local_id, ((): Partial<LinkUI> => {
-                      const nextLocale = event.target.value === "es" ? "es" : "pt-BR"
-                      const currentTitle = getLinkTitleByLocale(link)
-                      const currentDescription = getLinkDescriptionByLocale(link)
-                      return nextLocale === "es"
-                        ? {
-                            locale: "es",
-                            title_es: link.title_es ?? currentTitle,
-                            title_pt: null,
-                            description_es: link.description_es ?? currentDescription,
-                            description_pt: null,
-                          }
-                        : {
-                            locale: "pt-BR",
-                            title_pt: link.title_pt ?? currentTitle,
-                            title_es: null,
-                            description_pt: link.description_pt ?? currentDescription,
-                            description_es: null,
-                          }
-                    })())
-                  }
-                >
-                  <option value="pt-BR">Português</option>
-                  <option value="es">Español</option>
-                </select>
                 <Input
                   className="bg-slate-800/60 border-slate-700 text-white"
                   placeholder={link.locale === "es" ? "Título (Español)" : "Título (Português)"}

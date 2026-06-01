@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { CalendarDays, Clock3, Pencil, RefreshCcw, Save, Search, Trash2, X } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
 import type { Teacher, TeacherClass, TeacherSchedule } from "@/app/types/portal"
 
 const weekdayLabel: Record<number, string> = {
@@ -106,6 +107,7 @@ export default function TeacherAgendaClient({ teacherId }: { teacherId: string }
   const [deletingId, setDeletingId] = useState("")
   const [form, setForm] = useState<ScheduleForm | null>(null)
   const [error, setError] = useState("")
+  const { confirm, confirmDialog } = useConfirmDialog()
 
   async function loadAll() {
     setLoading(true)
@@ -225,7 +227,13 @@ export default function TeacherAgendaClient({ teacherId }: { teacherId: string }
   }
 
   async function deleteItem(item: TeacherSchedule) {
-    if (!confirm("Deseja excluir este item da agenda?")) return
+    const ok = await confirm({
+      title: "Excluir item da agenda",
+      description: "Deseja excluir este item da agenda?",
+      confirmText: "Excluir",
+      variant: "danger",
+    })
+    if (!ok) return
 
     setDeletingId(item.id)
     setError("")
@@ -545,6 +553,7 @@ export default function TeacherAgendaClient({ teacherId }: { teacherId: string }
           {schedules.filter((item) => item.is_recurring === false).length}
         </CardContent>
       </Card>
+      {confirmDialog}
     </div>
   )
 }

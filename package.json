@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "predev": "npm run check:utf8",
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "dev:turbo": "next dev --turbopack",
     "prebuild": "npm run check:utf8",
     "build": "next build",
     "start": "next start",

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card"
+import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
 import { ChevronDown, ChevronUp, Pencil, Trash } from "lucide-react"
 import type { Material } from "@/app/types/portal"
 
@@ -17,22 +17,22 @@ type MaterialView = Material & {
 }
 
 function languageLabel(lang: Lang) {
-  return lang === "pt-BR" ? "Portugues (BR)" : "Espanol"
+  return lang === "pt-BR" ? "Português (BR)" : "Espanhol"
 }
 
 function languageBadge(lang: Lang) {
   return lang === "pt-BR"
-    ? { label: "Portugues (BR)", cls: "bg-emerald-500/15 text-emerald-300" }
-    : { label: "Espanol", cls: "bg-amber-500/15 text-amber-300" }
+    ? { label: "Português (BR)", cls: "bg-emerald-500/15 text-emerald-300" }
+    : { label: "Espanhol", cls: "bg-amber-500/15 text-amber-300" }
 }
 
 function typeLabel(type: MaterialType) {
-  return type === "video" ? "Videos" : "Materiais (Documento)"
+  return type === "video" ? "Vídeos" : "Materiais (Documento)"
 }
 
 function typeBadge(type: MaterialType) {
   return type === "video"
-    ? { label: "Video", cls: "bg-blue-500/15 text-blue-300" }
+    ? { label: "Vídeo", cls: "bg-blue-500/15 text-blue-300" }
     : { label: "Documento", cls: "bg-indigo-500/15 text-indigo-300" }
 }
 
@@ -73,7 +73,7 @@ function yearInfo(value: any) {
       const year = value - 200
       return {
         key: `hs-${year}`,
-        label: `Ensino Medio ${year}`,
+        label: `Ensino Médio ${year}`,
         cls: "bg-purple-500/15 text-purple-300",
       }
     }
@@ -89,7 +89,7 @@ function yearInfo(value: any) {
 function yearLabelFromKey(key: string) {
   if (key.startsWith("age-")) return `${key.slice(4)} anos`
   if (key.startsWith("grade-")) return `Ano ${key.slice(6)}`
-  if (key.startsWith("hs-")) return `Ensino Medio ${key.slice(3)}`
+  if (key.startsWith("hs-")) return `Ensino Médio ${key.slice(3)}`
   return "Materiais complementares"
 }
 
@@ -115,6 +115,7 @@ export default function AdminMaterialsPage() {
   const [filterType, setFilterType] = useState<MaterialType | "all">("all")
   const [filterYear, setFilterYear] = useState<string>("all")
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({})
+  const { confirm, confirmDialog } = useConfirmDialog()
 
   async function load() {
     setLoading(true)
@@ -129,7 +130,13 @@ export default function AdminMaterialsPage() {
   }, [])
 
   async function deleteMaterial(id: string) {
-    if (!confirm("Tem certeza que deseja excluir este material?")) return
+    const ok = await confirm({
+      title: "Excluir material",
+      description: "Tem certeza que deseja excluir este material?",
+      confirmText: "Excluir",
+      variant: "danger",
+    })
+    if (!ok) return
 
     const res = await fetch(`/api/admin/materials/${id}`, { method: "DELETE" })
     if (res.ok) load()
@@ -210,7 +217,7 @@ export default function AdminMaterialsPage() {
         m.file_url,
         m.id,
         ...(m.teacher_names ?? []),
-        m.access_scope === "specific" ? "especifico selecionado" : "todos professores",
+        m.access_scope === "specific" ? "específico selecionado" : "todos professores",
       ]
         .map(normalizeText)
         .join(" ")
@@ -242,7 +249,7 @@ export default function AdminMaterialsPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Pesquisar por titulo, categoria, turma, descricao, URL ou professor..."
+              placeholder="Pesquisar por título, categoria, turma, descrição, URL ou professor..."
               className="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
             />
           </div>
@@ -356,64 +363,70 @@ export default function AdminMaterialsPage() {
               </button>
 
               {isOpen && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/30 backdrop-blur">
+                  <div className="hidden lg:grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_minmax(0,1fr)_auto] gap-3 px-4 py-3 text-[11px] uppercase tracking-wide text-slate-300 border-b border-white/10 bg-white/[0.04]">
+                    <span>Material</span>
+                    <span>Etiquetas</span>
+                    <span>Acesso</span>
+                    <span className="text-right">Ações</span>
+                  </div>
                   {list.map((m) => {
                     const badge = languageBadge(m.language)
                     const tBadge = typeBadge(m.file_type)
                     const aBadge = accessBadge(m)
 
                     return (
-                      <Card key={m.id} className="bg-slate-800/20 border-slate-700 backdrop-blur">
-                        <CardHeader>
-                          <CardTitle className="text-white">{m.title}</CardTitle>
-                        </CardHeader>
+                      <div
+                        key={m.id}
+                        className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_minmax(0,1fr)_auto] gap-3 px-4 py-4 border-b border-white/10 last:border-b-0 hover:bg-white/[0.03] transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm sm:text-base font-semibold text-white truncate">{m.title}</p>
+                          <p className="text-xs text-slate-300 line-clamp-2">{m.description}</p>
+                          <p className="text-[11px] text-slate-400 mt-1 truncate">{m.file_url}</p>
+                        </div>
 
-                        <CardContent>
-                          <p className="text-slate-300 mb-3">{m.description}</p>
+                        <div className="flex flex-wrap items-start gap-2">
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs ${badge.cls}`}>
+                            {badge.label}
+                          </span>
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs ${tBadge.cls}`}>
+                            {tBadge.label}
+                          </span>
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs ${m.yearCls}`}>
+                            {m.yearLabel}
+                          </span>
+                        </div>
 
-                          <div className="flex flex-wrap gap-2 mb-4">
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs ${badge.cls}`}>
-                              {badge.label}
-                            </span>
-
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs ${tBadge.cls}`}>
-                              {tBadge.label}
-                            </span>
-
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs ${m.yearCls}`}>
-                              {m.yearLabel}
-                            </span>
-
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs ${aBadge.cls}`}>
-                              {aBadge.label}
-                            </span>
-                          </div>
-
+                        <div className="space-y-1">
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs ${aBadge.cls}`}>
+                            {aBadge.label}
+                          </span>
                           {m.access_scope === "specific" && (
-                            <p className="text-xs text-slate-400 mb-4">
+                            <p className="text-[11px] text-slate-400">
                               {(m.teacher_names ?? []).length > 0
                                 ? `Professores: ${(m.teacher_names ?? []).join(", ")}`
                                 : "Nenhum professor listado."}
                             </p>
                           )}
+                        </div>
 
-                          <div className="flex justify-between">
-                            <Link href={`/portal/dashboard/admin/materials/edit/${m.id}`}>
-                              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 flex items-center gap-2">
-                                <Pencil className="w-4 h-4" /> Editar
-                              </Button>
-                            </Link>
-
-                            <Button
-                              size="sm"
-                              className="bg-red-600 hover:bg-red-700 flex items-center gap-2"
-                              onClick={() => deleteMaterial(m.id)}
-                            >
-                              <Trash className="w-4 h-4" /> Excluir
+                        <div className="flex items-center gap-2 lg:justify-end">
+                          <Link href={`/portal/dashboard/admin/materials/edit/${m.id}`}>
+                            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 flex items-center gap-2">
+                              <Pencil className="w-4 h-4" /> Editar
                             </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
+                          </Link>
+
+                          <Button
+                            size="sm"
+                            className="bg-red-600 hover:bg-red-700 flex items-center gap-2"
+                            onClick={() => deleteMaterial(m.id)}
+                          >
+                            <Trash className="w-4 h-4" /> Excluir
+                          </Button>
+                        </div>
+                      </div>
                     )
                   })}
                 </div>
@@ -421,6 +434,8 @@ export default function AdminMaterialsPage() {
             </section>
           )
         })}
+      {confirmDialog}
     </div>
   )
 }
+

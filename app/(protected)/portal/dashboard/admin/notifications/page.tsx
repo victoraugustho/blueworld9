@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Bell, Info, Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
 
 type NotificationItem = {
   id: string
@@ -95,6 +96,7 @@ export default function AdminNotificationsPage() {
   const [localeFilter, setLocaleFilter] = useState<"all" | LocaleKey>("all")
   const [countryFilter, setCountryFilter] = useState<"all" | CountryKey>("all")
   const [typeFilter, setTypeFilter] = useState<"all" | "standard" | "special_modal">("all")
+  const { confirm, confirmDialog } = useConfirmDialog()
 
   async function load() {
     setLoading(true)
@@ -109,7 +111,13 @@ export default function AdminNotificationsPage() {
   }, [])
 
   async function del(id: string) {
-    if (!confirm("Excluir esta notificacao?")) return
+    const ok = await confirm({
+      title: "Excluir notificação",
+      description: "Excluir esta notificação?",
+      confirmText: "Excluir",
+      variant: "danger",
+    })
+    if (!ok) return
     const res = await fetch(`/api/admin/notifications/${id}`, { method: "DELETE" })
     if (res.ok) load()
     else {
@@ -286,7 +294,7 @@ export default function AdminNotificationsPage() {
           </table>
         </div>
       ) : null}
+      {confirmDialog}
     </div>
   )
 }
-

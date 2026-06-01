@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
 
 type BlogStatus = "draft" | "review" | "scheduled" | "published" | "archived"
 type BlogLanguage = "pt-BR" | "es"
@@ -92,6 +93,7 @@ export default function BlogPostsListClient() {
   const [query, setQuery] = useState("")
   const [language, setLanguage] = useState<BlogLanguage | "all">("all")
   const [activeStatus, setActiveStatus] = useState<BlogStatus | "all">("all")
+  const { confirm, confirmDialog } = useConfirmDialog()
 
   async function loadPosts() {
     setLoading(true)
@@ -109,7 +111,12 @@ export default function BlogPostsListClient() {
   }
 
   async function deletePost(post: BlogPostRow) {
-    const ok = window.confirm(`Excluir o post "${post.title}"?`)
+    const ok = await confirm({
+      title: "Excluir post",
+      description: `Excluir o post "${post.title}"?`,
+      confirmText: "Excluir",
+      variant: "danger",
+    })
     if (!ok) return
 
     setDeletingId(post.id)
@@ -339,6 +346,7 @@ export default function BlogPostsListClient() {
           })}
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }

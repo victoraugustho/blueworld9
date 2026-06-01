@@ -82,7 +82,6 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
     const params = new URLSearchParams()
     params.set("page", "1")
     params.set("page_size", "120")
-    params.set("locale", locale)
     if (query.trim()) params.set("q", query.trim())
 
     const res = await fetch(`/api/portal/projects?${params.toString()}`, { cache: "no-store" })

@@ -59,6 +59,28 @@ async function fileExists(absPath: string) {
   }
 }
 
+async function findFileInTree(root: string, filename: string, maxDepth: number): Promise<string | null> {
+  if (maxDepth < 0) return null
+
+  const entries = await readdir(root, { withFileTypes: true }).catch(() => [])
+
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name === filename) {
+      return path.join(root, entry.name)
+    }
+  }
+
+  if (maxDepth === 0) return null
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const resolved = await findFileInTree(path.join(root, entry.name), filename, maxDepth - 1)
+    if (resolved) return resolved
+  }
+
+  return null
+}
+
 async function resolveFileByFilename(filename: string) {
   const cache = getCache()
   const now = Date.now()
@@ -82,38 +104,18 @@ async function resolveFileByFilename(filename: string) {
     }
   }
 
-  // projects/<year>/<month>/<file>
   const projectsRoot = path.join(uploadsRoot, "projects")
-  const years = await readdir(projectsRoot, { withFileTypes: true }).catch(() => [])
-  for (const yearDir of years) {
-    if (!yearDir.isDirectory()) continue
-    const yearPath = path.join(projectsRoot, yearDir.name)
-    const months = await readdir(yearPath, { withFileTypes: true }).catch(() => [])
-    for (const monthDir of months) {
-      if (!monthDir.isDirectory()) continue
-      const candidate = path.join(yearPath, monthDir.name, filename)
-      if (await fileExists(candidate)) {
-        cache.set(filename, { absPath: candidate, expiresAt: now + CACHE_TTL_MS })
-        return candidate
-      }
-    }
+  const projectFile = await findFileInTree(projectsRoot, filename, 4)
+  if (projectFile) {
+    cache.set(filename, { absPath: projectFile, expiresAt: now + CACHE_TTL_MS })
+    return projectFile
   }
 
-  // blog/<year>/<month>/<file>
   const blogRoot = path.join(uploadsRoot, "blog")
-  const blogYears = await readdir(blogRoot, { withFileTypes: true }).catch(() => [])
-  for (const yearDir of blogYears) {
-    if (!yearDir.isDirectory()) continue
-    const yearPath = path.join(blogRoot, yearDir.name)
-    const months = await readdir(yearPath, { withFileTypes: true }).catch(() => [])
-    for (const monthDir of months) {
-      if (!monthDir.isDirectory()) continue
-      const candidate = path.join(yearPath, monthDir.name, filename)
-      if (await fileExists(candidate)) {
-        cache.set(filename, { absPath: candidate, expiresAt: now + CACHE_TTL_MS })
-        return candidate
-      }
-    }
+  const blogFile = await findFileInTree(blogRoot, filename, 3)
+  if (blogFile) {
+    cache.set(filename, { absPath: blogFile, expiresAt: now + CACHE_TTL_MS })
+    return blogFile
   }
 
   return null
@@ -142,4 +144,3 @@ export async function GET(_: NextRequest, ctx: { params: Promise<{ filename: str
     return NextResponse.json({ error: "Falha ao ler arquivo." }, { status: 500 })
   }
 }
-

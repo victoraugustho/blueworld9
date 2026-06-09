@@ -4,6 +4,7 @@ import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { requireProjectAdminApi } from "@/lib/auth/project-admin-server"
 import { ensureProjectsSchema, getProjectUploadLimits } from "@/lib/projects"
+import { normalizeProjectFileUrl } from "@/lib/project-file-url"
 import { writeAuditLog } from "@/lib/audit"
 
 const IMAGE_MIME_TYPES = new Set([
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Arquivo excede o limite de ${maxMb}MB.` }, { status: 400 })
   }
 
-  let publicUrl = ""
+  let storageUrl = ""
   try {
     const now = new Date()
     const year = String(now.getFullYear())
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
     await fs.writeFile(finalPath, buffer)
 
     const storageKey = path.join(dirRel, generatedName).replaceAll("\\", "/")
-    publicUrl = `/uploads/${storageKey}`
+    storageUrl = `/uploads/${storageKey}`
   } catch (error) {
     console.error("[admin.projects.assets.upload] failed to persist file", error)
     return NextResponse.json(
@@ -110,6 +111,8 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     )
   }
+
+  const fileUrl = normalizeProjectFileUrl(storageUrl)
 
   await writeAuditLog({
     req,
@@ -122,7 +125,8 @@ export async function POST(req: NextRequest) {
       original_name: originalName,
       mime_type: mimeType,
       size_bytes: file.size,
-      public_url: publicUrl,
+      file_url: fileUrl,
+      storage_url: storageUrl,
     },
   })
 
@@ -131,7 +135,8 @@ export async function POST(req: NextRequest) {
     kind,
     scope: isCategoryCover ? "category" : "project",
     file_name: originalName,
-    file_url: publicUrl,
+    file_url: fileUrl,
+    storage_url: storageUrl,
     mime_type: mimeType || "application/octet-stream",
     size_bytes: file.size,
   })

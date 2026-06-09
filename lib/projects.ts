@@ -7,12 +7,14 @@ export const PROJECT_STATUSES = ["draft", "published", "archived"] as const
 export const PROJECT_TYPES = ["arduino_mblock", "programming", "custom"] as const
 export const PROJECT_ASSET_TYPES = ["gallery_image", "document"] as const
 export const PROJECT_COUNTRIES = ["BR", "UY", "PY"] as const
+export const PROJECT_CATEGORY_STATUSES = ["active", "archived"] as const
 
 export type ProjectLocale = (typeof PROJECT_LOCALES)[number]
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number]
 export type ProjectType = (typeof PROJECT_TYPES)[number]
 export type ProjectAssetType = (typeof PROJECT_ASSET_TYPES)[number]
 export type ProjectCountry = (typeof PROJECT_COUNTRIES)[number]
+export type ProjectCategoryStatus = (typeof PROJECT_CATEGORY_STATUSES)[number]
 
 function isObject(value: unknown): value is Record<string, any> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -54,6 +56,15 @@ export function normalizeProjectType(value: unknown): ProjectType {
   if (value === "programming") return "programming"
   if (value === "custom") return "custom"
   return "arduino_mblock"
+}
+
+export function normalizeProjectCategoryStatus(value: unknown): ProjectCategoryStatus {
+  return value === "archived" ? "archived" : "active"
+}
+
+export function normalizeProjectCategoryId(value: unknown) {
+  const id = String(value ?? "").trim()
+  return isUuid(id) ? id : null
 }
 
 export function normalizeProjectCountryList(value: unknown) {
@@ -412,12 +423,126 @@ export async function createProjectRevision(projectId: string, createdBy: string
 }
 
 export async function ensureProjectsSchema() {
-  await ensureRuntimeSchema("schema:projects:v4", async () => {
+  await ensureRuntimeSchema("schema:projects:v7", async () => {
     await db`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`
+
+    await db`
+      CREATE TABLE IF NOT EXISTS public.teacher_project_categories (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        locale TEXT NOT NULL DEFAULT 'pt-BR',
+        status TEXT NOT NULL DEFAULT 'active',
+        title TEXT NOT NULL,
+        description TEXT NULL,
+        cover_image_url TEXT NULL,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_by UUID NULL REFERENCES public.teachers(id) ON DELETE SET NULL,
+        updated_by UUID NULL REFERENCES public.teachers(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        deleted_at TIMESTAMPTZ NULL
+      )
+    `
+
+    await db`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'teacher_project_categories_locale_check'
+        ) THEN
+          ALTER TABLE public.teacher_project_categories
+            ADD CONSTRAINT teacher_project_categories_locale_check
+            CHECK (locale IN ('pt-BR', 'es'));
+        END IF;
+      END
+      $$;
+    `
+
+    await db`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'teacher_project_categories_status_check'
+        ) THEN
+          ALTER TABLE public.teacher_project_categories
+            ADD CONSTRAINT teacher_project_categories_status_check
+            CHECK (status IN ('active', 'archived'));
+        END IF;
+      END
+      $$;
+    `
+
+    await db`
+      CREATE INDEX IF NOT EXISTS teacher_project_categories_locale_status_idx
+      ON public.teacher_project_categories(locale, status, sort_order, title)
+    `
+
+    await db`
+      INSERT INTO public.teacher_project_categories (
+        locale,
+        status,
+        title,
+        description,
+        cover_image_url,
+        sort_order
+      )
+      SELECT
+        'pt-BR',
+        'active',
+        'Geral',
+        'Projetos gerais com Arduino, Micro:Bit, MakeyMakey, MBlock, programação e circuitos.',
+        '/project-general-cover-v2.webp',
+        0
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM public.teacher_project_categories
+        WHERE locale = 'pt-BR'
+          AND title = 'Geral'
+          AND deleted_at IS NULL
+      )
+    `
+
+    await db`
+      INSERT INTO public.teacher_project_categories (
+        locale,
+        status,
+        title,
+        description,
+        cover_image_url,
+        sort_order
+      )
+      SELECT
+        'es',
+        'active',
+        'General',
+        'Proyectos generales con Arduino, Micro:Bit, MakeyMakey, MBlock, programación y circuitos.',
+        '/project-general-cover-v2.webp',
+        0
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM public.teacher_project_categories
+        WHERE locale = 'es'
+          AND title = 'General'
+          AND deleted_at IS NULL
+      )
+    `
+
+    await db`
+      UPDATE public.teacher_project_categories
+      SET
+        cover_image_url = '/project-general-cover-v2.webp',
+        updated_at = NOW()
+      WHERE deleted_at IS NULL
+        AND (
+          (locale = 'pt-BR' AND title = 'Geral')
+          OR (locale = 'es' AND title = 'General')
+        )
+        AND cover_image_url IS DISTINCT FROM '/project-general-cover-v2.webp'
+    `
 
     await db`
       CREATE TABLE IF NOT EXISTS public.teacher_projects (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        category_id UUID NULL REFERENCES public.teacher_project_categories(id) ON DELETE SET NULL,
         project_type TEXT NOT NULL DEFAULT 'arduino_mblock',
         locale TEXT NOT NULL DEFAULT 'pt-BR',
         status TEXT NOT NULL DEFAULT 'draft',
@@ -443,6 +568,27 @@ export async function ensureProjectsSchema() {
     await db`
       ALTER TABLE public.teacher_projects
       ADD COLUMN IF NOT EXISTS locale TEXT NULL
+    `
+
+    await db`
+      ALTER TABLE public.teacher_projects
+      ADD COLUMN IF NOT EXISTS category_id UUID NULL
+    `
+
+    await db`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'teacher_projects_category_id_fkey'
+        ) THEN
+          ALTER TABLE public.teacher_projects
+            ADD CONSTRAINT teacher_projects_category_id_fkey
+            FOREIGN KEY (category_id)
+            REFERENCES public.teacher_project_categories(id)
+            ON DELETE SET NULL;
+        END IF;
+      END
+      $$;
     `
 
     await db`
@@ -519,6 +665,47 @@ export async function ensureProjectsSchema() {
     await db`
       CREATE INDEX IF NOT EXISTS teacher_projects_locale_status_idx
       ON public.teacher_projects(locale, status, published_at DESC)
+    `
+
+    await db`
+      CREATE INDEX IF NOT EXISTS teacher_projects_category_idx
+      ON public.teacher_projects(category_id, status, updated_at DESC)
+    `
+
+    await db`
+      WITH general AS (
+        SELECT id
+        FROM public.teacher_project_categories
+        WHERE locale = 'pt-BR'
+          AND title = 'Geral'
+          AND deleted_at IS NULL
+        ORDER BY created_at ASC
+        LIMIT 1
+      )
+      UPDATE public.teacher_projects p
+      SET category_id = (SELECT id FROM general),
+          updated_at = NOW()
+      WHERE p.category_id IS NULL
+        AND COALESCE(p.locale, 'pt-BR') = 'pt-BR'
+        AND EXISTS (SELECT 1 FROM general)
+    `
+
+    await db`
+      WITH general AS (
+        SELECT id
+        FROM public.teacher_project_categories
+        WHERE locale = 'es'
+          AND title = 'General'
+          AND deleted_at IS NULL
+        ORDER BY created_at ASC
+        LIMIT 1
+      )
+      UPDATE public.teacher_projects p
+      SET category_id = (SELECT id FROM general),
+          updated_at = NOW()
+      WHERE p.category_id IS NULL
+        AND COALESCE(p.locale, 'pt-BR') = 'es'
+        AND EXISTS (SELECT 1 FROM general)
     `
 
     await db`

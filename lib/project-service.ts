@@ -1,6 +1,7 @@
 import { db } from "@/lib/db"
 import {
   createProjectRevision,
+  normalizeProjectCategoryId,
   normalizeProjectLocale,
   normalizeProjectAssets,
   normalizeProjectLinks,
@@ -13,18 +14,42 @@ import {
 import { normalizeProjectFileUrl } from "@/lib/project-file-url"
 
 export async function loadProjectFull(projectId: string) {
-  const [project] = await db`
-    SELECT
-      p.*,
-      creator.name AS created_by_name,
-      updater.name AS updated_by_name
-    FROM public.teacher_projects p
-    LEFT JOIN public.teachers creator ON creator.id = p.created_by
-    LEFT JOIN public.teachers updater ON updater.id = p.updated_by
-    WHERE p.id = ${projectId}
-      AND p.deleted_at IS NULL
-    LIMIT 1
-  `
+  let project: any = null
+  try {
+    ;[project] = await db`
+      SELECT
+        p.*,
+        creator.name AS created_by_name,
+        updater.name AS updated_by_name,
+        category.title AS category_title,
+        category.description AS category_description,
+        category.cover_image_url AS category_cover_image_url
+      FROM public.teacher_projects p
+      LEFT JOIN public.teachers creator ON creator.id = p.created_by
+      LEFT JOIN public.teachers updater ON updater.id = p.updated_by
+      LEFT JOIN public.teacher_project_categories category ON category.id = p.category_id
+      WHERE p.id = ${projectId}
+        AND p.deleted_at IS NULL
+      LIMIT 1
+    `
+  } catch (error) {
+    console.error("[project-service.loadProjectFull] category join failed", error)
+    ;[project] = await db`
+      SELECT
+        p.*,
+        creator.name AS created_by_name,
+        updater.name AS updated_by_name,
+        NULL::text AS category_title,
+        NULL::text AS category_description,
+        NULL::text AS category_cover_image_url
+      FROM public.teacher_projects p
+      LEFT JOIN public.teachers creator ON creator.id = p.created_by
+      LEFT JOIN public.teachers updater ON updater.id = p.updated_by
+      WHERE p.id = ${projectId}
+        AND p.deleted_at IS NULL
+      LIMIT 1
+    `
+  }
   if (!project) return null
 
   const assets = await db`
@@ -76,6 +101,7 @@ export async function loadProjectFull(projectId: string) {
   return {
     ...project,
     cover_image_url: normalizeProjectFileUrl(project.cover_image_url),
+    category_cover_image_url: normalizeProjectFileUrl(project.category_cover_image_url),
     gallery_images: assets
       .filter((item: any) => String(item.asset_type) === "gallery_image")
       .map((item: any) => ({ ...item, file_url: normalizeProjectFileUrl(item.file_url) })),
@@ -111,6 +137,7 @@ export async function applyProjectSnapshotFromRevision(projectId: string, revisi
   }
 
   const projectType = normalizeProjectType(project.project_type)
+  const categoryId = normalizeProjectCategoryId(project.category_id)
   const locale = normalizeProjectLocale(project.locale)
   const status = normalizeProjectStatus(project.status)
   const links = normalizeProjectLinks(snapshot?.links ?? [])
@@ -132,6 +159,7 @@ export async function applyProjectSnapshotFromRevision(projectId: string, revisi
   await db`
     UPDATE public.teacher_projects
     SET
+      category_id = ${categoryId},
       project_type = ${projectType},
       locale = ${locale},
       status = ${status},

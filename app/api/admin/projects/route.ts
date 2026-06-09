@@ -5,6 +5,7 @@ import { requireProjectAdminApi } from "@/lib/auth/project-admin-server"
 import {
   createProjectRevision,
   ensureProjectsSchema,
+  normalizeProjectCategoryId,
   normalizeProjectAssets,
   normalizeProjectCountryList,
   normalizeProjectLocale,
@@ -63,6 +64,7 @@ export async function GET(req: NextRequest) {
     items = await db`
       SELECT
         p.id,
+        p.category_id,
         p.locale,
         p.project_type,
         p.status,
@@ -81,6 +83,8 @@ export async function GET(req: NextRequest) {
         p.updated_at,
         creator.name AS created_by_name,
         updater.name AS updated_by_name,
+        category.title AS category_title,
+        category.locale AS category_locale,
         (SELECT COUNT(*)::int FROM public.teacher_project_assets a WHERE a.project_id = p.id AND a.asset_type = 'gallery_image') AS images_count,
         (SELECT COUNT(*)::int FROM public.teacher_project_assets a WHERE a.project_id = p.id AND a.asset_type = 'document') AS documents_count,
         (SELECT COUNT(*)::int FROM public.teacher_project_links l WHERE l.project_id = p.id) AS links_count,
@@ -88,6 +92,7 @@ export async function GET(req: NextRequest) {
       FROM public.teacher_projects p
       LEFT JOIN public.teachers creator ON creator.id = p.created_by
       LEFT JOIN public.teachers updater ON updater.id = p.updated_by
+      LEFT JOIN public.teacher_project_categories category ON category.id = p.category_id
       WHERE p.deleted_at IS NULL
         ${qFilter}
         ${statusFilter}
@@ -161,6 +166,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
 
   const project_type = normalizeProjectType(body.project_type)
+  const category_id = normalizeProjectCategoryId(body.category_id)
   const locale = normalizeProjectLocale(body.locale)
   const status = normalizeProjectStatus(body.status)
   const titleSingle = String(body.title ?? "").trim()
@@ -204,8 +210,24 @@ export async function POST(req: NextRequest) {
   const galleryImages = normalizeProjectAssets(body.gallery_images, "gallery_image")
   const documents = normalizeProjectAssets(body.documents, "document")
 
+  if (category_id) {
+    const [category] = await db`
+      SELECT id
+      FROM public.teacher_project_categories
+      WHERE id = ${category_id}
+        AND locale = ${locale}
+        AND status = 'active'
+        AND deleted_at IS NULL
+      LIMIT 1
+    `
+    if (!category) {
+      return NextResponse.json({ error: "Categoria inválida para o idioma selecionado." }, { status: 400 })
+    }
+  }
+
   const [created] = await db`
     INSERT INTO public.teacher_projects (
+      category_id,
       project_type,
       locale,
       status,
@@ -224,6 +246,7 @@ export async function POST(req: NextRequest) {
       updated_by
     )
     VALUES (
+      ${category_id},
       ${project_type},
       ${locale},
       ${status},
@@ -267,6 +290,7 @@ export async function POST(req: NextRequest) {
     target: { type: "project", id: projectId },
     metadata: {
       project_type,
+      category_id,
       status,
       access_scope,
       target_teacher_ids_count: target_teacher_ids.length,

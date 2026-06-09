@@ -23,17 +23,43 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
   const locale = normalizeProjectLocale(req.nextUrl.searchParams.get("locale") ?? auth.teacher.locale)
 
-  const [project] = await db`
-    SELECT
-      p.*,
-      creator.name AS created_by_name
-    FROM public.teacher_projects p
-    LEFT JOIN public.teachers creator ON creator.id = p.created_by
-    WHERE p.id = ${id}
-      AND p.deleted_at IS NULL
-      AND p.status = 'published'
-    LIMIT 1
-  `
+  let project: any = null
+  try {
+    ;[project] = await db`
+      SELECT
+        p.*,
+        creator.name AS created_by_name,
+        category.title AS category_title,
+        category.description AS category_description,
+        category.cover_image_url AS category_cover_image_url
+      FROM public.teacher_projects p
+      LEFT JOIN public.teachers creator ON creator.id = p.created_by
+      LEFT JOIN public.teacher_project_categories category
+        ON category.id = p.category_id
+        AND category.status = 'active'
+        AND category.deleted_at IS NULL
+      WHERE p.id = ${id}
+        AND p.deleted_at IS NULL
+        AND p.status = 'published'
+      LIMIT 1
+    `
+  } catch (error) {
+    console.error("[portal.projects.detail] category join failed", error)
+    ;[project] = await db`
+      SELECT
+        p.*,
+        creator.name AS created_by_name,
+        NULL::text AS category_title,
+        NULL::text AS category_description,
+        NULL::text AS category_cover_image_url
+      FROM public.teacher_projects p
+      LEFT JOIN public.teachers creator ON creator.id = p.created_by
+      WHERE p.id = ${id}
+        AND p.deleted_at IS NULL
+        AND p.status = 'published'
+      LIMIT 1
+    `
+  }
 
   if (!project) return NextResponse.json({ error: "Projeto não encontrado." }, { status: 404 })
 
@@ -94,6 +120,9 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     summary: locale === "es" ? String(project.summary_es ?? "") : String(project.summary_pt ?? ""),
     introduction: locale === "es" ? String(project.summary_es ?? "") : String(project.summary_pt ?? ""),
     cover_image_url: normalizeProjectFileUrl(project.cover_image_url),
+    category_title: project.category_title ? String(project.category_title ?? "") : null,
+    category_description: project.category_title ? String(project.category_description ?? "") : null,
+    category_cover_image_url: project.category_title ? normalizeProjectFileUrl(project.category_cover_image_url) : null,
     gallery_images: assets
       .filter((item: any) => String(item.asset_type) === "gallery_image")
       .map((item: any) => ({ ...item, file_url: normalizeProjectFileUrl(item.file_url) })),

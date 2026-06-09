@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Capa geral de projetos BlueWorld9</title>
+  <desc id="desc">Imagem com Arduino, Micro:Bit, MakeyMakey, MBlock, Programação e Circuitos.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#061826"/>
+      <stop offset="0.48" stop-color="#0f2f3f"/>
+      <stop offset="1" stop-color="#10261c"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#21d4fd" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#35f08f" stop-opacity="0.28"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="22" stdDeviation="24" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <path d="M0 720 C230 650 330 780 550 705 C795 620 890 505 1110 575 C1330 645 1410 520 1600 565 L1600 900 L0 900 Z" fill="#0ea5a3" opacity="0.16"/>
+  <path d="M0 115 C185 170 310 62 500 115 C720 176 840 108 1025 80 C1275 42 1420 92 1600 55 L1600 0 L0 0 Z" fill="#22c55e" opacity="0.12"/>
+
+  <g stroke="#67e8f9" stroke-width="4" stroke-linecap="round" opacity="0.52">
+    <path d="M140 205 H390 V320 H530"/>
+    <path d="M1220 182 H1360 V330 H1470"/>
+    <path d="M170 665 H330 V575 H490"/>
+    <path d="M1075 715 H1235 V640 H1435"/>
+    <circle cx="390" cy="320" r="8" fill="#67e8f9"/>
+    <circle cx="530" cy="320" r="8" fill="#67e8f9"/>
+    <circle cx="1360" cy="330" r="8" fill="#67e8f9"/>
+    <circle cx="330" cy="575" r="8" fill="#67e8f9"/>
+    <circle cx="1235" cy="640" r="8" fill="#67e8f9"/>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="245" y="210" width="1110" height="480" rx="44" fill="#071521" opacity="0.72"/>
+    <rect x="245" y="210" width="1110" height="480" rx="44" fill="url(#panel)" opacity="0.54"/>
+    <rect x="285" y="250" width="1030" height="400" rx="32" fill="#0b1220" opacity="0.66"/>
+  </g>
+
+  <g transform="translate(355 306)" filter="url(#softShadow)">
+    <rect x="0" y="0" width="250" height="170" rx="28" fill="#0f766e"/>
+    <rect x="24" y="28" width="202" height="114" rx="18" fill="#052e2b" opacity="0.78"/>
+    <circle cx="54" cy="58" r="15" fill="#67e8f9"/>
+    <circle cx="105" cy="58" r="15" fill="#a7f3d0"/>
+    <circle cx="156" cy="58" r="15" fill="#fde68a"/>
+    <circle cx="207" cy="58" r="15" fill="#fda4af"/>
+    <rect x="46" y="101" width="158" height="18" rx="9" fill="#99f6e4"/>
+    <text x="125" y="218" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#ffffff">Arduino</text>
+  </g>
+
+  <g transform="translate(675 286)" filter="url(#softShadow)">
+    <rect x="0" y="0" width="250" height="210" rx="42" fill="#1e3a8a"/>
+    <circle cx="72" cy="62" r="18" fill="#93c5fd"/>
+    <circle cx="178" cy="62" r="18" fill="#93c5fd"/>
+    <path d="M73 137 C104 168 147 168 178 137" fill="none" stroke="#dbeafe" stroke-width="13" stroke-linecap="round"/>
+    <g fill="#60a5fa" opacity="0.9">
+      <circle cx="45" cy="105" r="8"/>
+      <circle cx="75" cy="105" r="8"/>
+      <circle cx="105" cy="105" r="8"/>
+      <circle cx="145" cy="105" r="8"/>
+      <circle cx="175" cy="105" r="8"/>
+      <circle cx="205" cy="105" r="8"/>
+    </g>
+    <text x="125" y="258" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#ffffff">Micro:Bit</text>
+  </g>
+
+  <g transform="translate(995 306)" filter="url(#softShadow)">
+    <rect x="0" y="0" width="250" height="170" rx="34" fill="#7c3aed"/>
+    <circle cx="58" cy="88" r="30" fill="#fef3c7"/>
+    <circle cx="125" cy="88" r="30" fill="#bfdbfe"/>
+    <circle cx="192" cy="88" r="30" fill="#bbf7d0"/>
+    <path d="M58 88 H192" stroke="#ffffff" stroke-width="10" stroke-linecap="round" opacity="0.75"/>
+    <text x="125" y="218" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#ffffff">MakeyMakey</text>
+  </g>
+
+  <g transform="translate(455 600)">
+    <rect x="0" y="0" width="220" height="56" rx="28" fill="#f97316"/>
+    <text x="110" y="38" text-anchor="middle" font-family="Arial, sans-serif" font-size="27" font-weight="700" fill="#ffffff">MBlock</text>
+  </g>
+  <g transform="translate(715 600)">
+    <rect x="0" y="0" width="245" height="56" rx="28" fill="#0891b2"/>
+    <text x="122" y="38" text-anchor="middle" font-family="Arial, sans-serif" font-size="27" font-weight="700" fill="#ffffff">Programação</text>
+  </g>
+  <g transform="translate(1000 600)">
+    <rect x="0" y="0" width="220" height="56" rx="28" fill="#16a34a"/>
+    <text x="110" y="38" text-anchor="middle" font-family="Arial, sans-serif" font-size="27" font-weight="700" fill="#ffffff">Circuitos</text>
+  </g>
+
+  <text x="800" y="168" text-anchor="middle" font-family="Arial, sans-serif" font-size="52" font-weight="800" fill="#ffffff">Projetos Gerais</text>
+  <text x="800" y="735" text-anchor="middle" font-family="Arial, sans-serif" font-size="25" font-weight="500" fill="#cbd5e1">Arduino, Micro:Bit, MakeyMakey, MBlock, Programação e Circuitos</text>
+</svg>

@@ -18,10 +18,24 @@ export async function GET() {
     ORDER BY name ASC
   `
 
+  let categories: any[] = []
+  try {
+    categories = await db`
+      SELECT id, locale, title, description, cover_image_url, sort_order
+      FROM public.teacher_project_categories
+      WHERE status = 'active'
+        AND deleted_at IS NULL
+      ORDER BY locale ASC, sort_order ASC, title ASC
+    `
+  } catch (error) {
+    console.error("[admin.projects.options] categories query failed", error)
+  }
+
   const limits = getProjectUploadLimits()
 
   return NextResponse.json({
     teachers,
+    categories,
     student_year_options: TURMA_YEAR_OPTIONS,
     countries: ["BR", "UY", "PY"],
     upload_limits: {

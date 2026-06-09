@@ -54,6 +54,13 @@ type StudentYearOption = {
   label: string
 }
 
+type CategoryOption = {
+  id: string
+  locale: ProjectLocale
+  title: string
+  description?: string | null
+}
+
 type RevisionRow = {
   id: string
   revision_number: number
@@ -89,12 +96,6 @@ const STATUS_LABEL: Record<ProjectStatus, string> = {
   archived: "Arquivado",
 }
 
-const TYPE_LABEL: Record<ProjectType, string> = {
-  arduino_mblock: "Arduino + MBlock",
-  programming: "Programação",
-  custom: "Personalizado",
-}
-
 const COVER_IMAGE_RECOMMENDATION = "Recomendado: 1600 x 900 px (16:9). Minimo: 1280 x 720 px."
 const GALLERY_IMAGE_RECOMMENDATION =
   "Recomendado: 1200 x 1200 px (1:1) ou 1600 x 900 px (16:9). Minimo: 1080 px no menor lado."
@@ -117,6 +118,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
   const [projectLocale, setProjectLocale] = useState<ProjectLocale>("pt-BR")
   const [projectType, setProjectType] = useState<ProjectType>("arduino_mblock")
   const [status, setStatus] = useState<ProjectStatus>("draft")
+  const [categoryId, setCategoryId] = useState("")
   const [title, setTitle] = useState("")
   const [summary, setSummary] = useState("")
   const [coverImageUrl, setCoverImageUrl] = useState("")
@@ -132,6 +134,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
   const [revisions, setRevisions] = useState<RevisionRow[]>([])
 
   const [teachers, setTeachers] = useState<TeacherOption[]>([])
+  const [categories, setCategories] = useState<CategoryOption[]>([])
   const [studentYearOptions, setStudentYearOptions] = useState<StudentYearOption[]>([])
   const [uploadConfig, setUploadConfig] = useState<{ image_limit_mb: number; document_limit_mb: number } | null>(null)
 
@@ -154,6 +157,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
     setSavedProjectId(String(project?.id ?? "").trim() || null)
     setProjectType((project?.project_type as ProjectType) || "arduino_mblock")
     setStatus((project?.status as ProjectStatus) || "draft")
+    setCategoryId(String(project?.category_id ?? "").trim())
 
     const locale: ProjectLocale = project?.locale === "es" ? "es" : "pt-BR"
     setProjectLocale(locale)
@@ -238,6 +242,16 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
         if (!active) return
 
         setTeachers(Array.isArray(options?.teachers) ? options.teachers : [])
+        setCategories(
+          Array.isArray(options?.categories)
+            ? options.categories.map((item: any) => ({
+                id: String(item?.id ?? ""),
+                locale: item?.locale === "es" ? "es" : "pt-BR",
+                title: String(item?.title ?? ""),
+                description: String(item?.description ?? "") || null,
+              }))
+            : [],
+        )
         setStudentYearOptions(
           Array.isArray(options?.student_year_options)
             ? options.student_year_options.map((item: any) => ({
@@ -497,6 +511,11 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
       return
     }
 
+    if (!categoryId) {
+      alert("Selecione uma categoria para padronizar a exibição do projeto.")
+      return
+    }
+
     if (
       accessScope === "targeted" &&
       targetTeacherIds.length === 0 &&
@@ -511,6 +530,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
       project_type: projectType,
       status,
       locale: projectLocale,
+      category_id: categoryId || null,
       title: normalizedTitle,
       summary: summary.trim() || null,
       cover_image_url: coverImageUrl.trim() || null,
@@ -597,6 +617,8 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
     return <div className="p-6 text-white">Carregando editor de projetos...</div>
   }
 
+  const categoryOptions = categories.filter((category) => category.locale === projectLocale)
+
   return (
     <div className="p-4 md:p-6 text-white space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -623,17 +645,17 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-slate-200">Tipo</Label>
+              <Label className="text-slate-200">Idioma</Label>
               <select
                 className="h-10 rounded-md bg-slate-800/60 border border-slate-700 px-3 text-white w-full"
-                value={projectType}
-                onChange={(event) => setProjectType(event.target.value as ProjectType)}
+                value={projectLocale}
+                onChange={(event) => {
+                  setProjectLocale(event.target.value as ProjectLocale)
+                  setCategoryId("")
+                }}
               >
-                {(Object.keys(TYPE_LABEL) as ProjectType[]).map((key) => (
-                  <option key={key} value={key}>
-                    {TYPE_LABEL[key]}
-                  </option>
-                ))}
+                <option className="bg-slate-800 text-white" value="pt-BR">Português</option>
+                <option className="bg-slate-800 text-white" value="es">Espanhol</option>
               </select>
             </div>
             <div className="space-y-1">
@@ -650,6 +672,27 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-slate-200">Categoria</Label>
+            <select
+              className="h-10 rounded-md bg-slate-800/60 border border-slate-700 px-3 text-white w-full"
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
+            >
+              <option className="bg-slate-800 text-white" value="">
+                Selecione uma categoria
+              </option>
+              {categoryOptions.map((category) => (
+                <option key={category.id} className="bg-slate-800 text-white" value={category.id}>
+                  {category.title}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-400">
+              As categorias aparecem para os professores antes da lista de projetos.
+            </p>
           </div>
 
           <div className="space-y-1">

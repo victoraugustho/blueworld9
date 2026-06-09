@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ChevronRight, Code, Cpu, FileText, Image as ImageIcon, Layers } from "lucide-react"
+import { ArrowLeft, ChevronRight, FileText, Image as ImageIcon, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,52 +17,25 @@ type ProjectItem = {
   title_es: string
   summary_pt?: string | null
   summary_es?: string | null
-  project_type: "arduino_mblock" | "programming" | "custom"
   cover_image_url?: string | null
   images_count: number
   documents_count: number
   updated_at: string
+  category_id?: string | null
+  category_title?: string | null
+  category_description?: string | null
+  category_cover_image_url?: string | null
+  category_sort_order?: number | null
 }
 
-const TYPE_META: Record<
-  ProjectItem["project_type"],
-  {
-    label_pt: string
-    label_es: string
-    icon: typeof Cpu
-    badgeClass: string
-    borderClass: string
-    glowClass: string
-    iconClass: string
-  }
-> = {
-  arduino_mblock: {
-    label_pt: "Arduino + MBlock",
-    label_es: "Arduino + MBlock",
-    icon: Cpu,
-    badgeClass: "bg-cyan-500/20 border-cyan-300/35 text-cyan-100",
-    borderClass: "border-cyan-300/25",
-    glowClass: "from-cyan-500/10 via-slate-900/35 to-blue-500/10",
-    iconClass: "bg-cyan-500/20 border-cyan-300/35 text-cyan-100",
-  },
-  programming: {
-    label_pt: "Programação",
-    label_es: "Programación",
-    icon: Code,
-    badgeClass: "bg-emerald-500/20 border-emerald-300/35 text-emerald-100",
-    borderClass: "border-emerald-300/25",
-    glowClass: "from-emerald-500/10 via-slate-900/35 to-teal-500/10",
-    iconClass: "bg-emerald-500/20 border-emerald-300/35 text-emerald-100",
-  },
-  custom: {
-    label_pt: "Personalizado",
-    label_es: "Personalizado",
-    icon: Layers,
-    badgeClass: "bg-violet-500/20 border-violet-300/35 text-violet-100",
-    borderClass: "border-violet-300/25",
-    glowClass: "from-violet-500/10 via-slate-900/35 to-indigo-500/10",
-    iconClass: "bg-violet-500/20 border-violet-300/35 text-violet-100",
-  },
+type ProjectCategoryView = {
+  key: string
+  id: string | null
+  title: string
+  description: string
+  cover_image_url: string | null
+  sort_order: number
+  projects: ProjectItem[]
 }
 
 function formatDate(value: string | null | undefined, locale: Locale) {
@@ -76,6 +49,7 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<ProjectItem[]>([])
   const [query, setQuery] = useState("")
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -87,6 +61,7 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
     const res = await fetch(`/api/portal/projects?${params.toString()}`, { cache: "no-store" })
     const data = await res.json().catch(() => ({}))
     setItems(Array.isArray(data?.items) ? data.items : [])
+    setSelectedCategoryKey(null)
     setLoading(false)
   }
 
@@ -104,9 +79,15 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
         apply: "Aplicar",
         updatedAt: "Actualizado en",
         open: "Abrir proyecto",
+        openCategory: "Abrir categoría",
+        backToCategories: "Volver a categorías",
+        categories: "Categorías",
         images: "Imágenes",
         documents: "Documentos",
         shortId: "ID",
+        projectCount: "proyectos",
+        uncategorized: "General",
+        uncategorizedDescription: "Proyectos generales con Arduino, Micro:Bit, MakeyMakey, MBlock, programación y circuitos.",
         noResults: "No hay proyectos publicados para tu perfil.",
       }
     }
@@ -118,12 +99,113 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
       apply: "Aplicar",
       updatedAt: "Atualizado em",
       open: "Abrir projeto",
+      openCategory: "Abrir categoria",
+      backToCategories: "Voltar às categorias",
+      categories: "Categorias",
       images: "Imagens",
       documents: "Documentos",
       shortId: "ID",
+      projectCount: "projetos",
+      uncategorized: "Geral",
+      uncategorizedDescription: "Projetos gerais com Arduino, Micro:Bit, MakeyMakey, MBlock, programação e circuitos.",
       noResults: "Não há projetos publicados para o seu perfil.",
     }
   }, [locale])
+
+  const categories = useMemo<ProjectCategoryView[]>(() => {
+    const map = new Map<string, ProjectCategoryView>()
+
+    for (const item of items) {
+      const hasCategory = Boolean(item.category_id && item.category_title)
+      const key = hasCategory ? String(item.category_id) : "__general"
+
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          id: hasCategory ? String(item.category_id) : null,
+          title: hasCategory ? String(item.category_title) : labels.uncategorized,
+          description: hasCategory
+            ? String(item.category_description ?? "")
+            : labels.uncategorizedDescription,
+          cover_image_url: hasCategory ? String(item.category_cover_image_url ?? "") || null : "/project-general-cover-v2.webp",
+          sort_order: hasCategory ? Number(item.category_sort_order ?? 0) : 999999,
+          projects: [],
+        })
+      }
+
+      map.get(key)?.projects.push(item)
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order
+      return a.title.localeCompare(b.title)
+    })
+  }, [items, labels.uncategorized, labels.uncategorizedDescription])
+
+  const selectedCategory = selectedCategoryKey
+    ? categories.find((category) => category.key === selectedCategoryKey) ?? null
+    : null
+  const visibleProjects = selectedCategory ? selectedCategory.projects : []
+
+  function renderProjectCard(item: ProjectItem) {
+    const shortId = String(item.id).slice(0, 8).toUpperCase()
+
+    return (
+      <Card key={item.id} className="group relative overflow-hidden border-white/10 bg-slate-900/35 backdrop-blur">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-slate-900/35 to-emerald-500/10" />
+        <CardContent className="relative p-0">
+          <div className="aspect-[21/9] w-full border-b border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/40 flex items-center justify-center overflow-hidden">
+            {item.cover_image_url ? (
+              <img src={item.cover_image_url} alt={item.title} className="h-full w-full object-contain" />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center">
+                <ImageIcon className="w-7 h-7 text-slate-500" />
+              </div>
+            )}
+          </div>
+
+          <div className="p-2.5 space-y-2">
+            <div className="flex items-start gap-2">
+              <div className="h-9 w-9 shrink-0 rounded-lg border border-cyan-300/35 bg-cyan-500/20 text-cyan-100 flex items-center justify-center">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex items-center flex-wrap gap-2">
+                  <span className="text-[11px] text-slate-400">{labels.shortId}: {shortId}</span>
+                </div>
+                <h3 className="text-base font-semibold text-white line-clamp-2">{item.title}</h3>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-200/95 line-clamp-3">{item.summary || "-"}</p>
+
+            <div className="flex flex-wrap gap-1.5 text-[11px]">
+              <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-0.5 text-slate-200">
+                <ImageIcon className="w-3 h-3" />
+                {labels.images}: {item.images_count}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-0.5 text-slate-200">
+                <FileText className="w-3 h-3" />
+                {labels.documents}: {item.documents_count}
+              </span>
+            </div>
+
+            <div className="pt-1 border-t border-white/10 flex items-center justify-between gap-2">
+              <p className="text-[11px] text-slate-400 line-clamp-1">
+                {labels.updatedAt}: {formatDate(item.updated_at, locale)}
+              </p>
+              <Link href={`/portal/dashboard/projetos/${item.id}`}>
+                <Button size="sm" className="bg-cyan-600/90 hover:bg-cyan-700 text-white h-8">
+                  <span>{labels.open}</span>
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -146,77 +228,68 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2">
-        {items.map((item) => {
-          const meta = TYPE_META[item.project_type]
-          const Icon = meta.icon
-          const shortId = String(item.id).slice(0, 8).toUpperCase()
-          const typeLabel = locale === "es" ? meta.label_es : meta.label_pt
+      {!selectedCategory ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-lg font-semibold text-white">{labels.categories}</h3>
+            <span className="text-xs text-slate-400">{categories.length}</span>
+          </div>
 
-          return (
-            <Card key={item.id} className={`group relative overflow-hidden bg-slate-900/35 backdrop-blur ${meta.borderClass}`}>
-              <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${meta.glowClass}`} />
-              <CardContent className="relative p-0">
-                <div className="aspect-[21/9] w-full border-b border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/40 flex items-center justify-center overflow-hidden">
-                  {item.cover_image_url ? (
-                    <img
-                      src={item.cover_image_url}
-                      alt={item.title}
-                      className="h-full w-full object-contain"
-                    />
+          <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2">
+            {categories.map((category) => (
+              <button
+                key={category.key}
+                type="button"
+                onClick={() => setSelectedCategoryKey(category.key)}
+                className="group overflow-hidden rounded-lg border border-white/10 bg-slate-900/35 text-left backdrop-blur transition hover:border-cyan-300/40 hover:bg-white/10"
+              >
+                <div className="aspect-[16/7] w-full border-b border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/40 flex items-center justify-center overflow-hidden">
+                  {category.cover_image_url ? (
+                    <img src={category.cover_image_url} alt={category.title} className="h-full w-full object-contain" />
                   ) : (
-                    <div className="h-full w-full flex items-center justify-center">
-                      <ImageIcon className="w-7 h-7 text-slate-500" />
-                    </div>
+                    <ImageIcon className="h-8 w-8 text-slate-500" />
                   )}
                 </div>
-
-                <div className="p-2.5 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <div className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center ${meta.iconClass}`}>
-                      <Icon className="w-5 h-5" />
+                <div className="p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="text-base font-semibold text-white line-clamp-2">{category.title}</h3>
+                      <p className="mt-1 text-sm text-slate-300 line-clamp-2">{category.description || "-"}</p>
                     </div>
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center flex-wrap gap-2">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${meta.badgeClass}`}>
-                          {typeLabel}
-                        </span>
-                        <span className="text-[11px] text-slate-400">{labels.shortId}: {shortId}</span>
-                      </div>
-                      <h3 className="text-base font-semibold text-white line-clamp-2">{item.title}</h3>
-                    </div>
+                    <ChevronRight className="h-5 w-5 shrink-0 text-cyan-200 transition group-hover:translate-x-0.5" />
                   </div>
-
-                  <p className="text-sm text-slate-200/95 line-clamp-3">{item.summary || "-"}</p>
-
-                  <div className="flex flex-wrap gap-1.5 text-[11px]">
-                    <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-0.5 text-slate-200">
-                      <ImageIcon className="w-3 h-3" />
-                      {labels.images}: {item.images_count}
+                  <div className="flex items-center justify-between gap-2 border-t border-white/10 pt-2">
+                    <span className="text-xs text-slate-400">
+                      {category.projects.length} {labels.projectCount}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-0.5 text-slate-200">
-                      <FileText className="w-3 h-3" />
-                      {labels.documents}: {item.documents_count}
-                    </span>
-                  </div>
-
-                  <div className="pt-1 border-t border-white/10 flex items-center justify-between gap-2">
-                    <p className="text-[11px] text-slate-400 line-clamp-1">
-                      {labels.updatedAt}: {formatDate(item.updated_at, locale)}
-                    </p>
-                    <Link href={`/portal/dashboard/projetos/${item.id}`}>
-                      <Button size="sm" className="bg-cyan-600/90 hover:bg-cyan-700 text-white h-8">
-                        <span>{labels.open}</span>
-                        <ChevronRight className="w-4 h-4 ml-1" />
-                      </Button>
-                    </Link>
+                    <span className="text-xs font-medium text-cyan-200">{labels.openCategory}</span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-xl font-semibold text-white">{selectedCategory.title}</h3>
+              <p className="text-sm text-slate-300">{selectedCategory.description || "-"}</p>
+            </div>
+            <Button
+              className="bg-white/10 hover:bg-white/15 border border-white/10"
+              onClick={() => setSelectedCategoryKey(null)}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              {labels.backToCategories}
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2">
+            {visibleProjects.map((item) => renderProjectCard(item))}
+          </div>
+        </div>
+      )}
 
       {!loading && items.length === 0 ? (
         <Card className="bg-slate-900/20 border border-white/10 backdrop-blur">

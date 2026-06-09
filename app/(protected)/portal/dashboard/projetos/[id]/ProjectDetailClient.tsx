@@ -20,6 +20,9 @@ type ProjectDetail = {
   summary_es?: string | null
   cover_image_url?: string | null
   project_type?: "arduino_mblock" | "programming" | "custom" | string
+  category_title?: string | null
+  category_description?: string | null
+  category_cover_image_url?: string | null
   created_at?: string | null
   updated_at?: string | null
   published_at?: string | null
@@ -102,7 +105,7 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
         emptyComments: "Aún no hay comentarios.",
         commentPlaceholder: "Comparte una experiencia, sugerencia o ajuste de clase...",
         notePlaceholder: "Registra observaciones privadas sobre cómo aplicar este proyecto en tus clases.",
-        type: "Tipo",
+        category: "Categoría",
         date: "Fecha",
         noSummary: "Sin introducción disponible.",
         noGallery: "Sin imágenes en la galería.",
@@ -143,7 +146,7 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
       emptyComments: "Ainda não há comentários.",
       commentPlaceholder: "Compartilhe uma experiência, sugestão ou ajuste de aula...",
       notePlaceholder: "Registre observações privadas sobre como aplicar este projeto nas suas turmas.",
-      type: "Tipo",
+      category: "Categoria",
       date: "Data",
       noSummary: "Sem introdução disponível.",
       noGallery: "Sem imagens na galeria.",
@@ -168,20 +171,9 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
     }
   }, [locale])
 
-  const projectTypeLabel = useMemo(() => {
-    if (!project?.project_type) return "-"
-    const type = String(project.project_type)
-    if (locale === "es") {
-      if (type === "arduino_mblock") return "Arduino + MBlock"
-      if (type === "programming") return "Programación"
-      if (type === "custom") return "Personalizado"
-      return type
-    }
-    if (type === "arduino_mblock") return "Arduino + MBlock"
-    if (type === "programming") return "Programação"
-    if (type === "custom") return "Personalizado"
-    return type
-  }, [locale, project?.project_type])
+  const projectCategoryLabel = useMemo(() => {
+    return String(project?.category_title ?? "").trim() || (locale === "es" ? "General" : "Geral")
+  }, [locale, project?.category_title])
 
   const projectDate = useMemo(() => {
     if (!project) return "-"
@@ -402,7 +394,7 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
             <p className="text-xs md:text-sm text-slate-100 max-w-3xl whitespace-pre-wrap">{introduction}</p>
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-200">
               <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5">
-                {labels.type}: {projectTypeLabel}
+                {labels.category}: {projectCategoryLabel}
               </span>
               <span className="rounded-full border border-cyan-300/35 bg-cyan-500/20 px-2.5 py-0.5 text-cyan-100">
                 {labels.date}: {projectDate}

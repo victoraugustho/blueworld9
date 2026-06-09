@@ -62,6 +62,8 @@ export async function POST(req: NextRequest) {
 
   const kindRaw = String(form.get("kind") ?? "image").trim().toLowerCase()
   const kind: "image" | "document" = kindRaw === "document" ? "document" : "image"
+  const scopeRaw = String(form.get("scope") ?? "project").trim().toLowerCase()
+  const isCategoryCover = scopeRaw === "category"
 
   const originalName = normalizeFilename(file.name || `arquivo-${Date.now()}`)
   const extension = getExtension(originalName)
@@ -83,7 +85,9 @@ export async function POST(req: NextRequest) {
     const now = new Date()
     const year = String(now.getFullYear())
     const month = String(now.getMonth() + 1).padStart(2, "0")
-    const dirRel = path.join("projects", year, month)
+    const dirRel = isCategoryCover
+      ? path.join("projects", "categories", year, month)
+      : path.join("projects", year, month)
     const baseDir = path.join(process.cwd(), "public", "uploads", dirRel)
     await fs.mkdir(baseDir, { recursive: true })
 
@@ -114,6 +118,7 @@ export async function POST(req: NextRequest) {
     actor: { id: auth.teacherId, email: auth.teacher.email, role: "admin", sessionId: auth.sessionId },
     metadata: {
       kind,
+      scope: isCategoryCover ? "category" : "project",
       original_name: originalName,
       mime_type: mimeType,
       size_bytes: file.size,
@@ -124,6 +129,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     success: true,
     kind,
+    scope: isCategoryCover ? "category" : "project",
     file_name: originalName,
     file_url: publicUrl,
     mime_type: mimeType || "application/octet-stream",

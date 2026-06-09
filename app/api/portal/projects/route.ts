@@ -33,44 +33,105 @@ export async function GET(req: NextRequest) {
     )`
     : db``
 
-  const rows = await db`
-    SELECT
-      p.id,
-      p.project_type,
-      p.status,
-      p.title_pt,
-      p.title_es,
-      p.summary_pt,
-      p.summary_es,
-      p.cover_image_url,
-      p.access_scope,
-      p.target_teacher_ids,
-      p.target_countries,
-      p.target_student_years,
-      p.target_class_ids,
-      p.published_at,
-      p.updated_at,
-      p.created_at,
-      creator.name AS created_by_name,
-      (
-        SELECT COUNT(*)::int
-        FROM public.teacher_project_assets a
-        WHERE a.project_id = p.id
-          AND a.asset_type = 'gallery_image'
-      ) AS images_count,
-      (
-        SELECT COUNT(*)::int
-        FROM public.teacher_project_assets a
-        WHERE a.project_id = p.id
-          AND a.asset_type = 'document'
-      ) AS documents_count
-    FROM public.teacher_projects p
-    LEFT JOIN public.teachers creator ON creator.id = p.created_by
-    WHERE p.deleted_at IS NULL
-      AND p.status = 'published'
-      ${qFilter}
-    ORDER BY COALESCE(p.published_at, p.updated_at, p.created_at) DESC
-  `
+  let rows: any[] = []
+  try {
+    rows = await db`
+      SELECT
+        p.id,
+        p.category_id,
+        p.project_type,
+        p.locale AS project_locale,
+        p.status,
+        p.title_pt,
+        p.title_es,
+        p.summary_pt,
+        p.summary_es,
+        p.cover_image_url,
+        p.access_scope,
+        p.target_teacher_ids,
+        p.target_countries,
+        p.target_student_years,
+        p.target_class_ids,
+        p.published_at,
+        p.updated_at,
+        p.created_at,
+        creator.name AS created_by_name,
+        category.title AS category_title,
+        category.description AS category_description,
+        category.cover_image_url AS category_cover_image_url,
+        category.sort_order AS category_sort_order,
+        (
+          SELECT COUNT(*)::int
+          FROM public.teacher_project_assets a
+          WHERE a.project_id = p.id
+            AND a.asset_type = 'gallery_image'
+        ) AS images_count,
+        (
+          SELECT COUNT(*)::int
+          FROM public.teacher_project_assets a
+          WHERE a.project_id = p.id
+            AND a.asset_type = 'document'
+        ) AS documents_count
+      FROM public.teacher_projects p
+      LEFT JOIN public.teachers creator ON creator.id = p.created_by
+      LEFT JOIN public.teacher_project_categories category
+        ON category.id = p.category_id
+        AND category.status = 'active'
+        AND category.deleted_at IS NULL
+      WHERE p.deleted_at IS NULL
+        AND p.status = 'published'
+        AND COALESCE(p.locale, 'pt-BR') = ${locale}
+        ${qFilter}
+      ORDER BY COALESCE(p.published_at, p.updated_at, p.created_at) DESC
+    `
+  } catch (error) {
+    console.error("[portal.projects.GET] category query failed, using project-only fallback", error)
+    rows = await db`
+      SELECT
+        p.id,
+        NULL::uuid AS category_id,
+        p.project_type,
+        p.locale AS project_locale,
+        p.status,
+        p.title_pt,
+        p.title_es,
+        p.summary_pt,
+        p.summary_es,
+        p.cover_image_url,
+        p.access_scope,
+        p.target_teacher_ids,
+        p.target_countries,
+        p.target_student_years,
+        p.target_class_ids,
+        p.published_at,
+        p.updated_at,
+        p.created_at,
+        creator.name AS created_by_name,
+        NULL::text AS category_title,
+        NULL::text AS category_description,
+        NULL::text AS category_cover_image_url,
+        999999::int AS category_sort_order,
+        (
+          SELECT COUNT(*)::int
+          FROM public.teacher_project_assets a
+          WHERE a.project_id = p.id
+            AND a.asset_type = 'gallery_image'
+        ) AS images_count,
+        (
+          SELECT COUNT(*)::int
+          FROM public.teacher_project_assets a
+          WHERE a.project_id = p.id
+            AND a.asset_type = 'document'
+        ) AS documents_count
+      FROM public.teacher_projects p
+      LEFT JOIN public.teachers creator ON creator.id = p.created_by
+      WHERE p.deleted_at IS NULL
+        AND p.status = 'published'
+        AND COALESCE(p.locale, 'pt-BR') = ${locale}
+        ${qFilter}
+      ORDER BY COALESCE(p.published_at, p.updated_at, p.created_at) DESC
+    `
+  }
 
   const scope = await loadTeacherScopeData(auth.teacherId)
   const visible = rows.filter((item: any) =>
@@ -89,6 +150,11 @@ export async function GET(req: NextRequest) {
     summary: locale === "es" ? String(item.summary_es ?? "") : String(item.summary_pt ?? ""),
     locale,
     cover_image_url: normalizeProjectFileUrl(item.cover_image_url),
+    category_id: item.category_title ? item.category_id : null,
+    category_title: item.category_title ? String(item.category_title ?? "") : null,
+    category_description: item.category_title ? String(item.category_description ?? "") : null,
+    category_cover_image_url: item.category_title ? normalizeProjectFileUrl(item.category_cover_image_url) : null,
+    category_sort_order: item.category_title ? Number(item.category_sort_order ?? 0) : 999999,
   }))
 
   return NextResponse.json({

@@ -6,6 +6,7 @@ import {
   createProjectRevision,
   ensureProjectsSchema,
   isUuid,
+  normalizeProjectCategoryId,
   normalizeProjectAssets,
   normalizeProjectCountryList,
   normalizeProjectLocale,
@@ -57,6 +58,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   const body = await req.json().catch(() => ({}))
 
   const project_type = normalizeProjectType(body.project_type)
+  const category_id = normalizeProjectCategoryId(body.category_id)
   const locale = normalizeProjectLocale(body.locale)
   const status = normalizeProjectStatus(body.status)
   const titleSingle = String(body.title ?? "").trim()
@@ -123,9 +125,25 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   const galleryImages = normalizeProjectAssets(body.gallery_images, "gallery_image")
   const documents = normalizeProjectAssets(body.documents, "document")
 
+  if (category_id) {
+    const [category] = await db`
+      SELECT id
+      FROM public.teacher_project_categories
+      WHERE id = ${category_id}
+        AND locale = ${locale}
+        AND status = 'active'
+        AND deleted_at IS NULL
+      LIMIT 1
+    `
+    if (!category) {
+      return NextResponse.json({ error: "Categoria inválida para o idioma selecionado." }, { status: 400 })
+    }
+  }
+
   await db`
     UPDATE public.teacher_projects
     SET
+      category_id = ${category_id},
       project_type = ${project_type},
       locale = ${locale},
       status = ${status},
@@ -159,6 +177,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     target: { type: "project", id },
     metadata: {
       project_type,
+      category_id,
       status,
       access_scope,
       target_teacher_ids_count: target_teacher_ids.length,
@@ -207,4 +226,3 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
 
   return NextResponse.json({ success: true })
 }
-

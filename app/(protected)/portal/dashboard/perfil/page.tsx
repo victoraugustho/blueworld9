@@ -2,13 +2,14 @@ import { redirect } from "next/navigation"
 import { db } from "@/lib/db"
 import { requireTeacherPage } from "@/lib/auth/server"
 import { ProfileForms } from "./ProfileForms"
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 
 export default async function PerfilPage() {
   const base = await requireTeacherPage()
 
   const [teacher] = await db`
     SELECT
-      id, name, phone, locale, role, approved, active,
+      id, name, phone, locale, role, is_admin, approved, active,
       email, country, document_type, document_number,
       avatar_url
     FROM teachers
@@ -19,7 +20,7 @@ export default async function PerfilPage() {
     redirect("/")
   }
 
-  const locale = (teacher.locale ?? "pt-BR") as "pt-BR" | "es"
+  const locale = await getEffectivePortalLocale(teacher)
 
   return (
     <div className="p-6 space-y-6">

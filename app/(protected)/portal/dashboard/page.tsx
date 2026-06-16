@@ -1,3 +1,4 @@
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 ﻿import Link from "next/link"
 import { db } from "@/lib/db"
 import { requireTeacherPage } from "@/lib/auth/server"
@@ -136,7 +137,7 @@ type PageProps = {
 
 export default async function PortalDashboardPage({ searchParams }: PageProps) {
   const teacher = await requireTeacherPage()
-  const locale: Locale = teacher.locale === "es" ? "es" : "pt-BR"
+  const locale: Locale = await getEffectivePortalLocale(teacher)
   const resolvedSearch = await searchParams
   const categoryRaw = Array.isArray(resolvedSearch?.blog_category)
     ? resolvedSearch?.blog_category[0]
@@ -201,7 +202,7 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
       AND (
         n.audience = 'all'
         OR (n.audience = 'country' AND n.country = ${teacher.country})
-        OR (n.audience = 'locale' AND n.locale = ${teacher.locale})
+        OR (n.audience = 'locale' AND n.locale = ${locale})
         OR (
           n.audience = 'teacher'
           AND (
@@ -223,7 +224,7 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
       AND (
         n.audience = 'all'
         OR (n.audience = 'country' AND n.country = ${teacher.country})
-        OR (n.audience = 'locale' AND n.locale = ${teacher.locale})
+        OR (n.audience = 'locale' AND n.locale = ${locale})
         OR (
           n.audience = 'teacher'
           AND (
@@ -621,5 +622,4 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
     </div>
   )
 }
-
 

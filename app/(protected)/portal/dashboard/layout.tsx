@@ -4,13 +4,14 @@ import SpecialNotificationModal from "@/components/portal/SpecialNotificationMod
 import { requireTeacherPage } from "@/lib/auth/server"
 import { isRestrictedAdminUser } from "@/lib/auth/restricted-admin"
 import { canManageProjects } from "@/lib/auth/project-admin"
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const teacher = await requireTeacherPage()
   const isAdmin = teacher.is_admin === true || teacher.role === "admin"
   const canAccessRestrictedAdminAreas = isAdmin && isRestrictedAdminUser(teacher.id)
   const canAccessProjectsAdminArea = isAdmin && canManageProjects(teacher.id)
-  const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
+  const locale = await getEffectivePortalLocale(teacher)
   const systemVersion = process.env.SYSTEM_VERSION ?? "dev"
 
   return (

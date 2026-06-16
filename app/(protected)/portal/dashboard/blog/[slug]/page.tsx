@@ -1,3 +1,4 @@
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 ﻿import Link from "next/link"
 import { notFound } from "next/navigation"
 import { db } from "@/lib/db"
@@ -104,7 +105,7 @@ async function loadPostBySlug(slug: string, preferredLanguage: "pt-BR" | "es") {
 
 export default async function DashboardBlogPostPage({ params }: Params) {
   const teacher = await requireTeacherPage()
-  const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
+  const locale = await getEffectivePortalLocale(teacher)
   const resolved = await params
   const slug = String(resolved?.slug ?? "").trim()
   if (!slug) notFound()

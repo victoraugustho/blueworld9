@@ -3,6 +3,7 @@ import { requireTeacherPage } from "@/lib/auth/server"
 import { ensureTurmasSchema } from "@/lib/turmas"
 import { FileText, Eye } from "lucide-react"
 import Link from "next/link"
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 
 type SearchParams = { year?: string | string[] }
 
@@ -12,7 +13,7 @@ export default async function MateriaisPage({
   searchParams?: Promise<SearchParams>
 }) {
   const teacher = await requireTeacherPage()
-  const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
+  const locale = await getEffectivePortalLocale(teacher)
 
   await ensureTurmasSchema()
 

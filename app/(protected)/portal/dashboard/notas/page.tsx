@@ -1,3 +1,4 @@
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 ﻿import { requireTeacherPage } from "@/lib/auth/server"
 import Link from "next/link"
 import { Sigma, ClipboardCheck, CalendarRange } from "lucide-react"
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default async function NotasPage() {
   const teacher = await requireTeacherPage()
-  const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
+  const locale = await getEffectivePortalLocale(teacher)
   const isEs = locale === "es"
   const cards = [
     {

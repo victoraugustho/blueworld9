@@ -9,6 +9,7 @@ import {
   normalizeProjectLocale,
 } from "@/lib/projects"
 import { normalizeProjectFileUrl } from "@/lib/project-file-url"
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -21,7 +22,8 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params
   if (!isUuid(id)) return NextResponse.json({ error: "ID inválido." }, { status: 400 })
 
-  const locale = normalizeProjectLocale(req.nextUrl.searchParams.get("locale") ?? auth.teacher.locale)
+  const effectiveLocale = await getEffectivePortalLocale(auth.teacher)
+  const locale = normalizeProjectLocale(req.nextUrl.searchParams.get("locale") ?? effectiveLocale)
 
   let project: any = null
   try {

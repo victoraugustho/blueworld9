@@ -1,5 +1,6 @@
 import { requireTeacherPage } from "@/lib/auth/server"
 import TurmaDetalheClient from "./TurmaDetalheClient"
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 
 type Params = {
   params: Promise<{ id: string }>
@@ -7,7 +8,7 @@ type Params = {
 
 export default async function NotasTurmaDetalhePage({ params }: Params) {
   const teacher = await requireTeacherPage()
-  const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
+  const locale = await getEffectivePortalLocale(teacher)
   const isAdmin = teacher.is_admin === true || teacher.role === "admin"
   const resolved = await params
 

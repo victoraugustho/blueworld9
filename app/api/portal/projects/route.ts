@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
 import { canTeacherAccessProject, ensureProjectsSchema, loadTeacherScopeData, normalizeProjectLocale } from "@/lib/projects"
 import { normalizeProjectFileUrl } from "@/lib/project-file-url"
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 
 function parsePagination(params: URLSearchParams) {
   const pageRaw = Number(params.get("page") ?? 1)
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   const params = req.nextUrl.searchParams
   const { page, page_size, offset } = parsePagination(params)
-  const locale = normalizeProjectLocale(auth.teacher.locale)
+  const locale = normalizeProjectLocale(await getEffectivePortalLocale(auth.teacher))
   const q = String(params.get("q") ?? "").trim()
 
   const qFilter = q
@@ -32,6 +33,17 @@ export async function GET(req: NextRequest) {
       OR COALESCE(p.summary_es, '') ILIKE ${`%${q}%`}
     )`
     : db``
+
+  const [{ exists: hasProjectLinks } = { exists: false }] = await db`
+    SELECT to_regclass('public.teacher_project_links') IS NOT NULL AS exists
+  `
+  const linksCountSelect = hasProjectLinks
+    ? db`(
+        SELECT COUNT(*)::int
+        FROM public.teacher_project_links l
+        WHERE l.project_id = p.id
+      ) AS links_count`
+    : db`0::int AS links_count`
 
   let rows: any[] = []
   try {
@@ -71,7 +83,8 @@ export async function GET(req: NextRequest) {
           FROM public.teacher_project_assets a
           WHERE a.project_id = p.id
             AND a.asset_type = 'document'
-        ) AS documents_count
+        ) AS documents_count,
+        ${linksCountSelect}
       FROM public.teacher_projects p
       LEFT JOIN public.teachers creator ON creator.id = p.created_by
       LEFT JOIN public.teacher_project_categories category
@@ -122,7 +135,8 @@ export async function GET(req: NextRequest) {
           FROM public.teacher_project_assets a
           WHERE a.project_id = p.id
             AND a.asset_type = 'document'
-        ) AS documents_count
+        ) AS documents_count,
+        ${linksCountSelect}
       FROM public.teacher_projects p
       LEFT JOIN public.teachers creator ON creator.id = p.created_by
       WHERE p.deleted_at IS NULL
@@ -150,6 +164,9 @@ export async function GET(req: NextRequest) {
     summary: locale === "es" ? String(item.summary_es ?? "") : String(item.summary_pt ?? ""),
     locale,
     cover_image_url: normalizeProjectFileUrl(item.cover_image_url),
+    images_count: Number(item.images_count ?? 0),
+    documents_count: Number(item.documents_count ?? 0),
+    links_count: Number(item.links_count ?? 0),
     category_id: item.category_title ? item.category_id : null,
     category_title: item.category_title ? String(item.category_title ?? "") : null,
     category_description: item.category_title ? String(item.category_description ?? "") : null,

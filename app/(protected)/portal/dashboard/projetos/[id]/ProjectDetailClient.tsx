@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight, RotateCcw, Trash2, X, ZoomIn, ZoomOut } from "lucide-react"
+import { ChevronLeft, ChevronRight, FileText, RotateCcw, Trash2, X, ZoomIn, ZoomOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -111,6 +111,8 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
         noGallery: "Sin imágenes en la galería.",
         noDocuments: "Sin anexos disponibles.",
         noLinks: "Sin enlaces de referencia.",
+        mainDocument: "Archivo principal",
+        documentHint: "Abre o descarga el material central de este proyecto.",
         saveCommentError: "Error al enviar comentario.",
         deleteComment: "Eliminar comentario",
         deleteCommentConfirm: "¿Deseas eliminar este comentario?",
@@ -152,6 +154,8 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
       noGallery: "Sem imagens na galeria.",
       noDocuments: "Sem anexos disponíveis.",
       noLinks: "Sem links de referência.",
+      mainDocument: "Arquivo principal",
+      documentHint: "Acesse ou baixe o material central deste projeto.",
       saveCommentError: "Falha ao enviar comentário.",
       deleteComment: "Excluir comentário",
       deleteCommentConfirm: "Deseja excluir este comentário?",
@@ -377,12 +381,12 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
       </div>
 
       <div className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/40 backdrop-blur">
-        <div className="h-[170px] md:h-[210px] w-full border-b border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/30 flex items-center justify-center overflow-hidden">
+        <div className="w-full max-h-[720px] border-b border-white/10 bg-slate-950 flex items-start justify-center overflow-hidden leading-none">
           {project.cover_image_url ? (
             <img
               src={project.cover_image_url}
               alt={project.title}
-              className="h-full w-full object-contain"
+              className="block max-h-[720px] w-full object-contain"
             />
           ) : (
             <div className="text-sm text-slate-400">Sem imagem de capa</div>
@@ -457,14 +461,26 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
         </Card>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-2.5">
-          <Card className="bg-slate-900/30 border border-white/10 backdrop-blur">
-            <CardHeader className="px-3 py-2.5">
-              <CardTitle className="text-base text-white">{labels.documents}</CardTitle>
+          <Card className="relative overflow-hidden border border-cyan-300/30 bg-cyan-950/25 shadow-[0_0_42px_rgba(34,211,238,0.10)] backdrop-blur">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.20),transparent_36%),linear-gradient(135deg,rgba(15,23,42,0.50),rgba(8,47,73,0.25))]" />
+            <CardHeader className="relative border-b border-cyan-300/15 px-3 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                  <span className="inline-flex w-fit rounded-full border border-cyan-300/35 bg-cyan-400/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-100">
+                    {labels.mainDocument}
+                  </span>
+                  <CardTitle className="text-base text-white">{labels.documents}</CardTitle>
+                  <p className="text-xs text-cyan-50/80">{labels.documentHint}</p>
+                </div>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-400/15 text-cyan-100">
+                  <FileText className="h-5 w-5" />
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="px-3 pb-3 pt-0 space-y-2">
+            <CardContent className="relative px-3 pb-3 pt-3 space-y-2">
               {project.documents.length === 0 ? <p className="text-sm text-slate-400">{labels.noDocuments}</p> : null}
               {project.documents.map((item) => (
-                <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 p-2.5 space-y-2">
+                <div key={item.id} className="rounded-xl border border-cyan-300/20 bg-slate-950/45 p-3 space-y-2 shadow-inner shadow-cyan-950/30">
                   <p className="text-sm text-white font-medium">
                     {locale === "es" ? item.title_es || item.file_name : item.title_pt || item.file_name}
                   </p>
@@ -474,14 +490,14 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
                       href={item.file_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-8 items-center rounded-md border border-cyan-300/40 bg-cyan-500/20 px-3 text-xs font-medium text-cyan-100 hover:bg-cyan-500/30"
+                      className="inline-flex h-8 items-center rounded-md border border-cyan-200/60 bg-cyan-500 px-3 text-xs font-semibold text-slate-950 hover:bg-cyan-300"
                     >
                       {labels.view}
                     </a>
                     <a
                       href={item.file_url}
                       download={item.file_name}
-                      className="inline-flex h-8 items-center rounded-md border border-white/20 bg-white/10 px-3 text-xs font-medium text-white hover:bg-white/15"
+                      className="inline-flex h-8 items-center rounded-md border border-cyan-300/30 bg-white/10 px-3 text-xs font-medium text-cyan-50 hover:bg-white/15"
                     >
                       {labels.download}
                     </a>

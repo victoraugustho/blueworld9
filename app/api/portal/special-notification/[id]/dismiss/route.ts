@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
 import { ensureNotificationsSchema } from "@/lib/notifications"
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -12,6 +13,7 @@ export async function POST(req: NextRequest, context: Ctx) {
 
   const teacherId = auth.teacherId
   const teacher = auth.teacher
+  const locale = await getEffectivePortalLocale(teacher)
   const { id } = await context.params
 
   await ensureNotificationsSchema()
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest, context: Ctx) {
       AND (
         n.audience = 'all'
         OR (n.audience = 'country' AND n.country = ${teacher.country})
-        OR (n.audience = 'locale' AND n.locale = ${teacher.locale})
+        OR (n.audience = 'locale' AND n.locale = ${locale})
         OR (
           n.audience = 'teacher'
           AND (

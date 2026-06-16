@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, ChevronRight, FileText, Image as ImageIcon, Layers } from "lucide-react"
+import { ArrowLeft, ChevronRight, FileText, Image as ImageIcon, Layers, Link2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -20,7 +20,7 @@ type ProjectItem = {
   cover_image_url?: string | null
   images_count: number
   documents_count: number
-  updated_at: string
+  links_count: number
   category_id?: string | null
   category_title?: string | null
   category_description?: string | null
@@ -36,13 +36,6 @@ type ProjectCategoryView = {
   cover_image_url: string | null
   sort_order: number
   projects: ProjectItem[]
-}
-
-function formatDate(value: string | null | undefined, locale: Locale) {
-  if (!value) return "-"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return date.toLocaleString(locale === "es" ? "es-UY" : "pt-BR")
 }
 
 export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
@@ -77,14 +70,13 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
         subtitle: "Guías técnicas para apoyar clases de circuitos, programación y desarrollo de proyectos.",
         searchPlaceholder: "Buscar proyecto...",
         apply: "Aplicar",
-        updatedAt: "Actualizado en",
         open: "Abrir proyecto",
         openCategory: "Abrir categoría",
         backToCategories: "Volver a categorías",
         categories: "Categorías",
         images: "Imágenes",
         documents: "Documentos",
-        shortId: "ID",
+        links: "Enlaces",
         projectCount: "proyectos",
         uncategorized: "General",
         uncategorizedDescription: "Proyectos generales con Arduino, Micro:Bit, MakeyMakey, MBlock, programación y circuitos.",
@@ -97,14 +89,13 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
       subtitle: "Guias técnicos para apoiar aulas de circuitos, programação e desenvolvimento de projetos.",
       searchPlaceholder: "Buscar projeto...",
       apply: "Aplicar",
-      updatedAt: "Atualizado em",
       open: "Abrir projeto",
       openCategory: "Abrir categoria",
       backToCategories: "Voltar às categorias",
       categories: "Categorias",
       images: "Imagens",
       documents: "Documentos",
-      shortId: "ID",
+      links: "Links",
       projectCount: "projetos",
       uncategorized: "Geral",
       uncategorizedDescription: "Projetos gerais com Arduino, Micro:Bit, MakeyMakey, MBlock, programação e circuitos.",
@@ -148,15 +139,13 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
   const visibleProjects = selectedCategory ? selectedCategory.projects : []
 
   function renderProjectCard(item: ProjectItem) {
-    const shortId = String(item.id).slice(0, 8).toUpperCase()
-
     return (
-      <Card key={item.id} className="group relative overflow-hidden border-white/10 bg-slate-900/35 backdrop-blur">
+      <Card key={item.id} className="group relative gap-0 overflow-hidden border-white/10 bg-slate-900/35 py-0 backdrop-blur">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-slate-900/35 to-emerald-500/10" />
         <CardContent className="relative p-0">
-          <div className="aspect-[21/9] w-full border-b border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/40 flex items-center justify-center overflow-hidden">
+          <div className="relative aspect-[3/1] w-full border-b border-white/10 bg-slate-950 flex items-center justify-center overflow-hidden leading-none">
             {item.cover_image_url ? (
-              <img src={item.cover_image_url} alt={item.title} className="h-full w-full object-contain" />
+              <img src={item.cover_image_url} alt={item.title} className="block h-full w-full object-contain" />
             ) : (
               <div className="h-full w-full flex items-center justify-center">
                 <ImageIcon className="w-7 h-7 text-slate-500" />
@@ -170,9 +159,6 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
                 <Layers className="w-5 h-5" />
               </div>
               <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex items-center flex-wrap gap-2">
-                  <span className="text-[11px] text-slate-400">{labels.shortId}: {shortId}</span>
-                </div>
                 <h3 className="text-base font-semibold text-white line-clamp-2">{item.title}</h3>
               </div>
             </div>
@@ -188,12 +174,13 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
                 <FileText className="w-3 h-3" />
                 {labels.documents}: {item.documents_count}
               </span>
+              <span className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-0.5 text-slate-200">
+                <Link2 className="w-3 h-3" />
+                {labels.links}: {item.links_count}
+              </span>
             </div>
 
-            <div className="pt-1 border-t border-white/10 flex items-center justify-between gap-2">
-              <p className="text-[11px] text-slate-400 line-clamp-1">
-                {labels.updatedAt}: {formatDate(item.updated_at, locale)}
-              </p>
+            <div className="pt-1 border-t border-white/10 flex justify-end">
               <Link href={`/portal/dashboard/projetos/${item.id}`}>
                 <Button size="sm" className="bg-cyan-600/90 hover:bg-cyan-700 text-white h-8">
                   <span>{labels.open}</span>
@@ -243,9 +230,21 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
                 onClick={() => setSelectedCategoryKey(category.key)}
                 className="group overflow-hidden rounded-lg border border-white/10 bg-slate-900/35 text-left backdrop-blur transition hover:border-cyan-300/40 hover:bg-white/10"
               >
-                <div className="aspect-[16/7] w-full border-b border-white/10 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/40 flex items-center justify-center overflow-hidden">
+                <div className="relative aspect-[16/7] w-full border-b border-white/10 bg-slate-950 flex items-center justify-center overflow-hidden leading-none">
                   {category.cover_image_url ? (
-                    <img src={category.cover_image_url} alt={category.title} className="h-full w-full object-contain" />
+                    <>
+                      <img
+                        src={category.cover_image_url}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 h-full w-full scale-110 object-cover opacity-45 blur-xl"
+                      />
+                      <img
+                        src={category.cover_image_url}
+                        alt={category.title}
+                        className="relative z-10 block h-full w-full object-contain"
+                      />
+                    </>
                   ) : (
                     <ImageIcon className="h-8 w-8 text-slate-500" />
                   )}

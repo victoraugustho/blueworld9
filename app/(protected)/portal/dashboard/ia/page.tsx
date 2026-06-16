@@ -1,10 +1,11 @@
 import { requireTeacherPage } from "@/lib/auth/server"
 import { AIChatPanel } from "./AiChatPanel"
 import { AIProfessorTips } from "./AIProfessorTips"
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 
 export default async function PortalIAPage() {
   const teacher = await requireTeacherPage()
-  const locale = (teacher.locale ?? "pt-BR") as "pt-BR" | "es"
+  const locale = await getEffectivePortalLocale(teacher)
   const mode = teacher.role === "admin" || teacher.is_admin === true ? "admin" : "teacher"
 
   return (

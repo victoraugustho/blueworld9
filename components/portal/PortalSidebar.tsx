@@ -23,6 +23,7 @@ import {
   FolderKanban,
   ChevronsLeft,
   ChevronsRight,
+  Globe2,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -62,6 +63,7 @@ export function PortalSidebar({
   const [unreadLoading, setUnreadLoading] = useState(false)
   const [pendingRelationsCount, setPendingRelationsCount] = useState(0)
   const [pendingRelationsLoading, setPendingRelationsLoading] = useState(false)
+  const [switchingLocale, setSwitchingLocale] = useState(false)
 
   const sidebarRef = useRef<HTMLElement | null>(null)
   const profileRef = useRef<HTMLDivElement | null>(null)
@@ -70,6 +72,8 @@ export function PortalSidebar({
     adminSection: locale === "es" ? "Administraci\u00f3n" : "Administra\u00e7\u00e3o",
     logout: locale === "es" ? "Salir" : "Sair",
     profile: locale === "es" ? "Perfil" : "Perfil",
+    switchLanguage:
+      locale === "es" ? "Ver portal en portugués" : "Ver portal em espanhol",
     menu: {
       home: locale === "es" ? "Inicio" : "In\u00edcio",
       aulas: locale === "es" ? "Clases" : "Aulas",
@@ -147,6 +151,29 @@ export function PortalSidebar({
   function isActive(href: string) {
     if (href === "/portal/dashboard") return pathname === href
     return pathname === href || pathname.startsWith(href + "/")
+  }
+
+  async function switchPortalLocale() {
+    if (!isAdmin || switchingLocale) return
+
+    const nextLocale: Locale = locale === "es" ? "pt-BR" : "es"
+    setSwitchingLocale(true)
+    try {
+      const res = await fetch("/api/portal/locale", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale: nextLocale }),
+      })
+
+      if (!res.ok) {
+        setSwitchingLocale(false)
+        return
+      }
+
+      window.location.reload()
+    } catch {
+      setSwitchingLocale(false)
+    }
   }
 
   useEffect(() => {
@@ -497,17 +524,37 @@ export function PortalSidebar({
           )}
         </nav>
 
-        <div className={`mt-4 pt-4 border-t border-white/10 flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-3 text-xs text-white/60`}>
-          <Link
-            href="/portal/dashboard/relatar-problema"
-            onClick={() => setOpen(false)}
-            title={t.menu.reportBug}
-            className={`flex items-center ${collapsed ? "justify-center" : ""} gap-2 hover:text-white transition-colors`}
-          >
-            <Bug className="w-4 h-4" />
-            {!collapsed ? t.menu.reportBug : null}
-          </Link>
-          {!collapsed ? <span className="text-[10px] text-white/40">v{systemVersion ?? "dev"}</span> : null}
+        <div className="mt-4 pt-4 border-t border-white/10 space-y-2 text-xs text-white/60">
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={() => void switchPortalLocale()}
+              disabled={switchingLocale}
+              title={t.switchLanguage}
+              className={`flex w-full items-center ${collapsed ? "justify-center px-2" : "justify-between px-3"} gap-2 rounded-lg border border-cyan-300/20 bg-cyan-400/10 py-2 text-cyan-100 transition hover:bg-cyan-400/20 disabled:opacity-60`}
+            >
+              <span className={`flex items-center ${collapsed ? "justify-center" : ""} gap-2`}>
+                <Globe2 className="h-4 w-4" />
+                {!collapsed ? t.switchLanguage : null}
+              </span>
+              <span className="rounded-md border border-white/10 bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                {locale === "es" ? "PT" : "ES"}
+              </span>
+            </button>
+          ) : null}
+
+          <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-3`}>
+            <Link
+              href="/portal/dashboard/relatar-problema"
+              onClick={() => setOpen(false)}
+              title={t.menu.reportBug}
+              className={`flex items-center ${collapsed ? "justify-center" : ""} gap-2 hover:text-white transition-colors`}
+            >
+              <Bug className="w-4 h-4" />
+              {!collapsed ? t.menu.reportBug : null}
+            </Link>
+            {!collapsed ? <span className="text-[10px] text-white/40">v{systemVersion ?? "dev"}</span> : null}
+          </div>
         </div>
       </aside>
 

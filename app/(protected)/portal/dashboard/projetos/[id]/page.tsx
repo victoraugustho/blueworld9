@@ -1,5 +1,6 @@
 import ProjectDetailClient from "./ProjectDetailClient"
 import { requireTeacherPage } from "@/lib/auth/server"
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -8,7 +9,7 @@ type Props = {
 export default async function ProjectDetailPage({ params }: Props) {
   const teacher = await requireTeacherPage()
   const { id } = await params
-  const locale: "pt-BR" | "es" = teacher.locale === "es" ? "es" : "pt-BR"
+  const locale = await getEffectivePortalLocale(teacher)
   return <ProjectDetailClient projectId={id} locale={locale} />
 }
 

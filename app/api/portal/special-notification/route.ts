@@ -2,6 +2,7 @@
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
 import { ensureNotificationsSchema } from "@/lib/notifications"
+import { getEffectivePortalLocale } from "@/lib/portal-locale"
 
 export async function GET() {
   const auth = await requireTeacherApi()
@@ -9,6 +10,7 @@ export async function GET() {
 
   const teacherId = auth.teacherId
   const teacher = auth.teacher
+  const locale = await getEffectivePortalLocale(teacher)
 
   await ensureNotificationsSchema()
 
@@ -37,7 +39,7 @@ export async function GET() {
       AND (
         n.audience = 'all'
         OR (n.audience = 'country' AND n.country = ${teacher.country})
-        OR (n.audience = 'locale' AND n.locale = ${teacher.locale})
+        OR (n.audience = 'locale' AND n.locale = ${locale})
         OR (
           n.audience = 'teacher'
           AND (

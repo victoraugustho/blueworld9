@@ -41,7 +41,7 @@ export async function createSession(teacherId: string, req: NextRequest) {
     VALUES (${teacherId}, ${tokenHash}, ${expiresAt}, ${ip}, ${userAgent})
   `
 
-  return token
+  return { token, expiresAt }
 }
 
 export async function revokeSessionByToken(token: string) {

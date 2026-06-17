@@ -117,17 +117,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const session = await createSession(teacher.id, request)
+
     // resposta + cookies
     const response = NextResponse.json({
       success: true,
       teacherId: teacher.id,
       approved: teacher.approved,
       locale,
+      sessionExpiresAt: session.expiresAt.toISOString(),
     })
 
     // ✅ cookie httpOnly (auth)
-    const sessionToken = await createSession(teacher.id, request)
-    response.cookies.set(SESSION_COOKIE, sessionToken, sessionCookieOptions())
+    response.cookies.set(SESSION_COOKIE, session.token, sessionCookieOptions())
 
     // ✅ cookie NÃO httpOnly (somente UI/idioma)
     response.cookies.set("portal_locale", locale, {

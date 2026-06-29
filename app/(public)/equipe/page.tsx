@@ -38,14 +38,14 @@ export default function EquipePage() {
       image: "/webp/Alexandra-att.webp",
       color: "from-green-500 to-emerald-600",
     },
-    {
+    /*{
       name: "Daniella Alquimim",
       role: "Coordenadora Pedagógica Internacional",
       formacao:"Graduada em Letras (Português/Inglês) e Pedagogia, com especializações em Espanhol e Educação Ambiental.",
       bio: "Com sua formação ampla e global, sua atuação lidera a coordenação pedagógica das unidades internacionais da Blue World 9. Sua missão foca em garantir o alinhamento pedagógico e a qualidade educacional das operações externas, dedicando-se ao acompanhamento docente e à orientação estratégica fora do Brasil.",
       image: "/webp/daniella.webp",
       color: "from-rose-400 to-red-600",
-    },
+    },*/
     {
       name: "Renato Borges",
       role: "Diretor Administrativo e de Negócios Global",

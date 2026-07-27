@@ -259,7 +259,7 @@ export default function TeacherProjectsClient({ locale }: { locale: Locale }) {
                   </div>
                   <div className="flex items-center justify-between gap-2 border-t border-white/10 pt-2">
                     <span className="text-xs text-slate-400">
-                      {category.projects.length} {/*labels.projectCount*/}
+                      {/*category.projects.length*/} {/*labels.projectCount*/}
                     </span>
                     <span className="text-xs font-medium text-cyan-200">{labels.openCategory}</span>
                   </div>

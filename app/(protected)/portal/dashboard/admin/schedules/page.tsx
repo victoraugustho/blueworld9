@@ -21,6 +21,7 @@ import {
 import type { Teacher, TeacherClass, TeacherClassStudent, TeacherSchedule } from "@/app/types/portal"
 import { TIMEZONE_OPTIONS, getDefaultTimezone, getTimezoneLabel } from "@/lib/timezones"
 import { TURMA_YEAR_OPTIONS } from "@/lib/turma-years"
+import { useFixedTeacherScheduleId } from "@/components/portal/TeacherScheduleContext"
 
 type TeacherGroupResponse = {
   approved: Teacher[]
@@ -117,9 +118,10 @@ type StudentDraft = {
 }
 
 export default function AdminSchedulesPage() {
+  const fixedTeacherId = useFixedTeacherScheduleId()
   const { confirm, confirmDialog } = useConfirmDialog()
   const [teachers, setTeachers] = useState<Teacher[]>([])
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string>("")
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>(fixedTeacherId ?? "")
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([])
   const [schedules, setSchedules] = useState<TeacherSchedule[]>([])
   const [activeSection, setActiveSection] = useState<"classes" | "students" | "agenda-form" | "agenda-view">(
@@ -295,10 +297,14 @@ export default function AdminSchedulesPage() {
         setTeachers([])
         return
       }
-      const list = Array.isArray(data?.approved) ? data.approved : []
+      const list = fixedTeacherId
+        ? [...(data?.approved ?? []), ...(data?.pending ?? []), ...(data?.disabled ?? [])]
+        : Array.isArray(data?.approved) ? data.approved : []
       list.sort((a, b) => a.name.localeCompare(b.name))
       setTeachers(list)
-      if (!selectedTeacherId && list.length > 0) {
+      if (fixedTeacherId) {
+        setSelectedTeacherId(fixedTeacherId)
+      } else if (!selectedTeacherId && list.length > 0) {
         setSelectedTeacherId(list[0].id)
       }
     } finally {
@@ -767,15 +773,17 @@ export default function AdminSchedulesPage() {
   }
 
   return (
-    <div className="p-6 text-white">
+    <div className={fixedTeacherId ? "text-white" : "p-6 text-white"}>
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <CalendarDays className="w-6 h-6 text-cyan-300" />
-            Agenda de Professores
+            {fixedTeacherId ? "Gestão e agenda" : "Agenda de Professores"}
           </h1>
           <p className="text-slate-400 text-sm">
-            Turmas e eventos (recorrentes ou pontuais) no mesmo calendario.
+            {fixedTeacherId
+              ? "Gerencie turmas, alunos, horários e eventos deste professor em um único lugar."
+              : "Turmas e eventos (recorrentes ou pontuais) no mesmo calendario."}
           </p>
         </div>
 
@@ -789,8 +797,8 @@ export default function AdminSchedulesPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6">
-        <Card className="bg-slate-900/40 border border-white/10">
+      <div className={`grid grid-cols-1 gap-6 ${fixedTeacherId ? "" : "xl:grid-cols-[320px,1fr]"}`}>
+        {!fixedTeacherId ? <Card className="bg-slate-900/40 border border-white/10">
           <CardHeader>
             <CardTitle className="text-white text-base">Professor</CardTitle>
           </CardHeader>
@@ -822,7 +830,7 @@ export default function AdminSchedulesPage() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card> : null}
 
         <div className="space-y-4">
           <div className="rounded-xl border border-white/10 bg-slate-900/30 backdrop-blur-sm p-2">

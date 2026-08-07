@@ -223,15 +223,22 @@ export async function POST(req: NextRequest) {
     c4: number | null
     comment: string | null
   }> = incomingEntries
-    .map((entry: any) => ({
-      student_id: String(entry?.student_id ?? "").trim(),
-      attendance: normalizeAttendance(entry?.attendance),
-      c1: normalizeScore(entry?.c1, scoreMax),
-      c2: normalizeScore(entry?.c2, scoreMax),
-      c3: normalizeScore(entry?.c3, scoreMax),
-      c4: normalizeScore(entry?.c4, scoreMax),
-      comment: typeof entry?.comment === "string" ? entry.comment.trim() : null,
-    }))
+    .map((entry: any) => {
+      const attendance = normalizeAttendance(entry?.attendance)
+      const isAbsent = attendance === "absent"
+
+      return {
+        student_id: String(entry?.student_id ?? "").trim(),
+        attendance,
+        // An absence has no academic score for this lesson. Enforce this on
+        // the server so stale or manipulated clients cannot persist grades.
+        c1: isAbsent ? null : normalizeScore(entry?.c1, scoreMax),
+        c2: isAbsent ? null : normalizeScore(entry?.c2, scoreMax),
+        c3: isAbsent ? null : normalizeScore(entry?.c3, scoreMax),
+        c4: isAbsent ? null : normalizeScore(entry?.c4, scoreMax),
+        comment: typeof entry?.comment === "string" ? entry.comment.trim() : null,
+      }
+    })
     .filter((entry: any) => isUuid(entry.student_id))
 
   if (class_id && parsedEntries.length > 0) {

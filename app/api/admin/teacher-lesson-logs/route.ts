@@ -56,13 +56,13 @@ export async function GET(req: NextRequest) {
       CASE
         WHEN COALESCE(gl.has_grades, TRUE) = FALSE THEN 100
         WHEN COALESCE(metrics.total_students, 0) > 0
-          THEN ROUND((COALESCE(metrics.graded_students, 0)::numeric / metrics.total_students::numeric) * 100.0, 2)
+          THEN ROUND((COALESCE(metrics.completed_students, 0)::numeric / metrics.total_students::numeric) * 100.0, 2)
         ELSE 0
       END AS completion_percent,
       CASE
         WHEN COALESCE(gl.has_grades, TRUE) = FALSE THEN TRUE
         WHEN COALESCE(metrics.total_students, 0) > 0
-          THEN COALESCE(metrics.graded_students, 0) >= metrics.total_students
+          THEN COALESCE(metrics.completed_students, 0) >= metrics.total_students
         ELSE FALSE
       END AS fully_completed
     FROM logs
@@ -84,7 +84,14 @@ export async function GET(req: NextRequest) {
             AND e.c2 IS NOT NULL
             AND e.c3 IS NOT NULL
             AND e.c4 IS NOT NULL
-        )::int AS graded_students
+        )::int AS graded_students,
+        COUNT(*) FILTER (
+          WHERE e.attendance = 'absent'
+             OR (e.c1 IS NOT NULL
+            AND e.c2 IS NOT NULL
+            AND e.c3 IS NOT NULL
+            AND e.c4 IS NOT NULL)
+        )::int AS completed_students
       FROM teacher_class_students s
       LEFT JOIN teacher_grade_entries e
         ON e.student_id = s.id

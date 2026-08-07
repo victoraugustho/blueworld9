@@ -12,7 +12,13 @@ function normalizeSearch(value: string) {
   return value.trim().toLowerCase()
 }
 
-export default function EditTeacherPage({ params }: { params: { id: string } }) {
+export default function EditTeacherPage({
+  params,
+  returnHref,
+}: {
+  params: { id: string }
+  returnHref?: string
+}) {
   const router = useRouter()
   const id = params.id
 
@@ -85,7 +91,7 @@ export default function EditTeacherPage({ params }: { params: { id: string } }) 
       return
     }
 
-    router.push("/portal/dashboard/admin/teachers")
+    router.push(returnHref ?? "/portal/dashboard/admin/teachers")
   }
 
   const filteredCategories = useMemo(() => {

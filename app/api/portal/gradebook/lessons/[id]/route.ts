@@ -11,7 +11,7 @@ import {
   normalizeScore,
 } from "@/lib/gradebook"
 
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 function isValidDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -311,10 +311,13 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
         if (!isUuid(studentId)) continue
 
         const attendance = normalizeAttendance(entry?.attendance)
-        const c1 = normalizeScore(entry?.c1, scoreMax)
-        const c2 = normalizeScore(entry?.c2, scoreMax)
-        const c3 = normalizeScore(entry?.c3, scoreMax)
-        const c4 = normalizeScore(entry?.c4, scoreMax)
+        const isAbsent = attendance === "absent"
+        // Absence and lesson scores are mutually exclusive. This server-side
+        // rule also protects updates coming from older clients.
+        const c1 = isAbsent ? null : normalizeScore(entry?.c1, scoreMax)
+        const c2 = isAbsent ? null : normalizeScore(entry?.c2, scoreMax)
+        const c3 = isAbsent ? null : normalizeScore(entry?.c3, scoreMax)
+        const c4 = isAbsent ? null : normalizeScore(entry?.c4, scoreMax)
         const comment = typeof entry?.comment === "string" ? entry.comment.trim() : null
 
         await sql`

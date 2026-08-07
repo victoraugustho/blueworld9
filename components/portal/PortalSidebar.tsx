@@ -87,7 +87,6 @@ export function PortalSidebar({
       adminBlog: locale === "es" ? "Blog (Admin)" : "Blog (Admin)",
       adminProjects: locale === "es" ? "Proyectos (Admin)" : "Projetos (Admin)",
       teachers: locale === "es" ? "Profesores" : "Professores",
-      adminSchedules: locale === "es" ? "Agenda de Profesores" : "Agenda de Professores",
       classTransfers: locale === "es" ? "Transferir Turmas" : "Transferir Turmas",
       adminAgenda: locale === "es" ? "Agenda de Coordinadores" : "Agenda de Coordenadores",
       technicalScheduling: locale === "es" ? "Agendamiento Tecnico" : "Agendamento Tecnico",
@@ -119,7 +118,6 @@ export function PortalSidebar({
         items.push(
           { href: "/portal/dashboard/admin/materials", label: t.menu.adminMaterials, icon: ShieldCheck },
           { href: "/portal/dashboard/admin/teachers", label: t.menu.teachers, icon: Users },
-          { href: "/portal/dashboard/admin/schedules", label: t.menu.adminSchedules, icon: CalendarDays },
           { href: "/portal/dashboard/admin/transferencias", label: t.menu.classTransfers, icon: ArrowRightLeft },
           { href: "/portal/dashboard/admin/agenda", label: t.menu.adminAgenda, icon: CalendarDays },
           { href: "/portal/dashboard/admin/agendamento-tecnico", label: t.menu.technicalScheduling, icon: CalendarDays },

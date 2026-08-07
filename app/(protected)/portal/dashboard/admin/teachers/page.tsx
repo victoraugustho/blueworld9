@@ -13,7 +13,6 @@ import {
   ChevronUp,
   Copy,
   MessageCircle,
-  Pencil,
   CheckCircle2,
   Ban,
   RotateCcw,
@@ -152,35 +151,64 @@ export default function AdminTeachersPage() {
     load()
   }, [])
 
-  async function approve(id: string) {
-    await fetch(`/api/admin/teachers/${id}/approve`, { method: "PATCH" })
-    load()
+  async function approve(teacher: Teacher) {
+    const ok = await confirm({
+      title: "Aprovar professor",
+      description: `Confirma a aprovação do acesso de ${teacher.name}?`,
+      confirmText: "Aprovar",
+    })
+    if (!ok) return
+
+    const res = await fetch(`/api/admin/teachers/${teacher.id}/approve`, { method: "PATCH" })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      alert(data?.error ?? "Não foi possível aprovar o professor.")
+      return
+    }
+    await load()
   }
 
-  async function disable(id: string) {
+  async function disable(teacher: Teacher) {
     const ok = await confirm({
       title: "Desativar professor",
-      description: "Tem certeza que deseja desativar este professor?",
+      description: `Tem certeza que deseja desativar o acesso de ${teacher.name}? O professor não poderá entrar no portal até ser reativado.`,
       confirmText: "Desativar",
       variant: "danger",
     })
     if (!ok) return
 
-    await fetch(`/api/admin/teachers/${id}/disable`, {
+    const res = await fetch(`/api/admin/teachers/${teacher.id}/disable`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active: false }),
     })
-    load()
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      alert(data?.error ?? "Não foi possível desativar o professor.")
+      return
+    }
+    await load()
   }
 
-  async function enable(id: string) {
-    await fetch(`/api/admin/teachers/${id}/disable`, {
+  async function enable(teacher: Teacher) {
+    const ok = await confirm({
+      title: "Reativar professor",
+      description: `Confirma a reativação do acesso de ${teacher.name}?`,
+      confirmText: "Reativar",
+    })
+    if (!ok) return
+
+    const res = await fetch(`/api/admin/teachers/${teacher.id}/disable`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active: true }),
     })
-    load()
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      alert(data?.error ?? "Não foi possível reativar o professor.")
+      return
+    }
+    await load()
   }
 
   const teachersRaw = data[activeTab] ?? []
@@ -341,7 +369,12 @@ export default function AdminTeachersPage() {
                           className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1.2fr)_minmax(0,0.9fr)_auto] gap-3 px-4 py-4 border-b border-white/10 last:border-b-0 hover:bg-white/[0.04] transition-colors"
                         >
                           <div className="min-w-0">
-                            <p className="text-sm sm:text-base font-semibold text-white truncate">{t.name}</p>
+                            <Link
+                              href={`/portal/dashboard/admin/teachers/${t.id}/info`}
+                              className="text-sm sm:text-base font-semibold text-white hover:text-cyan-200 truncate block"
+                            >
+                              {t.name}
+                            </Link>
                             <p className="text-xs text-white/60 truncate">{t.email}</p>
                           </div>
 
@@ -383,10 +416,10 @@ export default function AdminTeachersPage() {
                               </a>
                             ) : null}
 
-                            <Link href={`/portal/dashboard/admin/teachers/${t.id}/info`} title="Informações">
+                            <Link href={`/portal/dashboard/admin/teachers/${t.id}/info`} title="Gerenciar professor">
                               <span className="inline-flex">
                                 <IconButton
-                                  title="Informações"
+                                  title="Gerenciar professor"
                                   className="border-cyan-500/20 bg-cyan-500/10 hover:bg-cyan-500/15 text-cyan-200"
                                 >
                                   <Info className="w-4 h-4" />
@@ -394,21 +427,10 @@ export default function AdminTeachersPage() {
                               </span>
                             </Link>
 
-                            <Link href={`/portal/dashboard/admin/teachers/${t.id}`} title="Editar">
-                              <span className="inline-flex">
-                                <IconButton
-                                  title="Editar"
-                                  className="border-green-500/20 bg-green-500/10 hover:bg-green-500/15 text-green-200"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </IconButton>
-                              </span>
-                            </Link>
-
                             {activeTab === "pending" && (
                               <IconButton
                                 title="Aprovar"
-                                onClick={() => approve(t.id)}
+                                onClick={() => approve(t)}
                                 className="border-green-500/20 bg-green-500/10 hover:bg-green-500/15 text-green-200"
                               >
                                 <CheckCircle2 className="w-4 h-4" />
@@ -418,7 +440,7 @@ export default function AdminTeachersPage() {
                             {activeTab !== "disabled" ? (
                               <IconButton
                                 title="Desativar"
-                                onClick={() => disable(t.id)}
+                                onClick={() => disable(t)}
                                 className="border-red-500/20 bg-red-500/10 hover:bg-red-500/15 text-red-200"
                               >
                                 <Ban className="w-4 h-4" />
@@ -426,7 +448,7 @@ export default function AdminTeachersPage() {
                             ) : (
                               <IconButton
                                 title="Reativar"
-                                onClick={() => enable(t.id)}
+                                onClick={() => enable(t)}
                                 className="border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-200"
                               >
                                 <RotateCcw className="w-4 h-4" />

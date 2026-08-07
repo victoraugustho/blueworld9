@@ -126,10 +126,11 @@ export async function GET(req: NextRequest) {
           THEN ROUND(
             (
               COUNT(*) FILTER (
-                WHERE e.c1 IS NOT NULL
+                WHERE e.attendance = 'absent'
+                   OR (e.c1 IS NOT NULL
                   AND e.c2 IS NOT NULL
                   AND e.c3 IS NOT NULL
-                  AND e.c4 IS NOT NULL
+                  AND e.c4 IS NOT NULL)
               )::numeric / COUNT(ls.student_id)::numeric
             ) * 100.0
           , 2)
@@ -139,10 +140,11 @@ export async function GET(req: NextRequest) {
         WHEN COALESCE(l.has_grades, TRUE) = FALSE THEN TRUE
         WHEN COUNT(ls.student_id) > 0
           THEN COUNT(*) FILTER (
-            WHERE e.c1 IS NOT NULL
+            WHERE e.attendance = 'absent'
+               OR (e.c1 IS NOT NULL
               AND e.c2 IS NOT NULL
               AND e.c3 IS NOT NULL
-              AND e.c4 IS NOT NULL
+              AND e.c4 IS NOT NULL)
           ) >= COUNT(ls.student_id)
         ELSE FALSE
       END AS fully_launched,

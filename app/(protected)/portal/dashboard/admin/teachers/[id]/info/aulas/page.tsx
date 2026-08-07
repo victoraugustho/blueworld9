@@ -5,7 +5,7 @@ type RouteParams = { id: string }
 export default async function TeacherLessonsPage({
   params,
 }: {
-  params: Promise<RouteParams> | RouteParams
+  params: Promise<RouteParams>
 }) {
   const resolved = await params
   const teacherId = resolved?.id ?? ""

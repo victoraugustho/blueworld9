@@ -170,10 +170,10 @@ export async function POST(req: NextRequest) {
       ep.lesson_date,
       ARRAY_REMOVE(ARRAY[
         CASE WHEN e.lesson_id IS NULL OR e.attendance IS NULL THEN 'presenca' END,
-        CASE WHEN e.lesson_id IS NULL OR e.c1 IS NULL THEN 'C1' END,
-        CASE WHEN e.lesson_id IS NULL OR e.c2 IS NULL THEN 'C2' END,
-        CASE WHEN e.lesson_id IS NULL OR e.c3 IS NULL THEN 'C3' END,
-        CASE WHEN e.lesson_id IS NULL OR e.c4 IS NULL THEN 'C4' END
+        CASE WHEN e.lesson_id IS NULL OR (e.attendance <> 'absent' AND e.c1 IS NULL) THEN 'C1' END,
+        CASE WHEN e.lesson_id IS NULL OR (e.attendance <> 'absent' AND e.c2 IS NULL) THEN 'C2' END,
+        CASE WHEN e.lesson_id IS NULL OR (e.attendance <> 'absent' AND e.c3 IS NULL) THEN 'C3' END,
+        CASE WHEN e.lesson_id IS NULL OR (e.attendance <> 'absent' AND e.c4 IS NULL) THEN 'C4' END
       ], NULL) AS missing_fields
     FROM eligible_pairs ep
     LEFT JOIN teacher_grade_entries e
@@ -181,10 +181,12 @@ export async function POST(req: NextRequest) {
      AND e.student_id = ep.student_id
     WHERE e.lesson_id IS NULL
        OR e.attendance IS NULL
-       OR e.c1 IS NULL
-       OR e.c2 IS NULL
-       OR e.c3 IS NULL
-       OR e.c4 IS NULL
+       OR (e.attendance <> 'absent' AND (
+            e.c1 IS NULL
+         OR e.c2 IS NULL
+         OR e.c3 IS NULL
+         OR e.c4 IS NULL
+       ))
     ORDER BY ep.full_name ASC, ep.lesson_date ASC, ep.lesson_number ASC
   `
 

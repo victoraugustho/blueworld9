@@ -6,7 +6,7 @@ type RouteParams = { id: string }
 export default async function TeacherInfoPage({
   params,
 }: {
-  params: Promise<RouteParams> | RouteParams
+  params: Promise<RouteParams>
 }) {
   await requireAdminPage()
   const resolved = await params

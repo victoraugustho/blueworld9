@@ -11,7 +11,7 @@ export default async function TeacherInfoLayout({
   params,
 }: {
   children: ReactNode
-  params: Promise<RouteParams> | RouteParams
+  params: Promise<RouteParams>
 }) {
   await requireAdminPage()
 

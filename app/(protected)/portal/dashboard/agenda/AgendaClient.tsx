@@ -1470,11 +1470,15 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                                 type="checkbox"
                                 className="h-4 w-4 accent-cyan-500 cursor-pointer"
                                 checked={entry.attendance !== "absent"}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                  const attendance = e.target.checked ? "present" : "absent"
                                   updateRegisterEntry(entry.student_id, {
-                                    attendance: e.target.checked ? "present" : "absent",
+                                    attendance,
+                                    ...(attendance === "absent"
+                                      ? { c1: null, c2: null, c3: null, c4: null }
+                                      : {}),
                                   })
-                                }
+                                }}
                               />
                             </td>
                             <td className="py-2 pr-2">
@@ -1484,6 +1488,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                                 min={0}
                                 max={10}
                                 step={0.01}
+                                disabled={entry.attendance === "absent"}
                                 value={entry.c1 ?? ""}
                                 onChange={(e) =>
                                   updateRegisterEntry(entry.student_id, {
@@ -1502,6 +1507,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                                 min={0}
                                 max={10}
                                 step={0.01}
+                                disabled={entry.attendance === "absent"}
                                 value={entry.c2 ?? ""}
                                 onChange={(e) =>
                                   updateRegisterEntry(entry.student_id, {
@@ -1520,6 +1526,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                                 min={0}
                                 max={10}
                                 step={0.01}
+                                disabled={entry.attendance === "absent"}
                                 value={entry.c3 ?? ""}
                                 onChange={(e) =>
                                   updateRegisterEntry(entry.student_id, {
@@ -1538,6 +1545,7 @@ export default function AgendaClient({ locale }: { locale: Locale }) {
                                 min={0}
                                 max={10}
                                 step={0.01}
+                                disabled={entry.attendance === "absent"}
                                 value={entry.c4 ?? ""}
                                 onChange={(e) =>
                                   updateRegisterEntry(entry.student_id, {

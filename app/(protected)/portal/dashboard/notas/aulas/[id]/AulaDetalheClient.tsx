@@ -357,11 +357,15 @@ export default function AulaDetalheClient({
                               type="checkbox"
                               className="h-4 w-4 accent-cyan-500 cursor-pointer"
                               checked={entry.attendance !== "absent"}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                const attendance = e.target.checked ? "present" : "absent"
                                 updateEntry(entry.student_id, {
-                                  attendance: e.target.checked ? "present" : "absent",
+                                  attendance,
+                                  ...(attendance === "absent"
+                                    ? { c1: null, c2: null, c3: null, c4: null }
+                                    : {}),
                                 })
-                              }
+                              }}
                             />
                           </label>
                         </td>
@@ -373,6 +377,7 @@ export default function AulaDetalheClient({
                             max={scoreMax}
                             step={0.01}
                             inputMode="decimal"
+                            disabled={entry.attendance === "absent"}
                             value={entry.c1 ?? ""}
                             onChange={(e) => updateEntry(entry.student_id, { c1: parseNumericInput(e.target.value, scoreMax) })}
                             onBlur={() => clampEntryScore(entry.student_id, "c1", scoreMax)}
@@ -388,6 +393,7 @@ export default function AulaDetalheClient({
                             max={scoreMax}
                             step={0.01}
                             inputMode="decimal"
+                            disabled={entry.attendance === "absent"}
                             value={entry.c2 ?? ""}
                             onChange={(e) => updateEntry(entry.student_id, { c2: parseNumericInput(e.target.value, scoreMax) })}
                             onBlur={() => clampEntryScore(entry.student_id, "c2", scoreMax)}
@@ -403,6 +409,7 @@ export default function AulaDetalheClient({
                             max={scoreMax}
                             step={0.01}
                             inputMode="decimal"
+                            disabled={entry.attendance === "absent"}
                             value={entry.c3 ?? ""}
                             onChange={(e) => updateEntry(entry.student_id, { c3: parseNumericInput(e.target.value, scoreMax) })}
                             onBlur={() => clampEntryScore(entry.student_id, "c3", scoreMax)}
@@ -418,6 +425,7 @@ export default function AulaDetalheClient({
                             max={scoreMax}
                             step={0.01}
                             inputMode="decimal"
+                            disabled={entry.attendance === "absent"}
                             value={entry.c4 ?? ""}
                             onChange={(e) => updateEntry(entry.student_id, { c4: parseNumericInput(e.target.value, scoreMax) })}
                             onBlur={() => clampEntryScore(entry.student_id, "c4", scoreMax)}
@@ -538,4 +546,3 @@ export default function AulaDetalheClient({
     </div>
   )
 }
-

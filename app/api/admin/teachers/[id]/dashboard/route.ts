@@ -1031,6 +1031,13 @@ export async function GET(req: NextRequest, ctx: Ctx) {
             AND e.c3 IS NOT NULL
             AND e.c4 IS NOT NULL
         )::int AS graded_students,
+        COUNT(*) FILTER (
+          WHERE e.attendance = 'absent'
+             OR (e.c1 IS NOT NULL
+            AND e.c2 IS NOT NULL
+            AND e.c3 IS NOT NULL
+            AND e.c4 IS NOT NULL)
+        )::int AS completed_students,
         COUNT(*) FILTER (WHERE e.attendance IN ('present', 'absent'))::int AS attendance_students,
         COUNT(*) FILTER (WHERE e.attendance = 'absent')::int AS absence_students
       FROM lesson_scope l
@@ -1047,7 +1054,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       COALESCE(
         SUM(
           CASE
-            WHEN has_grades = TRUE THEN graded_students
+            WHEN has_grades = TRUE THEN completed_students
             ELSE expected_students
           END
         ),
@@ -1057,7 +1064,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       COALESCE(SUM(absence_students), 0)::int AS absences_total,
       COUNT(*) FILTER (
         WHERE CASE
-          WHEN has_grades = TRUE THEN (expected_students = 0 OR graded_students >= expected_students)
+          WHEN has_grades = TRUE THEN (expected_students = 0 OR completed_students >= expected_students)
           ELSE TRUE
         END
       )::int AS fully_completed_lessons,
@@ -1103,6 +1110,13 @@ export async function GET(req: NextRequest, ctx: Ctx) {
             AND e.c3 IS NOT NULL
             AND e.c4 IS NOT NULL
         )::int AS graded_students,
+        COUNT(*) FILTER (
+          WHERE e.attendance = 'absent'
+             OR (e.c1 IS NOT NULL
+            AND e.c2 IS NOT NULL
+            AND e.c3 IS NOT NULL
+            AND e.c4 IS NOT NULL)
+        )::int AS completed_students,
         COUNT(*) FILTER (WHERE e.attendance = 'absent')::int AS absences_total
       FROM lesson_scope l
       LEFT JOIN lesson_students ls
@@ -1122,7 +1136,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       COALESCE(
         SUM(
           CASE
-            WHEN lm.has_grades = TRUE THEN lm.graded_students
+            WHEN lm.has_grades = TRUE THEN lm.completed_students
             ELSE lm.expected_students
           END
         ),

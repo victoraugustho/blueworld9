@@ -31,6 +31,7 @@ async function getTeacherWithTurmas(id: string) {
       document_number,
       approved,
       active,
+      can_download,
       created_at,
       updated_at
     FROM teachers
@@ -109,6 +110,7 @@ export async function PUT(req: NextRequest, context: Ctx) {
 
   const approved = !!body.approved
   const active = body.active !== undefined ? !!body.active : true
+  const can_download = body.can_download !== undefined ? !!body.can_download : true
 
   if (!name || !email || !phone || !country || !document_number) {
     return NextResponse.json({ error: "Dados incompletos" }, { status: 400 })
@@ -144,7 +146,8 @@ export async function PUT(req: NextRequest, context: Ctx) {
       document_type = ${document_type},
       document_number = ${document_number},
       approved = ${approved},
-      active = ${active}
+      active = ${active},
+      can_download = ${can_download}
     WHERE id = ${id}
     RETURNING
       id,
@@ -157,6 +160,7 @@ export async function PUT(req: NextRequest, context: Ctx) {
       document_number,
       approved,
       active,
+      can_download,
       created_at,
       updated_at
   `
@@ -218,6 +222,7 @@ export async function PUT(req: NextRequest, context: Ctx) {
       country,
       approved,
       active,
+      can_download,
       category_count: category_ids.length,
       turma_year_count: student_years.length,
     },

@@ -74,7 +74,15 @@ function initials(name: string | null | undefined) {
   return parts.map((item) => item.charAt(0).toUpperCase()).join("")
 }
 
-export default function ProjectDetailClient({ projectId, locale }: { projectId: string; locale: Locale }) {
+export default function ProjectDetailClient({
+  projectId,
+  locale,
+  canDownload,
+}: {
+  projectId: string
+  locale: Locale
+  canDownload: boolean
+}) {
   const [loading, setLoading] = useState(true)
   const [project, setProject] = useState<ProjectDetail | null>(null)
   const [comments, setComments] = useState<CommentRow[]>([])
@@ -494,13 +502,15 @@ export default function ProjectDetailClient({ projectId, locale }: { projectId: 
                     >
                       {labels.view}
                     </a>
-                    <a
-                      href={item.file_url}
-                      download={item.file_name}
-                      className="inline-flex h-8 items-center rounded-md border border-cyan-300/30 bg-white/10 px-3 text-xs font-medium text-cyan-50 hover:bg-white/15"
-                    >
-                      {labels.download}
-                    </a>
+                    {canDownload ? (
+                      <a
+                        href={item.file_url}
+                        download={item.file_name}
+                        className="inline-flex h-8 items-center rounded-md border border-cyan-300/30 bg-white/10 px-3 text-xs font-medium text-cyan-50 hover:bg-white/15"
+                      >
+                        {labels.download}
+                      </a>
+                    ) : null}
                   </div>
                 </div>
               ))}

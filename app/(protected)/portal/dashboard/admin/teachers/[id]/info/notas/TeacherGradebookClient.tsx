@@ -71,6 +71,35 @@ type TeacherInsights = {
   }
 }
 
+type PendingCloseReport = {
+  context: {
+    class_id: string
+    class_name: string
+    school_year: number
+    bimester: number
+  }
+  pending: {
+    lesson_entries: Array<{
+      student_id: string
+      full_name: string
+      lesson_id: string
+      lesson_number: number
+      lesson_date: string
+      missing_fields: string[]
+    }>
+    note2: Array<{
+      student_id: string
+      full_name: string
+      missing_exam_score: boolean
+      missing_c5_score: boolean
+    }>
+    final_grades: Array<{
+      student_id: string
+      full_name: string
+    }>
+  }
+}
+
 type StudentInsightModalData = {
   class: {
     id: string
@@ -152,6 +181,8 @@ export default function TeacherGradebookClient({ teacherId }: { teacherId: strin
   const [error, setError] = useState("")
   const [studentDetailsLoading, setStudentDetailsLoading] = useState(false)
   const [studentDetailsModal, setStudentDetailsModal] = useState<StudentInsightModalData | null>(null)
+  const [pendingCloseReport, setPendingCloseReport] = useState<PendingCloseReport | null>(null)
+  const [forceClosing, setForceClosing] = useState(false)
   const [classSearch, setClassSearch] = useState("")
 
   async function loadAll() {
@@ -266,11 +297,43 @@ export default function TeacherGradebookClient({ teacherId }: { teacherId: strin
     const data = await res.json().catch(() => null)
     setLockSavingKey("")
 
+    if (res.status === 409 && data?.requires_force_confirmation) {
+      setPendingCloseReport(data as PendingCloseReport)
+      return
+    }
+
     if (!res.ok) {
       setError(String(data?.error ?? "Nao foi possivel alterar o status do bimestre."))
       return
     }
 
+    await loadAll()
+  }
+
+  async function confirmForcedClose() {
+    if (!pendingCloseReport || forceClosing) return
+    setForceClosing(true)
+    setError("")
+
+    const res = await fetch("/api/portal/gradebook/bimester-lock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        class_id: pendingCloseReport.context.class_id,
+        school_year: pendingCloseReport.context.school_year,
+        bimester: pendingCloseReport.context.bimester,
+        force_close: true,
+      }),
+    })
+    const data = await res.json().catch(() => null)
+    setForceClosing(false)
+
+    if (!res.ok) {
+      setError(String(data?.error ?? "Nao foi possivel fechar o bimestre."))
+      return
+    }
+
+    setPendingCloseReport(null)
     await loadAll()
   }
 
@@ -521,6 +584,115 @@ export default function TeacherGradebookClient({ teacherId }: { teacherId: strin
           )}
         </CardContent>
       </Card>
+
+      {pendingCloseReport ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 md:p-4">
+          <button
+            type="button"
+            onClick={() => {
+              if (!forceClosing) setPendingCloseReport(null)
+            }}
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            aria-label="Cancelar fechamento"
+          />
+          <Card className="relative z-10 w-full max-w-4xl max-h-[92vh] overflow-hidden bg-slate-900/95 border border-amber-400/30 text-white shadow-2xl">
+            <CardHeader className="border-b border-amber-400/20 bg-amber-500/10">
+              <CardTitle className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-amber-200">Existem pendências neste bimestre</p>
+                  <p className="mt-1 text-sm font-normal text-slate-300">
+                    {pendingCloseReport.context.class_name} | {pendingCloseReport.context.school_year} | B{pendingCloseReport.context.bimester}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => setPendingCloseReport(null)}
+                  disabled={forceClosing}
+                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="max-h-[calc(92vh-92px)] overflow-y-auto space-y-5 pt-4">
+              <p className="rounded-lg border border-amber-400/25 bg-amber-500/10 p-3 text-sm text-amber-100">
+                Se continuar, o bimestre será fechado mesmo com os itens abaixo incompletos. O professor não poderá alterar esses lançamentos enquanto o bimestre estiver fechado.
+              </p>
+
+              {pendingCloseReport.pending.lesson_entries.length > 0 ? (
+                <section className="space-y-2">
+                  <h3 className="font-semibold text-white">
+                    Aulas com notas ou presença pendentes ({pendingCloseReport.pending.lesson_entries.length})
+                  </h3>
+                  <div className="rounded-lg border border-white/10 bg-slate-950/40 divide-y divide-white/10">
+                    {pendingCloseReport.pending.lesson_entries.map((item) => (
+                      <div key={`${item.student_id}:${item.lesson_id}`} className="p-3 text-sm">
+                        <p className="font-medium text-white">{item.full_name}</p>
+                        <p className="text-slate-300">
+                          Aula {item.lesson_number} ({formatDate(item.lesson_date)}) — faltando: {item.missing_fields.join(", ")}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {pendingCloseReport.pending.note2.length > 0 ? (
+                <section className="space-y-2">
+                  <h3 className="font-semibold text-white">
+                    Prova/Atividade ou C5 pendentes ({pendingCloseReport.pending.note2.length})
+                  </h3>
+                  <div className="rounded-lg border border-white/10 bg-slate-950/40 divide-y divide-white/10">
+                    {pendingCloseReport.pending.note2.map((item) => {
+                      const fields = [
+                        item.missing_exam_score ? "Prova/Atividade" : null,
+                        item.missing_c5_score ? "C5" : null,
+                      ].filter(Boolean)
+                      return (
+                        <div key={item.student_id} className="p-3 text-sm">
+                          <span className="font-medium text-white">{item.full_name}</span>
+                          <span className="text-slate-300"> — faltando: {fields.join(", ")}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              ) : null}
+
+              {pendingCloseReport.pending.final_grades.length > 0 ? (
+                <section className="space-y-2">
+                  <h3 className="font-semibold text-white">
+                    Nota final não calculada ({pendingCloseReport.pending.final_grades.length})
+                  </h3>
+                  <div className="rounded-lg border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
+                    {pendingCloseReport.pending.final_grades.map((item) => item.full_name).join(", ")}
+                  </div>
+                </section>
+              ) : null}
+
+              <div className="sticky bottom-0 flex flex-col-reverse sm:flex-row justify-end gap-2 border-t border-white/10 bg-slate-900/95 pt-4 pb-1">
+                <Button
+                  type="button"
+                  onClick={() => setPendingCloseReport(null)}
+                  disabled={forceClosing}
+                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                >
+                  Cancelar e revisar notas
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void confirmForcedClose()}
+                  disabled={forceClosing}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  <Lock className="w-4 h-4 mr-2" />
+                  {forceClosing ? "Fechando..." : "Confirmar fechamento mesmo assim"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       {studentDetailsLoading ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

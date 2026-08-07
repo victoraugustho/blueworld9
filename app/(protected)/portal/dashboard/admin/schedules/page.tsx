@@ -150,13 +150,6 @@ export default function AdminSchedulesPage() {
   const [studentSavingId, setStudentSavingId] = useState("")
   const [studentDeletingId, setStudentDeletingId] = useState("")
   const [studentDrafts, setStudentDrafts] = useState<Record<string, StudentDraft>>({})
-  const [ownershipMode, setOwnershipMode] = useState<"transfer" | "duplicate">("transfer")
-  const [ownershipSourceClassId, setOwnershipSourceClassId] = useState("")
-  const [ownershipTargetTeacherId, setOwnershipTargetTeacherId] = useState("")
-  const [ownershipTargetClassName, setOwnershipTargetClassName] = useState("")
-  const [ownershipLoading, setOwnershipLoading] = useState(false)
-  const [ownershipError, setOwnershipError] = useState("")
-  const [ownershipSuccess, setOwnershipSuccess] = useState("")
 
   const [form, setForm] = useState<ScheduleForm>({
     teacher_id: "",
@@ -174,11 +167,6 @@ export default function AdminSchedulesPage() {
 
   const selectedTeacher = useMemo(
     () => teachers.find((t) => t.id === selectedTeacherId) ?? null,
-    [teachers, selectedTeacherId],
-  )
-
-  const ownershipTargetTeachers = useMemo(
-    () => teachers.filter((teacher) => teacher.id !== selectedTeacherId),
     [teachers, selectedTeacherId],
   )
 
@@ -503,80 +491,6 @@ export default function AdminSchedulesPage() {
     }
   }
 
-  async function handleClassOwnershipAction(e: React.FormEvent) {
-    e.preventDefault()
-
-    const sourceClassId = ownershipSourceClassId.trim()
-    const targetTeacherId = ownershipTargetTeacherId.trim()
-    if (!sourceClassId || !targetTeacherId) return
-
-    const sourceClass = teacherClasses.find((item) => item.id === sourceClassId)
-    const targetTeacher = teachers.find((item) => item.id === targetTeacherId)
-    const sourceClassName = String(sourceClass?.name ?? "turma").trim()
-    const targetTeacherName = String(targetTeacher?.name ?? "professor").trim()
-
-    const verb = ownershipMode === "transfer" ? "transferir" : "duplicar"
-    const confirmationMessage =
-      ownershipMode === "transfer"
-        ? `Deseja transferir a turma "${sourceClassName}" para ${targetTeacherName}? Todos os vinculos (agenda, alunos, aulas, notas e registros) serao movidos.`
-        : `Deseja duplicar a turma "${sourceClassName}" para ${targetTeacherName}? Todos os vinculos (agenda, alunos, aulas, notas e registros) serao copiados.`
-
-    const confirmOwnership = await confirm({
-      title: ownershipMode === "transfer" ? "Transferir turma" : "Duplicar turma",
-      description: confirmationMessage,
-      confirmText: ownershipMode === "transfer" ? "Transferir" : "Duplicar",
-      variant: "danger",
-    })
-    if (!confirmOwnership) return
-
-    setOwnershipLoading(true)
-    setOwnershipError("")
-    setOwnershipSuccess("")
-
-    const res = await fetch("/api/admin/teacher-classes/ownership", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mode: ownershipMode,
-        source_class_id: sourceClassId,
-        target_teacher_id: targetTeacherId,
-        target_class_name: ownershipTargetClassName.trim() || null,
-      }),
-    })
-
-    const data = await res.json().catch(() => ({}))
-    setOwnershipLoading(false)
-
-    if (!res.ok) {
-      setOwnershipError(String(data?.error ?? "Nao foi possivel concluir a operacao."))
-      return
-    }
-
-    if (ownershipMode === "transfer") {
-      setOwnershipSuccess("Turma transferida com sucesso.")
-
-      if (studentsClassId === sourceClassId) {
-        setStudentsClassId("")
-        setClassStudents([])
-        setStudentDrafts({})
-      }
-
-      if (form.class_id === sourceClassId) {
-        setForm((prev) => ({ ...prev, class_id: "" }))
-      }
-
-      if (editingClassId === sourceClassId) {
-        resetClassForm()
-      }
-    } else {
-      setOwnershipSuccess("Turma duplicada com sucesso.")
-    }
-
-    setOwnershipTargetClassName("")
-    await loadTeacherClasses(selectedTeacherId)
-    await loadSchedules(selectedTeacherId)
-  }
-
   async function handleAddStudent(e: React.FormEvent) {
     e.preventDefault()
     const classId = studentsClassId.trim()
@@ -751,13 +665,6 @@ export default function AdminSchedulesPage() {
     setBulkStudents("")
     setClassSearch("")
     setScheduleSearch("")
-    setOwnershipError("")
-    setOwnershipSuccess("")
-    setOwnershipTargetClassName("")
-    setOwnershipMode("transfer")
-    const fallbackTargetTeacher =
-      teachers.find((teacher) => teacher.id !== selectedTeacherId)?.id ?? ""
-    setOwnershipTargetTeacherId(fallbackTargetTeacher)
     setActiveSection("classes")
     resetForm(selectedTeacher)
     loadSchedules(selectedTeacherId)
@@ -770,27 +677,14 @@ export default function AdminSchedulesPage() {
       setStudentsClassId("")
       setClassStudents([])
       setStudentDrafts({})
-      setOwnershipSourceClassId("")
       return
     }
-
-    setOwnershipSourceClassId((prev) => {
-      if (prev && teacherClasses.some((item) => item.id === prev)) return prev
-      return teacherClasses[0]?.id ?? ""
-    })
 
     setStudentsClassId((prev) => {
       if (prev && teacherClasses.some((item) => item.id === prev)) return prev
       return teacherClasses[0]?.id ?? ""
     })
   }, [teacherClasses])
-
-  useEffect(() => {
-    if (ownershipTargetTeacherId && teachers.some((item) => item.id === ownershipTargetTeacherId)) return
-    const fallbackTargetTeacher =
-      teachers.find((teacher) => teacher.id !== selectedTeacherId)?.id ?? ""
-    setOwnershipTargetTeacherId(fallbackTargetTeacher)
-  }, [ownershipTargetTeacherId, selectedTeacherId, teachers])
 
   useEffect(() => {
     if (!studentsClassId) return
@@ -1187,108 +1081,6 @@ export default function AdminSchedulesPage() {
                     })}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          )}
-
-          {activeSection === "classes" && (
-            <Card className="bg-slate-900/30 border border-white/10 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-white text-base flex items-center gap-2">
-                  <RefreshCcw className="w-4 h-4 text-cyan-300" />
-                  Transferir / Duplicar Turma
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleClassOwnershipAction} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <p className="text-xs text-slate-300">
-                      Esta acao replica ou move todos os vinculos da turma: agenda, alunos, aulas, notas e registros.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-slate-400">Modo</label>
-                    <select
-                      value={ownershipMode}
-                      onChange={(e) => setOwnershipMode(e.target.value === "duplicate" ? "duplicate" : "transfer")}
-                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white"
-                    >
-                      <option value="transfer">Transferir (move dados)</option>
-                      <option value="duplicate">Duplicar (copia dados)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-slate-400">Turma de origem</label>
-                    <select
-                      value={ownershipSourceClassId}
-                      onChange={(e) => setOwnershipSourceClassId(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white"
-                    >
-                      <option value="">Selecione</option>
-                      {filteredTeacherClasses.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name} | ID:{shortClassId(item.id)} | {item.school_year}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-slate-400">Professor de destino</label>
-                    <select
-                      value={ownershipTargetTeacherId}
-                      onChange={(e) => setOwnershipTargetTeacherId(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white"
-                    >
-                      <option value="">Selecione</option>
-                      {ownershipTargetTeachers.map((teacher) => (
-                        <option key={teacher.id} value={teacher.id}>
-                          {teacher.name} | {teacher.email}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-slate-400">Nome da turma no destino (opcional)</label>
-                    <input
-                      value={ownershipTargetClassName}
-                      onChange={(e) => setOwnershipTargetClassName(e.target.value)}
-                      placeholder="Se vazio, usa o nome atual"
-                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white"
-                    />
-                  </div>
-
-                  {ownershipError ? (
-                    <p className="md:col-span-2 text-xs text-rose-300">{ownershipError}</p>
-                  ) : null}
-                  {ownershipSuccess ? (
-                    <p className="md:col-span-2 text-xs text-emerald-300">{ownershipSuccess}</p>
-                  ) : null}
-
-                  <div className="md:col-span-2 flex flex-wrap gap-2">
-                    <Button
-                      type="submit"
-                      className="bg-cyan-600 hover:bg-cyan-700"
-                      disabled={
-                        ownershipLoading ||
-                        !ownershipSourceClassId ||
-                        !ownershipTargetTeacherId ||
-                        ownershipTargetTeacherId === selectedTeacherId
-                      }
-                    >
-                      {ownershipLoading
-                        ? ownershipMode === "transfer"
-                          ? "Transferindo..."
-                          : "Duplicando..."
-                        : ownershipMode === "transfer"
-                          ? "Transferir turma"
-                          : "Duplicar turma"}
-                    </Button>
-                  </div>
-                </form>
               </CardContent>
             </Card>
           )}

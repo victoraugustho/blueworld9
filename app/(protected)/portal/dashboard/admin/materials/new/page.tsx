@@ -142,7 +142,7 @@ export default function NewMaterialPage() {
           <p className="text-sm text-slate-300">
             Controle dinamico por categoria, turma (ano) e material.
             {" "}
-            <Link href="/portal/dashboard/admin/turmas" className="text-cyan-300 hover:text-cyan-200 underline">
+            <Link href="/portal/dashboard/admin/materials?section=turmas" className="text-cyan-300 hover:text-cyan-200 underline">
               Gerenciar categorias e turmas
             </Link>
           </p>

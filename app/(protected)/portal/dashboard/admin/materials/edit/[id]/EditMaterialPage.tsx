@@ -151,7 +151,7 @@ export default function EditMaterialPage({ params }: EditPageProps) {
         <p className="text-slate-300 text-sm mb-6">
           Precisa ajustar categorias/turmas?
           {" "}
-          <Link href="/portal/dashboard/admin/turmas" className="text-cyan-300 hover:text-cyan-200 underline">
+          <Link href="/portal/dashboard/admin/materials?section=turmas" className="text-cyan-300 hover:text-cyan-200 underline">
             Gerenciar categorias e turmas
           </Link>
         </p>

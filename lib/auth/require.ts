@@ -18,6 +18,7 @@ type TeacherAuthRow = {
   name: string
   email: string
   avatar_url: string | null
+  can_download: boolean
 }
 
 function buildUnauthResponse() {
@@ -47,7 +48,8 @@ export async function requireTeacherApi() {
       t.country,
       t.name,
       t.email,
-      t.avatar_url
+      t.avatar_url,
+      t.can_download
     FROM teacher_sessions s
     JOIN teachers t ON t.id = s.teacher_id
     WHERE s.token_hash = ${tokenHash}

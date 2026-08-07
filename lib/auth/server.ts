@@ -16,6 +16,7 @@ type TeacherRow = {
   role: string | null
   is_admin: boolean | null
   avatar_url: string | null
+  can_download: boolean
 }
 
 export async function getTeacherFromSession() {
@@ -37,7 +38,8 @@ export async function getTeacherFromSession() {
       t.country,
       t.role,
       t.is_admin,
-      t.avatar_url
+      t.avatar_url,
+      t.can_download
     FROM teacher_sessions s
     JOIN teachers t ON t.id = s.teacher_id
     WHERE s.token_hash = ${tokenHash}

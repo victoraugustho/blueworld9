@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
 import { ChevronDown, ChevronUp, Pencil, Trash } from "lucide-react"
 import type { Material } from "@/app/types/portal"
+import AdminTurmasPage from "../turmas/page"
 
 type Lang = Material["language"]
 type MaterialType = Material["file_type"]
@@ -107,7 +108,7 @@ function groupByCategory(list: MaterialView[]) {
   return map
 }
 
-export default function AdminMaterialsPage() {
+function MaterialsPanel() {
   const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
@@ -234,9 +235,6 @@ export default function AdminMaterialsPage() {
         <h1 className="text-3xl font-bold">Gerenciar Materiais</h1>
 
         <div className="flex items-center gap-2">
-          <Link href="/portal/dashboard/admin/turmas">
-            <Button className="bg-white/10 hover:bg-white/15 border border-white/10">Turmas</Button>
-          </Link>
           <Link href="/portal/dashboard/admin/materials/new">
             <Button className="bg-cyan-600 hover:bg-cyan-700">Novo Material</Button>
           </Link>
@@ -413,17 +411,24 @@ export default function AdminMaterialsPage() {
 
                         <div className="flex items-center gap-2 lg:justify-end">
                           <Link href={`/portal/dashboard/admin/materials/edit/${m.id}`}>
-                            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 flex items-center gap-2">
-                              <Pencil className="w-4 h-4" /> Editar
+                            <Button
+                              size="sm"
+                              className="h-9 w-9 p-0 bg-blue-600 hover:bg-blue-700"
+                              aria-label={`Editar ${m.title}`}
+                              title="Editar material"
+                            >
+                              <Pencil className="w-4 h-4" />
                             </Button>
                           </Link>
 
                           <Button
                             size="sm"
-                            className="bg-red-600 hover:bg-red-700 flex items-center gap-2"
+                            className="h-9 w-9 p-0 bg-red-600 hover:bg-red-700"
                             onClick={() => deleteMaterial(m.id)}
+                            aria-label={`Excluir ${m.title}`}
+                            title="Excluir material"
                           >
-                            <Trash className="w-4 h-4" /> Excluir
+                            <Trash className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
@@ -439,3 +444,60 @@ export default function AdminMaterialsPage() {
   )
 }
 
+type AdminMaterialsSection = "materials" | "turmas"
+
+export default function AdminMaterialsPage() {
+  const [section, setSection] = useState<AdminMaterialsSection>("materials")
+
+  useEffect(() => {
+    const syncSectionFromUrl = () => {
+      const selected = new URLSearchParams(window.location.search).get("section")
+      setSection(selected === "turmas" ? "turmas" : "materials")
+    }
+
+    syncSectionFromUrl()
+    window.addEventListener("popstate", syncSectionFromUrl)
+    return () => window.removeEventListener("popstate", syncSectionFromUrl)
+  }, [])
+
+  function selectSection(next: AdminMaterialsSection) {
+    setSection(next)
+    const url = new URL(window.location.href)
+    if (next === "turmas") url.searchParams.set("section", "turmas")
+    else url.searchParams.delete("section")
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="px-6 pt-6">
+        <div className="inline-flex flex-wrap gap-1 rounded-xl border border-white/10 bg-slate-900/50 p-1">
+          <button
+            type="button"
+            onClick={() => selectSection("materials")}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+              section === "materials"
+                ? "bg-cyan-600 text-white shadow"
+                : "text-slate-300 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            Materiais
+          </button>
+          <button
+            type="button"
+            onClick={() => selectSection("turmas")}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+              section === "turmas"
+                ? "bg-cyan-600 text-white shadow"
+                : "text-slate-300 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            Categorias/Turmas
+          </button>
+        </div>
+      </div>
+
+      {section === "materials" ? <MaterialsPanel /> : <AdminTurmasPage />}
+    </div>
+  )
+}

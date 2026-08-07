@@ -355,6 +355,10 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
 
+  if (auth.teacher.can_download === false) {
+    return NextResponse.json({ error: "Downloads nao permitidos para este acesso." }, { status: 403 })
+  }
+
   await ensureGradebookSchema()
 
   const resolved = await ctx.params

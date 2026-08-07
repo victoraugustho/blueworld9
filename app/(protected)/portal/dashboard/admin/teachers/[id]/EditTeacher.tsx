@@ -296,6 +296,20 @@ export default function EditTeacherPage({ params }: { params: { id: string } }) 
               />
               <Label className="text-white">Ativo</Label>
             </div>
+
+            <div className="flex items-center gap-3 md:col-span-2 rounded-lg border border-white/15 bg-slate-950/30 p-3">
+              <input
+                type="checkbox"
+                checked={teacher.can_download !== false}
+                onChange={(e) => setTeacher({ ...teacher, can_download: e.target.checked })}
+              />
+              <div>
+                <Label className="text-white">Permitir downloads e exportações</Label>
+                <p className="text-xs text-slate-300 mt-1">
+                  Desative para acessos de teste. O professor continua vendo as telas, mas não recebe ações de download.
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="text-sm text-slate-300 pt-2">

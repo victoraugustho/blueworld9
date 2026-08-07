@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
   const classId = String(body.class_id ?? "").trim()
   const bimester = normalizeBimester(body.bimester)
   const schoolYear = normalizeSchoolYear(body.school_year)
+  const forceClose = body.force_close === true
 
   if (!isUuid(classId)) {
     return NextResponse.json({ error: "Turma invalida" }, { status: 400 })
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest) {
 
   const missingLessonRows = await db`
     WITH lesson_scope AS (
-      SELECT l.id, l.lesson_date
+      SELECT l.id, l.lesson_date, l.lesson_number
       FROM teacher_grade_lessons l
       WHERE l.class_id = ${classId}
         AND l.school_year = ${schoolYear}
@@ -154,7 +155,9 @@ export async function POST(req: NextRequest) {
       SELECT
         s.id AS student_id,
         s.full_name,
-        l.id AS lesson_id
+        l.id AS lesson_id,
+        l.lesson_number,
+        l.lesson_date
       FROM active_students s
       JOIN lesson_scope l
         ON s.enrollment_date <= l.lesson_date::date
@@ -162,50 +165,28 @@ export async function POST(req: NextRequest) {
     SELECT
       ep.student_id,
       ep.full_name,
-      COUNT(*) FILTER (
-        WHERE e.lesson_id IS NULL
-           OR e.attendance IS NULL
-           OR e.c1 IS NULL
-           OR e.c2 IS NULL
-           OR e.c3 IS NULL
-           OR e.c4 IS NULL
-      )::int AS pending_lessons
+      ep.lesson_id,
+      ep.lesson_number,
+      ep.lesson_date,
+      ARRAY_REMOVE(ARRAY[
+        CASE WHEN e.lesson_id IS NULL OR e.attendance IS NULL THEN 'presenca' END,
+        CASE WHEN e.lesson_id IS NULL OR e.c1 IS NULL THEN 'C1' END,
+        CASE WHEN e.lesson_id IS NULL OR e.c2 IS NULL THEN 'C2' END,
+        CASE WHEN e.lesson_id IS NULL OR e.c3 IS NULL THEN 'C3' END,
+        CASE WHEN e.lesson_id IS NULL OR e.c4 IS NULL THEN 'C4' END
+      ], NULL) AS missing_fields
     FROM eligible_pairs ep
     LEFT JOIN teacher_grade_entries e
       ON e.lesson_id = ep.lesson_id
      AND e.student_id = ep.student_id
-    GROUP BY ep.student_id, ep.full_name
-    HAVING COUNT(*) FILTER (
-      WHERE e.lesson_id IS NULL
-         OR e.attendance IS NULL
-         OR e.c1 IS NULL
-         OR e.c2 IS NULL
-         OR e.c3 IS NULL
-         OR e.c4 IS NULL
-    ) > 0
-    ORDER BY ep.full_name ASC
+    WHERE e.lesson_id IS NULL
+       OR e.attendance IS NULL
+       OR e.c1 IS NULL
+       OR e.c2 IS NULL
+       OR e.c3 IS NULL
+       OR e.c4 IS NULL
+    ORDER BY ep.full_name ASC, ep.lesson_date ASC, ep.lesson_number ASC
   `
-
-  if (missingLessonRows.length > 0) {
-    const previewNames = missingLessonRows
-      .slice(0, 5)
-      .map((row) => String(row.full_name ?? "").trim())
-      .filter(Boolean)
-    const moreCount = Math.max(0, missingLessonRows.length - previewNames.length)
-    const namesPart =
-      previewNames.length > 0
-        ? ` Pendentes: ${previewNames.join(", ")}${moreCount > 0 ? ` e mais ${moreCount}.` : "."}`
-        : ""
-
-    return NextResponse.json(
-      {
-        error: `Nao e possivel fechar: existem ${missingLessonRows.length} aluno(s) com notas/presenca pendentes nas aulas.${namesPart}`,
-        missing_lesson_count: missingLessonRows.length,
-        missing_lesson_students: missingLessonRows,
-      },
-      { status: 400 },
-    )
-  }
 
   const missingNote2Rows = await db`
     WITH
@@ -219,7 +200,9 @@ export async function POST(req: NextRequest) {
     )
     SELECT
       s.id AS student_id,
-      s.full_name
+      s.full_name,
+      (bg.exam_score IS NULL) AS missing_exam_score,
+      (bg.c5_score IS NULL) AS missing_c5_score
     FROM active_students s
     LEFT JOIN teacher_bimester_grades bg
       ON bg.class_id = ${classId}
@@ -231,26 +214,6 @@ export async function POST(req: NextRequest) {
     ORDER BY s.full_name ASC
   `
 
-  if (missingNote2Rows.length > 0) {
-    const previewNames = missingNote2Rows
-      .slice(0, 5)
-      .map((row) => String(row.full_name ?? "").trim())
-      .filter(Boolean)
-    const moreCount = Math.max(0, missingNote2Rows.length - previewNames.length)
-    const namesPart =
-      previewNames.length > 0
-        ? ` Pendentes: ${previewNames.join(", ")}${moreCount > 0 ? ` e mais ${moreCount}.` : "."}`
-        : ""
-
-    return NextResponse.json(
-      {
-        error: `Nao e possivel fechar: existem ${missingNote2Rows.length} aluno(s) sem Prova/Atividade e/ou C5 lancados.${namesPart}`,
-        missing_note2_count: missingNote2Rows.length,
-        missing_note2_students: missingNote2Rows,
-      },
-      { status: 400 },
-    )
-  }
 
   const missingFinalRows = await db`
     WITH lesson_scope AS (
@@ -349,24 +312,27 @@ export async function POST(req: NextRequest) {
     ORDER BY full_name ASC
   `
 
-  if (missingFinalRows.length > 0) {
-    const previewNames = missingFinalRows
-      .slice(0, 5)
-      .map((row) => String(row.full_name ?? "").trim())
-      .filter(Boolean)
-    const moreCount = Math.max(0, missingFinalRows.length - previewNames.length)
-    const namesPart =
-      previewNames.length > 0
-        ? ` Pendentes: ${previewNames.join(", ")}${moreCount > 0 ? ` e mais ${moreCount}.` : "."}`
-        : ""
+  const hasPendingItems =
+    missingLessonRows.length > 0 || missingNote2Rows.length > 0 || missingFinalRows.length > 0
 
+  if (hasPendingItems && !forceClose) {
     return NextResponse.json(
       {
-        error: `Nao e possivel fechar: existem ${missingFinalRows.length} aluno(s) sem nota final lancada.${namesPart}`,
-        missing_final_count: missingFinalRows.length,
-        missing_final_students: missingFinalRows,
+        error: "Existem notas ou presencas pendentes. Confirme o fechamento forcado para continuar.",
+        requires_force_confirmation: true,
+        context: {
+          class_id: classId,
+          class_name: String(classRow.name ?? "Turma"),
+          school_year: schoolYear,
+          bimester,
+        },
+        pending: {
+          lesson_entries: missingLessonRows,
+          note2: missingNote2Rows,
+          final_grades: missingFinalRows,
+        },
       },
-      { status: 400 },
+      { status: 409 },
     )
   }
 
@@ -396,6 +362,7 @@ export async function POST(req: NextRequest) {
     ok: true,
     closed: true,
     already_closed: !created,
+    forced: forceClose && hasPendingItems,
     lock,
   })
 }

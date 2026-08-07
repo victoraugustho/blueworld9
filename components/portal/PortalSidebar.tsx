@@ -19,11 +19,11 @@ import {
   ChevronDown,
   CalendarDays,
   Bug,
-  GraduationCap,
   FolderKanban,
   ChevronsLeft,
   ChevronsRight,
   Globe2,
+  ArrowRightLeft,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -83,12 +83,12 @@ export function PortalSidebar({
       notas: locale === "es" ? "Notas" : "Notas",
       notificacoes: locale === "es" ? "Notificaciones" : "Notifica\u00e7\u00f5es",
       reportBug: locale === "es" ? "Reportar problema" : "Relatar problema",
-      adminMaterials: locale === "es" ? "Materiales (Admin)" : "Materiais (Admin)",
+      adminMaterials: locale === "es" ? "Materiales y Categorías" : "Materiais e Categorias",
       adminBlog: locale === "es" ? "Blog (Admin)" : "Blog (Admin)",
       adminProjects: locale === "es" ? "Proyectos (Admin)" : "Projetos (Admin)",
-      adminTurmas: locale === "es" ? "Categorias/Turmas" : "Categorias/Turmas",
       teachers: locale === "es" ? "Profesores" : "Professores",
       adminSchedules: locale === "es" ? "Agenda de Profesores" : "Agenda de Professores",
+      classTransfers: locale === "es" ? "Transferir Turmas" : "Transferir Turmas",
       adminAgenda: locale === "es" ? "Agenda de Coordinadores" : "Agenda de Coordenadores",
       technicalScheduling: locale === "es" ? "Agendamiento Tecnico" : "Agendamento Tecnico",
       adminNotifications: locale === "es" ? "Notificaciones (Admin)" : "Notifica\u00e7\u00f5es (Admin)",
@@ -118,9 +118,9 @@ export function PortalSidebar({
       if (isAdmin) {
         items.push(
           { href: "/portal/dashboard/admin/materials", label: t.menu.adminMaterials, icon: ShieldCheck },
-          { href: "/portal/dashboard/admin/turmas", label: t.menu.adminTurmas, icon: GraduationCap },
           { href: "/portal/dashboard/admin/teachers", label: t.menu.teachers, icon: Users },
           { href: "/portal/dashboard/admin/schedules", label: t.menu.adminSchedules, icon: CalendarDays },
+          { href: "/portal/dashboard/admin/transferencias", label: t.menu.classTransfers, icon: ArrowRightLeft },
           { href: "/portal/dashboard/admin/agenda", label: t.menu.adminAgenda, icon: CalendarDays },
           { href: "/portal/dashboard/admin/agendamento-tecnico", label: t.menu.technicalScheduling, icon: CalendarDays },
           { href: "/portal/dashboard/admin/notifications", label: t.menu.adminNotifications, icon: Bell },
@@ -563,4 +563,3 @@ export function PortalSidebar({
     </>
   )
 }
-

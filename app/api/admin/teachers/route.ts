@@ -14,7 +14,7 @@ export async function GET() {
       id, name, email, phone,
       avatar_url,
       country, locale, document_type, document_number,
-      approved, active, created_at, updated_at,
+      approved, active, can_download, created_at, updated_at,
       COALESCE(
         (SELECT ARRAY_AGG(tc.category_id ORDER BY tc.category_id) FROM teacher_categories tc WHERE tc.teacher_id = teachers.id),
         ARRAY[]::int[]
@@ -41,7 +41,7 @@ export async function GET() {
       id, name, email, phone,
       avatar_url,
       country, locale, document_type, document_number,
-      approved, active, created_at, updated_at,
+      approved, active, can_download, created_at, updated_at,
       COALESCE(
         (SELECT ARRAY_AGG(tc.category_id ORDER BY tc.category_id) FROM teacher_categories tc WHERE tc.teacher_id = teachers.id),
         ARRAY[]::int[]
@@ -68,7 +68,7 @@ export async function GET() {
       id, name, email, phone,
       avatar_url,
       country, locale, document_type, document_number,
-      approved, active, created_at, updated_at,
+      approved, active, can_download, created_at, updated_at,
       COALESCE(
         (SELECT ARRAY_AGG(tc.category_id ORDER BY tc.category_id) FROM teacher_categories tc WHERE tc.teacher_id = teachers.id),
         ARRAY[]::int[]

@@ -55,6 +55,7 @@ export interface Teacher {
   cpf?: string | null
   approved: boolean
   active?: boolean
+  can_download?: boolean
   created_at?: string
   updated_at?: string
   role?: string | null

@@ -280,9 +280,11 @@ const turmaScoreFieldOrder: TurmaScoreField[] = ["exam_score", "c5_score", "manu
 export default function LancamentosClient({
   locale,
   scoreMax = 10,
+  canDownload = true,
 }: {
   locale: Locale
   scoreMax?: number
+  canDownload?: boolean
 }) {
   const isEs = locale === "es"
   const isPyScoreScale = scoreMax <= 5
@@ -1763,7 +1765,7 @@ export default function LancamentosClient({
                   <RefreshCcw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
                   {isEs ? "Actualizar" : "Atualizar"}
                 </Button>
-                <Button
+                {canDownload ? <Button
                   type="button"
                   onClick={() => openExportModal("xlsx")}
                   disabled={exportingFormat !== "" || !selectedClassId}
@@ -1776,8 +1778,8 @@ export default function LancamentosClient({
                     : isEs
                       ? "Exportar XLSX"
                       : "Exportar XLSX"}
-                </Button>
-                <Button
+                </Button> : null}
+                {canDownload ? <Button
                   type="button"
                   onClick={() => openExportModal("pdf")}
                   disabled={exportingFormat !== "" || !selectedClassId}
@@ -1790,7 +1792,7 @@ export default function LancamentosClient({
                     : isEs
                       ? "Exportar PDF"
                       : "Exportar PDF"}
-                </Button>
+                </Button> : null}
               </div>
             </div>
           </div>
@@ -3270,7 +3272,7 @@ export default function LancamentosClient({
         </div>
       ) : null}
 
-      {exportModalOpen ? (
+      {canDownload && exportModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4">
           <button
             type="button"
@@ -3400,4 +3402,3 @@ export default function LancamentosClient({
     </div>
   )
 }
-

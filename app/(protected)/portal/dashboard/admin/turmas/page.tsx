@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
-import { Pencil, RefreshCcw, Trash2, Users, BookOpen, Link2, Layers, CalendarRange } from "lucide-react"
+import { Check, Pencil, RefreshCcw, Trash2, Users, BookOpen, Link2, Layers, CalendarRange, X } from "lucide-react"
 import type { Category, Teacher, TurmaYear } from "@/app/types/portal"
 
 function normalizeSearch(value: string) {
@@ -432,47 +432,54 @@ export default function AdminTurmasPage() {
                               <Button
                                 type="button"
                                 disabled={saving || !editingName.trim()}
-                                className="bg-blue-600 hover:bg-blue-700"
+                                className="h-9 w-9 p-0 bg-blue-600 hover:bg-blue-700"
                                 onClick={() => saveEdit(item)}
+                                aria-label={`Salvar alteração de ${item.name}`}
+                                title="Salvar alteração"
                               >
-                                Salvar
+                                <Check className="w-4 h-4" />
                               </Button>
                               <Button
                                 type="button"
-                                className="bg-white/10 hover:bg-white/15 border border-white/10"
+                                className="h-9 w-9 p-0 bg-white/10 hover:bg-white/15 border border-white/10"
                                 onClick={cancelEdit}
+                                aria-label="Cancelar edição"
+                                title="Cancelar edição"
                               >
-                                Cancelar
+                                <X className="w-4 h-4" />
                               </Button>
                             </>
                           ) : (
                             <Button
                               type="button"
-                              className="bg-indigo-600 hover:bg-indigo-700"
+                              className="h-9 w-9 p-0 bg-indigo-600 hover:bg-indigo-700"
                               onClick={() => startEdit(item)}
+                              aria-label={`Editar ${item.name}`}
+                              title="Editar categoria"
                             >
-                              <Pencil className="w-4 h-4 mr-2" />
-                              Editar
+                              <Pencil className="w-4 h-4" />
                             </Button>
                           )}
 
                           <Button
                             type="button"
-                            className="bg-emerald-600 hover:bg-emerald-700"
+                            className="h-9 w-9 p-0 bg-emerald-600 hover:bg-emerald-700"
                             onClick={() => (isLinking ? cancelCategoryLinking() : startCategoryLinking(item))}
+                            aria-label={isLinking ? `Fechar vínculos de ${item.name}` : `Vincular professores a ${item.name}`}
+                            title={isLinking ? "Fechar vínculos" : "Vincular professores"}
                           >
-                            <Link2 className="w-4 h-4 mr-2" />
-                            {isLinking ? "Fechar vínculo" : "Vincular professores"}
+                            {isLinking ? <X className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
                           </Button>
 
                           <Button
                             type="button"
-                            className="bg-rose-600 hover:bg-rose-700"
+                            className="h-9 w-9 p-0 bg-rose-600 hover:bg-rose-700"
                             onClick={() => deleteCategory(item)}
                             disabled={saving}
+                            aria-label={`Excluir ${item.name}`}
+                            title="Excluir categoria"
                           >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Excluir
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
@@ -609,11 +616,12 @@ export default function AdminTurmasPage() {
                     <div className="md:justify-self-end">
                       <Button
                         type="button"
-                        className="bg-amber-600 hover:bg-amber-700"
+                        className="h-9 w-9 p-0 bg-amber-600 hover:bg-amber-700"
                         onClick={() => (isLinking ? cancelYearLinking() : startYearLinking(item))}
+                        aria-label={isLinking ? `Fechar vínculos de ${item.label}` : `Vincular professores a ${item.label}`}
+                        title={isLinking ? "Fechar vínculos" : "Vincular professores"}
                       >
-                        <Link2 className="w-4 h-4 mr-2" />
-                        {isLinking ? "Fechar vínculo" : "Vincular professores"}
+                        {isLinking ? <X className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
                       </Button>
                     </div>
                   </div>
@@ -712,4 +720,3 @@ export default function AdminTurmasPage() {
     </div>
   )
 }
-

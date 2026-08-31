@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { isAdminUser } from "@/lib/auth/authorization"
 import {
   ensureGradebookSchema,
   isUuid,
@@ -9,7 +10,7 @@ import {
   normalizeStudentName,
 } from "@/lib/gradebook"
 
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 async function loadStudent(studentId: string) {
   const [row] = await db`
@@ -28,7 +29,7 @@ async function loadStudent(studentId: string) {
 export async function PUT(req: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
   if (!isAdmin) {
     return NextResponse.json({ error: "Apenas admin pode editar alunos." }, { status: 403 })
   }
@@ -83,7 +84,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 export async function DELETE(_req: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
   if (!isAdmin) {
     return NextResponse.json({ error: "Apenas admin pode excluir alunos." }, { status: 403 })
   }

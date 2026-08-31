@@ -7,6 +7,14 @@ export async function proxy(request: NextRequest) {
 
   const isAuthPage = pathname === "/" || pathname === "/cadastro";
 
+  if (pathname.startsWith("/uploads/projects/")) {
+    const filename = pathname.split("/").filter(Boolean).pop();
+    if (!filename) return NextResponse.json({ error: "Arquivo inválido." }, { status: 400 });
+    return NextResponse.rewrite(
+      new URL(`/api/project-files/${encodeURIComponent(filename)}`, request.url),
+    );
+  }
+
   if (isAuthPage && session) {
     return NextResponse.redirect(new URL("/portal/dashboard", request.url));
   }
@@ -19,5 +27,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/portal/:path*"],
+  matcher: ["/portal/:path*", "/uploads/projects/:path*"],
 };

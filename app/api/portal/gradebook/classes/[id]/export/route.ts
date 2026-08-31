@@ -3,6 +3,7 @@ import ExcelJS from "exceljs"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { isAdminUser } from "@/lib/auth/authorization"
 import {
   ensureGradebookSchema,
   getScoreMaxByCountry,
@@ -11,7 +12,7 @@ import {
   normalizeSchoolYear,
 } from "@/lib/gradebook"
 
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 function formatScore(value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "-"
@@ -81,18 +82,29 @@ async function loadExportRows(params: {
       SELECT
         e.student_id,
         COUNT(*) FILTER (
-          WHERE e.c1 IS NOT NULL
-            AND e.c2 IS NOT NULL
-            AND e.c3 IS NOT NULL
-            AND e.c4 IS NOT NULL
-        )::int AS graded_lessons,
-        ROUND(
-          AVG((e.c1 + e.c2 + e.c3 + e.c4) / 4.0)
-          FILTER (
-            WHERE e.c1 IS NOT NULL
+          WHERE e.attendance = 'absent'
+             OR (
+              e.c1 IS NOT NULL
               AND e.c2 IS NOT NULL
               AND e.c3 IS NOT NULL
               AND e.c4 IS NOT NULL
+            )
+        )::int AS graded_lessons,
+        ROUND(
+          AVG(
+            CASE
+              WHEN e.attendance = 'absent' THEN 0
+              ELSE (e.c1 + e.c2 + e.c3 + e.c4) / 4.0
+            END
+          )
+          FILTER (
+            WHERE e.attendance = 'absent'
+               OR (
+                e.c1 IS NOT NULL
+                AND e.c2 IS NOT NULL
+                AND e.c3 IS NOT NULL
+                AND e.c4 IS NOT NULL
+              )
           )::numeric,
           2
         ) AS note1,
@@ -367,7 +379,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const format = String(search.get("format") ?? "xlsx").trim().toLowerCase()
   const bimester = normalizeBimester(search.get("bimester"))
   const schoolYear = normalizeSchoolYear(search.get("schoolYear"))
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
 
   if (!isUuid(classId)) {
     return NextResponse.json({ error: "Turma invalida" }, { status: 400 })

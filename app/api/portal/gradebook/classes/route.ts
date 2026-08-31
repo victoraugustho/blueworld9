@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { isAdminUser } from "@/lib/auth/authorization"
 import {
   ensureGradebookSchema,
   isUuid,
@@ -13,7 +14,7 @@ import { ensureTurmasSchema } from "@/lib/turmas"
 export async function GET(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
 
   await ensureTurmasSchema()
   await ensureGradebookSchema()
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
 
   if (!isAdmin) {
     return NextResponse.json({ error: "Apenas admin pode criar turmas." }, { status: 403 })

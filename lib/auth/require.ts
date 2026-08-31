@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { db } from "@/lib/db"
 import { SESSION_COOKIE } from "@/lib/auth/constants"
 import { clearSessionCookie, hashSessionToken } from "@/lib/auth/session"
+import { isAdminUser } from "@/lib/auth/authorization"
 
 type TeacherAuthRow = {
   session_id: string
@@ -84,8 +85,7 @@ export async function requireAdminApi() {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth
 
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
-  if (!isAdmin) {
+  if (!isAdminUser(auth.teacher)) {
     return { ok: false as const, response: NextResponse.json({ error: "Sem permissão" }, { status: 403 }) }
   }
 

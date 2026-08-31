@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "Nao foi possivel salvar o arquivo no servidor. Verifique permissao de escrita e volume de /app/public/uploads.",
+          "Não foi possível salvar o arquivo no servidor. Verifique a permissão de escrita e o volume de /app/public/uploads.",
       },
       { status: 500 },
     )

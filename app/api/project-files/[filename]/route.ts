@@ -2,6 +2,16 @@ import path from "node:path"
 import { access, constants, readdir, readFile } from "node:fs/promises"
 import { NextRequest, NextResponse } from "next/server"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { isAdminUser } from "@/lib/auth/authorization"
+import { canManageProjects } from "@/lib/auth/project-admin"
+import { db } from "@/lib/db"
+import {
+  canTeacherAccessProject,
+  ensureProjectsSchema,
+  isProjectCategoryAccessReady,
+  loadTeacherScopeData,
+} from "@/lib/projects"
+import { canTeacherAccessProjectWithCategory } from "@/lib/project-category-access"
 
 export const runtime = "nodejs"
 
@@ -89,12 +99,13 @@ async function resolveFileByFilename(filename: string) {
     return cached.absPath
   }
 
-  const uploadsRoot = path.join(process.cwd(), "public", "uploads")
+  const uploadsRoot = path.join(
+    /* turbopackIgnore: true */ process.cwd(),
+    "public",
+    "uploads",
+  )
   const directCandidates = [
-    path.join(uploadsRoot, filename),
     path.join(uploadsRoot, "projects", filename),
-    path.join(uploadsRoot, "blog", filename),
-    path.join(uploadsRoot, "avatars", filename),
   ]
 
   for (const candidate of directCandidates) {
@@ -111,14 +122,113 @@ async function resolveFileByFilename(filename: string) {
     return projectFile
   }
 
-  const blogRoot = path.join(uploadsRoot, "blog")
-  const blogFile = await findFileInTree(blogRoot, filename, 3)
-  if (blogFile) {
-    cache.set(filename, { absPath: blogFile, expiresAt: now + CACHE_TTL_MS })
-    return blogFile
+  return null
+}
+
+async function canReadProjectFile(filename: string, auth: Awaited<ReturnType<typeof requireTeacherApi>>) {
+  if (!auth.ok) return false
+  if (isAdminUser(auth.teacher) && canManageProjects(auth.teacherId)) return true
+
+  await ensureProjectsSchema()
+  const categoryAccessReady = await isProjectCategoryAccessReady()
+
+  const categoryAccessSelect = categoryAccessReady
+    ? db`
+        category.access_scope AS category_access_scope,
+        category.target_teacher_ids AS category_target_teacher_ids,
+        category.target_countries AS category_target_countries,
+        category.target_locales AS category_target_locales
+      `
+    : db`
+        'all'::text AS category_access_scope,
+        ARRAY[]::uuid[] AS category_target_teacher_ids,
+        ARRAY[]::text[] AS category_target_countries,
+        ARRAY[]::text[] AS category_target_locales
+      `
+
+  let projects: any[] = []
+  try {
+    projects = await db`
+      SELECT DISTINCT
+        p.id,
+        p.locale,
+        p.access_scope,
+        p.target_teacher_ids,
+        p.target_countries,
+        p.target_student_years,
+        p.target_class_ids,
+        ${categoryAccessSelect}
+      FROM public.teacher_projects p
+      LEFT JOIN public.teacher_project_categories category
+        ON category.id = p.category_id
+        AND category.status = 'active'
+        AND category.deleted_at IS NULL
+      WHERE p.deleted_at IS NULL
+        AND p.status = 'published'
+        AND (
+          REGEXP_REPLACE(COALESCE(p.cover_image_url, ''), '^.*/', '') = ${filename}
+          OR REGEXP_REPLACE(COALESCE(category.cover_image_url, ''), '^.*/', '') = ${filename}
+          OR EXISTS (
+            SELECT 1
+            FROM public.teacher_project_assets asset
+            WHERE asset.project_id = p.id
+              AND REGEXP_REPLACE(COALESCE(asset.file_url, ''), '^.*/', '') = ${filename}
+          )
+        )
+    `
+  } catch (error) {
+    if (categoryAccessReady) throw error
+    projects = await db`
+      SELECT DISTINCT
+        p.id,
+        p.locale,
+        p.access_scope,
+        p.target_teacher_ids,
+        p.target_countries,
+        p.target_student_years,
+        p.target_class_ids,
+        'all'::text AS category_access_scope,
+        ARRAY[]::uuid[] AS category_target_teacher_ids,
+        ARRAY[]::text[] AS category_target_countries,
+        ARRAY[]::text[] AS category_target_locales
+      FROM public.teacher_projects p
+      WHERE p.deleted_at IS NULL
+        AND p.status = 'published'
+        AND (
+          REGEXP_REPLACE(COALESCE(p.cover_image_url, ''), '^.*/', '') = ${filename}
+          OR EXISTS (
+            SELECT 1
+            FROM public.teacher_project_assets asset
+            WHERE asset.project_id = p.id
+              AND REGEXP_REPLACE(COALESCE(asset.file_url, ''), '^.*/', '') = ${filename}
+          )
+        )
+    `
   }
 
-  return null
+  if (projects.length === 0) return false
+
+  const scope = await loadTeacherScopeData(auth.teacherId)
+
+  return projects.some((project) =>
+    canTeacherAccessProjectWithCategory(
+      project as any,
+      {
+        access_scope: project.category_access_scope,
+        target_teacher_ids: project.category_target_teacher_ids,
+        target_countries: project.category_target_countries,
+        target_locales: project.category_target_locales,
+      },
+      {
+        id: auth.teacherId,
+        country: auth.teacher.country ? String(auth.teacher.country) : null,
+        locale: auth.teacher.locale,
+        years: scope.years,
+        classIds: scope.classIds,
+      },
+      canTeacherAccessProject,
+    ),
+  )
 }
 
 export async function GET(_: NextRequest, ctx: { params: Promise<{ filename: string }> }) {
@@ -127,10 +237,14 @@ export async function GET(_: NextRequest, ctx: { params: Promise<{ filename: str
 
   const { filename } = await ctx.params
   const safe = safeFilename(filename)
-  if (!safe) return NextResponse.json({ error: "Arquivo invalido." }, { status: 400 })
+  if (!safe) return NextResponse.json({ error: "Arquivo inválido." }, { status: 400 })
+
+  if (!(await canReadProjectFile(safe, auth))) {
+    return NextResponse.json({ error: "Sem permissão para acessar este arquivo." }, { status: 403 })
+  }
 
   const resolved = await resolveFileByFilename(safe)
-  if (!resolved) return NextResponse.json({ error: "Arquivo nao encontrado." }, { status: 404 })
+  if (!resolved) return NextResponse.json({ error: "Arquivo não encontrado." }, { status: 404 })
 
   try {
     const file = await readFile(resolved)

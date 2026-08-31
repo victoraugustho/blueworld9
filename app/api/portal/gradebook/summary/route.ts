@@ -72,18 +72,29 @@ export async function GET(req: NextRequest) {
       SELECT
         e.student_id,
         COUNT(*) FILTER (
-          WHERE e.c1 IS NOT NULL
-            AND e.c2 IS NOT NULL
-            AND e.c3 IS NOT NULL
-            AND e.c4 IS NOT NULL
-        )::int AS graded_lessons,
-        ROUND(
-          AVG((e.c1 + e.c2 + e.c3 + e.c4) / 4.0)
-          FILTER (
-            WHERE e.c1 IS NOT NULL
+          WHERE e.attendance = 'absent'
+             OR (
+              e.c1 IS NOT NULL
               AND e.c2 IS NOT NULL
               AND e.c3 IS NOT NULL
               AND e.c4 IS NOT NULL
+            )
+        )::int AS graded_lessons,
+        ROUND(
+          AVG(
+            CASE
+              WHEN e.attendance = 'absent' THEN 0
+              ELSE (e.c1 + e.c2 + e.c3 + e.c4) / 4.0
+            END
+          )
+          FILTER (
+            WHERE e.attendance = 'absent'
+               OR (
+                e.c1 IS NOT NULL
+                AND e.c2 IS NOT NULL
+                AND e.c3 IS NOT NULL
+                AND e.c4 IS NOT NULL
+              )
           )::numeric,
           2
         ) AS note1,

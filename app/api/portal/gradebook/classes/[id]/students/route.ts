@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { isAdminUser } from "@/lib/auth/authorization"
 import {
   ensureGradebookSchema,
   isUuid,
@@ -9,7 +10,7 @@ import {
   normalizeStudentName,
 } from "@/lib/gradebook"
 
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 async function loadClass(classId: string) {
   const [classRow] = await db`
@@ -24,7 +25,7 @@ async function loadClass(classId: string) {
 export async function GET(_req: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
 
   await ensureGradebookSchema()
 
@@ -55,7 +56,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 export async function POST(req: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
   if (!isAdmin) {
     return NextResponse.json({ error: "Apenas admin pode gerenciar alunos da turma." }, { status: 403 })
   }

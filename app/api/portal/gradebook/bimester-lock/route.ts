@@ -1,6 +1,7 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { isAdminUser } from "@/lib/auth/authorization"
 import {
   ensureGradebookSchema,
   getBimesterLock,
@@ -42,7 +43,7 @@ async function loadClass(classId: string) {
 export async function GET(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
 
   await ensureGradebookSchema()
 
@@ -78,7 +79,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
 
   if (!isAdmin) {
     return NextResponse.json({ error: "Apenas admin pode fechar bimestre." }, { status: 403 })
@@ -211,8 +212,11 @@ export async function POST(req: NextRequest) {
      AND bg.student_id = s.id
      AND bg.school_year = ${schoolYear}
      AND bg.bimester = ${bimester}
-    WHERE bg.exam_score IS NULL
-       OR bg.c5_score IS NULL
+    WHERE bg.manual_final_score IS NULL
+      AND (
+        bg.exam_score IS NULL
+        OR bg.c5_score IS NULL
+      )
     ORDER BY s.full_name ASC
   `
 
@@ -249,12 +253,20 @@ export async function POST(req: NextRequest) {
       SELECT
         e.student_id,
         ROUND(
-          AVG((e.c1 + e.c2 + e.c3 + e.c4) / 4.0)
+          AVG(
+            CASE
+              WHEN e.attendance = 'absent' THEN 0
+              ELSE (e.c1 + e.c2 + e.c3 + e.c4) / 4.0
+            END
+          )
           FILTER (
-            WHERE e.c1 IS NOT NULL
-              AND e.c2 IS NOT NULL
-              AND e.c3 IS NOT NULL
-              AND e.c4 IS NOT NULL
+            WHERE e.attendance = 'absent'
+               OR (
+                e.c1 IS NOT NULL
+                AND e.c2 IS NOT NULL
+                AND e.c3 IS NOT NULL
+                AND e.c4 IS NOT NULL
+              )
           )::numeric,
           2
         ) AS note1
@@ -372,7 +384,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
 
   if (!isAdmin) {
     return NextResponse.json({ error: "Apenas admin pode reabrir bimestre." }, { status: 403 })

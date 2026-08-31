@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { db } from "@/lib/db"
 import { SESSION_COOKIE } from "@/lib/auth/constants"
 import { hashSessionToken } from "@/lib/auth/session"
+import { isAdminUser } from "@/lib/auth/authorization"
 
 type TeacherRow = {
   id: string
@@ -48,7 +49,7 @@ export async function getTeacherFromSession() {
 
   if (!row) return null
   if (row.revoked_at) return null
-  if (new Date(row.expires_at).getTime() <= Date.now()) return null
+  if (new Date(row.session_expires_at).getTime() <= Date.now()) return null
 
   return row as TeacherRow
 }
@@ -63,8 +64,7 @@ export async function requireTeacherPage() {
 
 export async function requireAdminPage() {
   const teacher = await requireTeacherPage()
-  const isAdmin = teacher.is_admin === true || teacher.role === "admin"
-  if (!isAdmin) {
+  if (!isAdminUser(teacher)) {
     redirect("/portal/dashboard")
   }
   return teacher

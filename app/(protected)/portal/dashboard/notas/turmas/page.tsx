@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation"
 import { requireTeacherPage } from "@/lib/auth/server"
+import { isAdminUser } from "@/lib/auth/authorization"
 
 export default async function NotasTurmasPage() {
   const teacher = await requireTeacherPage()
-  const isAdmin = teacher.is_admin === true || teacher.role === "admin"
+  const isAdmin = isAdminUser(teacher)
 
   if (isAdmin) {
     redirect("/portal/dashboard/admin/schedules")
@@ -11,4 +12,3 @@ export default async function NotasTurmasPage() {
 
   redirect("/portal/dashboard/notas/lancamentos")
 }
-

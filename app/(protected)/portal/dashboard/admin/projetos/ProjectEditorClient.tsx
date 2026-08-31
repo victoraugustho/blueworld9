@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useId, useState } from "react"
+import { useCallback, useEffect, useId, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { FileUp, ImagePlus } from "lucide-react"
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { canTeacherAccessProjectCategory } from "@/lib/project-category-access"
 
 type ProjectLocale = "pt-BR" | "es"
 type ProjectStatus = "draft" | "published" | "archived"
@@ -47,6 +48,8 @@ type TeacherOption = {
   name: string
   email: string
   country?: string | null
+  locale?: ProjectLocale | null
+  student_years?: number[]
 }
 
 type StudentYearOption = {
@@ -59,6 +62,10 @@ type CategoryOption = {
   locale: ProjectLocale
   title: string
   description?: string | null
+  access_scope?: "all" | "targeted"
+  target_teacher_ids?: string[]
+  target_countries?: Array<"BR" | "UY" | "PY">
+  target_locales?: ProjectLocale[]
 }
 
 type RevisionRow = {
@@ -137,6 +144,22 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [studentYearOptions, setStudentYearOptions] = useState<StudentYearOption[]>([])
   const [uploadConfig, setUploadConfig] = useState<{ image_limit_mb: number; document_limit_mb: number } | null>(null)
+
+  const selectedCategory = useMemo(
+    () => categories.find((category) => category.id === categoryId) ?? null,
+    [categories, categoryId],
+  )
+
+  const effectiveTeachers = useMemo(() => {
+    if (accessScope === "all") {
+      return teachers.filter((teacher) => canTeacherAccessProjectCategory(selectedCategory, teacher))
+    }
+    return teachers.filter((teacher) => {
+      if (targetTeacherIds.includes(teacher.id)) return true
+      if (teacher.country && targetCountries.includes(teacher.country)) return true
+      return (teacher.student_years ?? []).some((year) => targetStudentYears.includes(Number(year)))
+    })
+  }, [accessScope, selectedCategory, targetCountries, targetStudentYears, targetTeacherIds, teachers])
 
   const loadRevisions = useCallback(async (targetId: string) => {
     setRevisionsLoading(true)
@@ -617,7 +640,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
     return <div className="p-6 text-white">Carregando editor de projetos...</div>
   }
 
-  const categoryOptions = categories.filter((category) => category.locale === projectLocale)
+  const categoryOptions = categories
 
   return (
     <div className="p-4 md:p-6 text-white space-y-6">
@@ -645,18 +668,18 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-slate-200">Idioma</Label>
+              <Label className="text-slate-200">Idioma do conteúdo</Label>
               <select
                 className="h-10 rounded-md bg-slate-800/60 border border-slate-700 px-3 text-white w-full"
                 value={projectLocale}
-                onChange={(event) => {
-                  setProjectLocale(event.target.value as ProjectLocale)
-                  setCategoryId("")
-                }}
+                onChange={(event) => setProjectLocale(event.target.value as ProjectLocale)}
               >
                 <option className="bg-slate-800 text-white" value="pt-BR">Português</option>
                 <option className="bg-slate-800 text-white" value="es">Espanhol</option>
               </select>
+              <p className="text-xs text-slate-400">
+                Define o idioma do texto do projeto. Não é usado como regra de acesso.
+              </p>
             </div>
             <div className="space-y-1">
               <Label className="text-slate-200">Status</Label>
@@ -687,11 +710,12 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
               {categoryOptions.map((category) => (
                 <option key={category.id} className="bg-slate-800 text-white" value={category.id}>
                   {category.title}
+                  {category.locale === "es" ? " (ES)" : " (PT-BR)"}
                 </option>
               ))}
             </select>
             <p className="text-xs text-slate-400">
-              As categorias aparecem para os professores antes da lista de projetos.
+              A categoria organiza o projeto e fornece a regra de acesso quando a publicação herda a categoria.
             </p>
           </div>
 
@@ -763,7 +787,7 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
               onClick={() => setAccessScope("all")}
               className={`rounded-md border px-3 py-2 text-sm ${accessScope === "all" ? "border-cyan-300/50 bg-cyan-500/20 text-cyan-100" : "border-white/15 bg-white/5 text-slate-200"}`}
             >
-              Para todos
+              Para todos (herdar categoria)
             </button>
             <button
               type="button"
@@ -775,7 +799,12 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
           </div>
 
           {accessScope === "targeted" ? (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="space-y-4">
+              <div className="rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
+                <strong>{effectiveTeachers.length} professores terão acesso.</strong>{" "}
+                Esta regra substitui a regra da categoria. As condições são dinâmicas e combinadas por “qualquer uma”. O idioma do conteúdo não restringe a visualização.
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-white">Professores</p>
                 <div className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-white/5 p-2 space-y-1">
@@ -826,8 +855,26 @@ export default function ProjectEditorClient({ projectId }: { projectId?: string 
                   ))}
                 </div>
               </div>
+              </div>
+              {effectiveTeachers.length > 0 ? (
+                <p className="text-xs leading-relaxed text-slate-400">
+                  Acesso efetivo: {effectiveTeachers.map((teacher) => teacher.name).join(", ")}
+                </p>
+              ) : null}
             </div>
-          ) : null}
+          ) : (
+            <div className="rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-3 py-3 text-sm text-emerald-100">
+              <strong>{effectiveTeachers.length} professores terão acesso.</strong>{" "}
+              {selectedCategory?.access_scope === "targeted"
+                ? `O projeto herdará a segmentação da categoria “${selectedCategory.title}”.`
+                : "A categoria selecionada não possui restrições de acesso."}
+              {effectiveTeachers.length > 0 ? (
+                <span className="mt-1 block text-xs leading-relaxed text-emerald-100/75">
+                  Acesso efetivo: {effectiveTeachers.map((teacher) => teacher.name).join(", ")}
+                </span>
+              ) : null}
+            </div>
+          )}
         </CardContent>
       </Card>
 

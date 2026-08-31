@@ -220,6 +220,22 @@ export function canTeacherAccessProject(
   return false
 }
 
+export async function isProjectCategoryAccessReady() {
+  const [row] = await db`
+    SELECT COUNT(*)::int = 4 AS ready
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'teacher_project_categories'
+      AND column_name IN (
+        'access_scope',
+        'target_teacher_ids',
+        'target_countries',
+        'target_locales'
+      )
+  `
+  return row?.ready === true
+}
+
 export async function loadTeacherScopeData(teacherId: string) {
   const classes = await db`
     SELECT DISTINCT id::text AS id, student_year
@@ -423,7 +439,7 @@ export async function createProjectRevision(projectId: string, createdBy: string
 }
 
 export async function ensureProjectsSchema() {
-  await ensureRuntimeSchema("schema:projects:v7", async () => {
+  await ensureRuntimeSchema("schema:projects:v8", async () => {
     await db`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`
 
     await db`
@@ -441,6 +457,50 @@ export async function ensureProjectsSchema() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         deleted_at TIMESTAMPTZ NULL
       )
+    `
+
+    await db`
+      ALTER TABLE public.teacher_project_categories
+        ADD COLUMN IF NOT EXISTS access_scope TEXT NOT NULL DEFAULT 'all',
+        ADD COLUMN IF NOT EXISTS target_teacher_ids UUID[] NOT NULL DEFAULT ARRAY[]::uuid[],
+        ADD COLUMN IF NOT EXISTS target_countries TEXT[] NOT NULL DEFAULT ARRAY[]::text[],
+        ADD COLUMN IF NOT EXISTS target_locales TEXT[] NOT NULL DEFAULT ARRAY[]::text[]
+    `
+
+    await db`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'teacher_project_categories_access_scope_check'
+        ) THEN
+          ALTER TABLE public.teacher_project_categories
+            ADD CONSTRAINT teacher_project_categories_access_scope_check
+            CHECK (access_scope IN ('all', 'targeted'));
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'teacher_project_categories_countries_check'
+        ) THEN
+          ALTER TABLE public.teacher_project_categories
+            ADD CONSTRAINT teacher_project_categories_countries_check
+            CHECK (target_countries <@ ARRAY['BR', 'UY', 'PY']::text[]);
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'teacher_project_categories_locales_check'
+        ) THEN
+          ALTER TABLE public.teacher_project_categories
+            ADD CONSTRAINT teacher_project_categories_locales_check
+            CHECK (target_locales <@ ARRAY['pt-BR', 'es']::text[]);
+        END IF;
+      END
+      $$;
     `
 
     await db`
@@ -474,6 +534,12 @@ export async function ensureProjectsSchema() {
     await db`
       CREATE INDEX IF NOT EXISTS teacher_project_categories_locale_status_idx
       ON public.teacher_project_categories(locale, status, sort_order, title)
+    `
+
+    await db`
+      CREATE INDEX IF NOT EXISTS teacher_project_categories_target_teacher_ids_idx
+      ON public.teacher_project_categories USING GIN (target_teacher_ids)
+      WHERE access_scope = 'targeted'
     `
 
     await db`

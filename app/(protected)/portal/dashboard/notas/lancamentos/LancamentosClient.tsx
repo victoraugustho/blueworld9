@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import {
   useEffect,
@@ -201,10 +201,47 @@ function displayScore(value: number | null | undefined) {
   return Number(value).toFixed(2)
 }
 
+const note2ComponentMax = 5
+
 function calcNote2(exam: number | null, c5: number | null, isPyScoreScale: boolean) {
   if (exam === null || c5 === null) return null
   const value = isPyScoreScale ? (exam + c5) / 2 : exam + c5
   return Math.round(value * 100) / 100
+}
+
+function buildFinalFallbackComponent(finalScore: number | null) {
+  if (finalScore === null) return null
+  const value = Math.min(note2ComponentMax, Math.max(0, finalScore / 2))
+  return Math.round(value * 100) / 100
+}
+
+function buildFinalGradePayload(params: {
+  examRaw: string
+  c5Raw: string
+  manualFinalRaw: string
+  note1: number | null
+  scoreMax: number
+  isPyScoreScale: boolean
+}) {
+  const exam = parseNote2Component(params.examRaw)
+  const c5 = parseNote2Component(params.c5Raw)
+  const note2 = calcNote2(exam, c5, params.isPyScoreScale)
+  const manualFinal = calcFinalForSave(params.manualFinalRaw, params.note1, note2, params.scoreMax)
+
+  if (manualFinal !== null && (exam === null || c5 === null)) {
+    const fallbackComponent = buildFinalFallbackComponent(manualFinal)
+    return {
+      exam_score: fallbackComponent,
+      c5_score: fallbackComponent,
+      manual_final_score: manualFinal,
+    }
+  }
+
+  return {
+    exam_score: exam,
+    c5_score: c5,
+    manual_final_score: manualFinal,
+  }
 }
 
 function buildQuickLaunchSnapshot(data: QuickLaunchSnapshotData) {
@@ -237,8 +274,6 @@ function getQuickLaunchUnloadText(locale: Locale) {
     ? "Hay cambios sin guardar en el lanzamiento de clase."
     : "Ha alteracoes sem salvar no lancamento da aula."
 }
-
-const note2ComponentMax = 5
 
 function parseNote2Component(value: string) {
   return parseNumericInput(value, note2ComponentMax)
@@ -957,21 +992,6 @@ export default function LancamentosClient({
       return
     }
 
-    const hasMissingExam = turmaRows.some((row) => {
-      const form = turmaGradeForm[row.student_id]
-      if (!form) return true
-      return parseNote2Component(form.exam_score) === null
-    })
-
-    if (hasMissingExam) {
-      setError(
-        isEs
-          ? "Campo Prueba/Actividad es obligatorio para todos."
-          : "Campo Prova/Atividade e obrigatorio para todos.",
-      )
-      return
-    }
-
     setTurmaSaving(true)
     setError("")
     const payload = turmaRows.map((row) => {
@@ -981,17 +1001,20 @@ export default function LancamentosClient({
         manual_final_score: "",
         notes: "",
       }
+      const gradePayload = buildFinalGradePayload({
+        examRaw: form.exam_score,
+        c5Raw: form.c5_score,
+        manualFinalRaw: form.manual_final_score,
+        note1: toNumber(row.note1),
+        scoreMax,
+        isPyScoreScale,
+      })
       return {
         student_id: row.student_id,
         has_exam: true,
-        exam_score: parseNote2Component(form.exam_score),
-        c5_score: parseNote2Component(form.c5_score),
-        manual_final_score: calcFinalForSave(
-          form.manual_final_score,
-          toNumber(row.note1),
-          calcNote2(parseNote2Component(form.exam_score), parseNote2Component(form.c5_score), isPyScoreScale),
-          scoreMax,
-        ),
+        exam_score: gradePayload.exam_score,
+        c5_score: gradePayload.c5_score,
+        manual_final_score: gradePayload.manual_final_score,
         notes: String(form.notes ?? "").trim() || null,
       }
     })
@@ -1271,8 +1294,12 @@ export default function LancamentosClient({
   }
 
   function updateEntry(studentId: string, patch: Partial<TeacherGradeLessonEntry>) {
+    const safePatch =
+      patch.attendance === "absent"
+        ? { ...patch, c1: null, c2: null, c3: null, c4: null }
+        : patch
     setEntries((prev) =>
-      prev.map((item) => (item.student_id === studentId ? { ...item, ...patch } : item)),
+      prev.map((item) => (item.student_id === studentId ? { ...item, ...safePatch } : item)),
     )
   }
 
@@ -1290,8 +1317,12 @@ export default function LancamentosClient({
   }
 
   function updateQuickLaunchEntry(studentId: string, patch: Partial<TeacherGradeLessonEntry>) {
+    const safePatch =
+      patch.attendance === "absent"
+        ? { ...patch, c1: null, c2: null, c3: null, c4: null }
+        : patch
     setQuickLaunchEntries((prev) =>
-      prev.map((item) => (item.student_id === studentId ? { ...item, ...patch } : item)),
+      prev.map((item) => (item.student_id === studentId ? { ...item, ...safePatch } : item)),
     )
   }
 
@@ -1422,10 +1453,10 @@ export default function LancamentosClient({
           ? quickLaunchEntries.map((entry) => ({
               student_id: entry.student_id,
               attendance: entry.attendance,
-              c1: entry.c1 ?? null,
-              c2: entry.c2 ?? null,
-              c3: entry.c3 ?? null,
-              c4: entry.c4 ?? null,
+              c1: entry.attendance === "absent" ? null : entry.c1 ?? null,
+              c2: entry.attendance === "absent" ? null : entry.c2 ?? null,
+              c3: entry.attendance === "absent" ? null : entry.c3 ?? null,
+              c4: entry.attendance === "absent" ? null : entry.c4 ?? null,
               comment: entry.comment ?? null,
             }))
           : [],
@@ -1533,10 +1564,10 @@ export default function LancamentosClient({
           ? entries.map((item) => ({
               student_id: item.student_id,
               attendance: item.attendance,
-              c1: item.c1 ?? null,
-              c2: item.c2 ?? null,
-              c3: item.c3 ?? null,
-              c4: item.c4 ?? null,
+              c1: item.attendance === "absent" ? null : item.c1 ?? null,
+              c2: item.attendance === "absent" ? null : item.c2 ?? null,
+              c3: item.attendance === "absent" ? null : item.c3 ?? null,
+              c4: item.attendance === "absent" ? null : item.c4 ?? null,
               comment: item.comment ?? null,
             }))
           : [],
@@ -2498,7 +2529,6 @@ export default function LancamentosClient({
                                     min={0}
                                     max={scoreMax}
                                     step={0.01}
-                                    disabled={entry.attendance === "absent"}
                                     value={entry.c1 ?? ""}
                                     onChange={(e) =>
                                       updateEntry(entry.student_id, {
@@ -2507,7 +2537,8 @@ export default function LancamentosClient({
                                     }
                                     onBlur={() => clampEntryScore(entry.student_id, "c1", scoreMax)}
                                     onKeyDown={(e) => handleLessonScoreKeyDown(e, rowIndex, "c1")}
-                                    className={scoreInputClass}
+                                    className={`${scoreInputClass} ${entry.attendance === "absent" ? "opacity-60 cursor-not-allowed" : ""}`}
+                                    disabled={entry.attendance === "absent"}
                                   />
                                 </td>
                                 <td className="py-2 px-2">
@@ -2517,7 +2548,6 @@ export default function LancamentosClient({
                                     min={0}
                                     max={scoreMax}
                                     step={0.01}
-                                    disabled={entry.attendance === "absent"}
                                     value={entry.c2 ?? ""}
                                     onChange={(e) =>
                                       updateEntry(entry.student_id, {
@@ -2526,7 +2556,8 @@ export default function LancamentosClient({
                                     }
                                     onBlur={() => clampEntryScore(entry.student_id, "c2", scoreMax)}
                                     onKeyDown={(e) => handleLessonScoreKeyDown(e, rowIndex, "c2")}
-                                    className={scoreInputClass}
+                                    className={`${scoreInputClass} ${entry.attendance === "absent" ? "opacity-60 cursor-not-allowed" : ""}`}
+                                    disabled={entry.attendance === "absent"}
                                   />
                                 </td>
                                 <td className="py-2 px-2">
@@ -2536,7 +2567,6 @@ export default function LancamentosClient({
                                     min={0}
                                     max={scoreMax}
                                     step={0.01}
-                                    disabled={entry.attendance === "absent"}
                                     value={entry.c3 ?? ""}
                                     onChange={(e) =>
                                       updateEntry(entry.student_id, {
@@ -2545,7 +2575,8 @@ export default function LancamentosClient({
                                     }
                                     onBlur={() => clampEntryScore(entry.student_id, "c3", scoreMax)}
                                     onKeyDown={(e) => handleLessonScoreKeyDown(e, rowIndex, "c3")}
-                                    className={scoreInputClass}
+                                    className={`${scoreInputClass} ${entry.attendance === "absent" ? "opacity-60 cursor-not-allowed" : ""}`}
+                                    disabled={entry.attendance === "absent"}
                                   />
                                 </td>
                                 <td className="py-2 px-2">
@@ -2555,7 +2586,6 @@ export default function LancamentosClient({
                                     min={0}
                                     max={scoreMax}
                                     step={0.01}
-                                    disabled={entry.attendance === "absent"}
                                     value={entry.c4 ?? ""}
                                     onChange={(e) =>
                                       updateEntry(entry.student_id, {
@@ -2564,7 +2594,8 @@ export default function LancamentosClient({
                                     }
                                     onBlur={() => clampEntryScore(entry.student_id, "c4", scoreMax)}
                                     onKeyDown={(e) => handleLessonScoreKeyDown(e, rowIndex, "c4")}
-                                    className={scoreInputClass}
+                                    className={`${scoreInputClass} ${entry.attendance === "absent" ? "opacity-60 cursor-not-allowed" : ""}`}
+                                    disabled={entry.attendance === "absent"}
                                   />
                                 </td>
                                 <td className="py-2 px-2">
@@ -3133,7 +3164,6 @@ export default function LancamentosClient({
                                   min={0}
                                   max={scoreMax}
                                   step={0.01}
-                                  disabled={entry.attendance === "absent"}
                                   value={entry.c1 ?? ""}
                                   onChange={(e) =>
                                     updateQuickLaunchEntry(entry.student_id, {
@@ -3142,7 +3172,8 @@ export default function LancamentosClient({
                                   }
                                   onBlur={() => clampQuickLaunchEntryScore(entry.student_id, "c1", scoreMax)}
                                   onKeyDown={(e) => handleQuickLaunchScoreKeyDown(e, rowIndex, "c1")}
-                                  className={scoreInputClass}
+                                  className={`${scoreInputClass} ${entry.attendance === "absent" ? "opacity-60 cursor-not-allowed" : ""}`}
+                                  disabled={entry.attendance === "absent"}
                                 />
                               </td>
                               <td className="py-2 px-2">
@@ -3152,7 +3183,6 @@ export default function LancamentosClient({
                                   min={0}
                                   max={scoreMax}
                                   step={0.01}
-                                  disabled={entry.attendance === "absent"}
                                   value={entry.c2 ?? ""}
                                   onChange={(e) =>
                                     updateQuickLaunchEntry(entry.student_id, {
@@ -3161,7 +3191,8 @@ export default function LancamentosClient({
                                   }
                                   onBlur={() => clampQuickLaunchEntryScore(entry.student_id, "c2", scoreMax)}
                                   onKeyDown={(e) => handleQuickLaunchScoreKeyDown(e, rowIndex, "c2")}
-                                  className={scoreInputClass}
+                                  className={`${scoreInputClass} ${entry.attendance === "absent" ? "opacity-60 cursor-not-allowed" : ""}`}
+                                  disabled={entry.attendance === "absent"}
                                 />
                               </td>
                               <td className="py-2 px-2">
@@ -3171,7 +3202,6 @@ export default function LancamentosClient({
                                   min={0}
                                   max={scoreMax}
                                   step={0.01}
-                                  disabled={entry.attendance === "absent"}
                                   value={entry.c3 ?? ""}
                                   onChange={(e) =>
                                     updateQuickLaunchEntry(entry.student_id, {
@@ -3180,7 +3210,8 @@ export default function LancamentosClient({
                                   }
                                   onBlur={() => clampQuickLaunchEntryScore(entry.student_id, "c3", scoreMax)}
                                   onKeyDown={(e) => handleQuickLaunchScoreKeyDown(e, rowIndex, "c3")}
-                                  className={scoreInputClass}
+                                  className={`${scoreInputClass} ${entry.attendance === "absent" ? "opacity-60 cursor-not-allowed" : ""}`}
+                                  disabled={entry.attendance === "absent"}
                                 />
                               </td>
                               <td className="py-2 px-2">
@@ -3190,7 +3221,6 @@ export default function LancamentosClient({
                                   min={0}
                                   max={scoreMax}
                                   step={0.01}
-                                  disabled={entry.attendance === "absent"}
                                   value={entry.c4 ?? ""}
                                   onChange={(e) =>
                                     updateQuickLaunchEntry(entry.student_id, {
@@ -3199,7 +3229,8 @@ export default function LancamentosClient({
                                   }
                                   onBlur={() => clampQuickLaunchEntryScore(entry.student_id, "c4", scoreMax)}
                                   onKeyDown={(e) => handleQuickLaunchScoreKeyDown(e, rowIndex, "c4")}
-                                  className={scoreInputClass}
+                                  className={`${scoreInputClass} ${entry.attendance === "absent" ? "opacity-60 cursor-not-allowed" : ""}`}
+                                  disabled={entry.attendance === "absent"}
                                 />
                               </td>
                               <td className="py-2 px-2">

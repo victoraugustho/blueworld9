@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Material, Category, Teacher } from "@/app/types/portal"
+import MaterialAccessPolicyEditor from "@/components/admin/MaterialAccessPolicyEditor"
 
 interface EditPageProps {
   params: { id: string }
@@ -16,10 +17,7 @@ interface EditPageProps {
 type MaterialForm = Material & {
   access_scope: "all" | "specific"
   teacher_ids: string[]
-}
-
-function normalizeSearch(value: string) {
-  return value.trim().toLowerCase()
+  access_policy: Material["access_policy"]
 }
 
 export default function EditMaterialPage({ params }: EditPageProps) {
@@ -38,13 +36,14 @@ export default function EditMaterialPage({ params }: EditPageProps) {
     student_year: null,
     access_scope: "all",
     teacher_ids: [],
+    access_policy: null,
   })
 
   const [categories, setCategories] = useState<Category[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [teacherQuery, setTeacherQuery] = useState("")
+  const [startedAsLegacy, setStartedAsLegacy] = useState(false)
   const ageYears = [3, 4, 5]
   const highYears = [1, 2, 3]
   const gradeYears = Array.from({ length: 9 }, (_, i) => i + 1)
@@ -68,12 +67,15 @@ export default function EditMaterialPage({ params }: EditPageProps) {
       setTeachers(approvedTeachers.sort((a: Teacher, b: Teacher) => a.name.localeCompare(b.name)))
 
       if (materialData?.id) {
+        const hasPolicy = materialData.access_policy && Number(materialData.access_policy.version) === 2
+        setStartedAsLegacy(!hasPolicy)
         setForm({
           ...materialData,
           video_notes: String(materialData.video_notes ?? ""),
           language: materialData.language === "es" ? "es" : "pt-BR",
           access_scope: materialData.access_scope === "specific" ? "specific" : "all",
           teacher_ids: Array.isArray(materialData.teacher_ids) ? materialData.teacher_ids : [],
+          access_policy: hasPolicy ? materialData.access_policy : null,
         })
       }
 
@@ -82,20 +84,6 @@ export default function EditMaterialPage({ params }: EditPageProps) {
 
     load()
   }, [id])
-
-  function toggleTeacher(teacherId: string) {
-    setForm((prev) => {
-      const current = new Set(prev.teacher_ids ?? [])
-      if (current.has(teacherId)) current.delete(teacherId)
-      else current.add(teacherId)
-      const nextIds = Array.from(current)
-      return {
-        ...prev,
-        teacher_ids: nextIds,
-        access_scope: nextIds.length > 0 ? "specific" : prev.access_scope,
-      }
-    })
-  }
 
   function setMaterialType(nextType: Material["file_type"]) {
     setForm((prev) => ({
@@ -108,7 +96,7 @@ export default function EditMaterialPage({ params }: EditPageProps) {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
 
-    if (form.access_scope === "specific" && (form.teacher_ids?.length ?? 0) === 0) {
+    if (!form.access_policy && form.access_scope === "specific" && (form.teacher_ids?.length ?? 0) === 0) {
       alert("Selecione ao menos um professor para acesso especifico.")
       return
     }
@@ -129,15 +117,6 @@ export default function EditMaterialPage({ params }: EditPageProps) {
 
     router.push("/portal/dashboard/admin/materials")
   }
-
-  const filteredTeachers = useMemo(() => {
-    const query = normalizeSearch(teacherQuery)
-    if (!query) return teachers
-    return teachers.filter((teacher) => {
-      const hay = `${teacher.name} ${teacher.email}`.toLowerCase()
-      return hay.includes(query)
-    })
-  }, [teacherQuery, teachers])
 
   if (loading) return <p className="text-white p-6">Carregando...</p>
 
@@ -186,7 +165,7 @@ export default function EditMaterialPage({ params }: EditPageProps) {
           </div>
 
           <div>
-            <Label className="text-slate-200">Titulo</Label>
+            <Label className="text-slate-200">Título</Label>
             <Input
               className="bg-slate-700 border-white/20 text-white placeholder-slate-400"
               value={form.title}
@@ -230,21 +209,31 @@ export default function EditMaterialPage({ params }: EditPageProps) {
 
           <div className="grid grid-cols-1 gap-4">
             <div>
-              <Label className="text-slate-200">Idioma</Label>
+              <Label className="text-slate-200">Idioma do conteúdo</Label>
               <select
                 className="w-full p-3 rounded-lg bg-slate-700 border border-white/20 text-white focus:ring-2 focus:ring-blue-500"
                 value={form.language}
-                onChange={(e) => setForm({ ...form, language: e.target.value as Material["language"] })}
+                onChange={(e) => {
+                  const language = e.target.value as Material["language"]
+                  setForm((prev) => ({
+                    ...prev,
+                    language,
+                    access_policy:
+                      prev.access_policy?.locales.length === 1 && prev.access_policy.locales[0] === prev.language
+                        ? { ...prev.access_policy, locales: [language] }
+                        : prev.access_policy,
+                  }))
+                }}
               >
-                <option className="text-white" value="pt-BR">Portugues (BR)</option>
-                <option className="text-white" value="es">Espanol</option>
+                <option className="text-white" value="pt-BR">Português (BR)</option>
+                <option className="text-white" value="es">Español</option>
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label className="text-slate-200">Turma (Ano) opcional</Label>
+              <Label className="text-slate-200">Ano/turma de organização (opcional)</Label>
               <select
                 className="w-full p-3 rounded-lg bg-slate-700 border border-white/20 text-white focus:ring-2 focus:ring-blue-500"
                 value={form.student_year ?? ""}
@@ -276,12 +265,14 @@ export default function EditMaterialPage({ params }: EditPageProps) {
                 </optgroup>
               </select>
               <p className="text-xs text-slate-400 mt-1">
-                Se preencher, o material aparece somente para professores vinculados a este ano/turma.
+                {form.access_policy
+                  ? "Classifica o conteúdo por etapa. O acesso é definido separadamente abaixo."
+                  : "No controle legado, este campo também restringe o acesso aos professores vinculados."}
               </p>
             </div>
 
             <div>
-              <Label className="text-slate-200">Categoria (opcional)</Label>
+              <Label className="text-slate-200">Categoria de organização (opcional)</Label>
               <select
                 className="w-full p-3 rounded-lg bg-slate-700 border border-white/20 text-white focus:ring-2 focus:ring-blue-500"
                 value={form.category_id ?? ""}
@@ -295,80 +286,27 @@ export default function EditMaterialPage({ params }: EditPageProps) {
                 ))}
               </select>
               <p className="text-xs text-slate-400 mt-1">
-                Se preencher, o material aparece somente para professores vinculados a esta categoria.
+                {form.access_policy
+                  ? "Organiza o material nas telas. O acesso é definido separadamente abaixo."
+                  : "No controle legado, este campo também restringe o acesso aos professores vinculados."}
               </p>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <Label className="text-slate-200">Acesso ao material</Label>
-            <p className="text-xs text-slate-400">
-              Regras aplicadas em conjunto: categoria + turma (ano) + acesso do material.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setForm((prev) => ({ ...prev, access_scope: "all", teacher_ids: [] }))}
-                className={`inline-flex items-center px-3 py-1 rounded-full text-xs border transition ${
-                  form.access_scope === "all"
-                    ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/40"
-                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
-                }`}
-              >
-                Todos os professores
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm((prev) => ({ ...prev, access_scope: "specific" }))}
-                className={`inline-flex items-center px-3 py-1 rounded-full text-xs border transition ${
-                  form.access_scope === "specific"
-                    ? "bg-blue-500/20 text-blue-200 border-blue-500/40"
-                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
-                }`}
-              >
-                Professores especificos
-              </button>
-            </div>
-
-            {form.access_scope === "specific" && (
-              <div className="space-y-2">
-                <Input
-                  className="bg-slate-800/50 border-slate-700 text-white"
-                  placeholder="Buscar professor..."
-                  value={teacherQuery}
-                  onChange={(e) => setTeacherQuery(e.target.value)}
-                />
-                <div className="max-h-52 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900/40">
-                  {filteredTeachers.length === 0 && (
-                    <div className="p-3 text-sm text-slate-400">Nenhum professor encontrado.</div>
-                  )}
-                  {filteredTeachers.map((teacher) => {
-                    const checked = (form.teacher_ids ?? []).includes(teacher.id)
-                    return (
-                      <label
-                        key={teacher.id}
-                        className="flex items-start gap-2 px-3 py-2 border-b border-white/5 last:border-none cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          className="mt-1"
-                          checked={checked}
-                          onChange={() => toggleTeacher(teacher.id)}
-                        />
-                        <div className="min-w-0">
-                          <div className="text-sm text-white truncate">{teacher.name}</div>
-                          <div className="text-xs text-slate-400 truncate">{teacher.email}</div>
-                        </div>
-                      </label>
-                    )
-                  })}
-                </div>
-                <p className="text-xs text-slate-400">
-                  Selecionados: {(form.teacher_ids ?? []).length}
-                </p>
-              </div>
-            )}
-          </div>
+          <MaterialAccessPolicyEditor
+            policy={form.access_policy ?? null}
+            onChange={(access_policy) => setForm((prev) => ({ ...prev, access_policy }))}
+            teachers={teachers}
+            categories={categories}
+            contentLanguage={form.language}
+            legacyAccess={startedAsLegacy ? {
+              language: form.language,
+              categoryId: form.category_id ?? null,
+              studentYear: form.student_year ?? null,
+              accessScope: form.access_scope,
+              teacherIds: form.teacher_ids ?? [],
+            } : undefined}
+          />
 
           <Button
             disabled={saving}

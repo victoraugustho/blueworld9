@@ -4,6 +4,7 @@ import { requireAdminApi } from "@/lib/auth/require"
 import { ensureGradebookSchema } from "@/lib/gradebook"
 import { ensureTurmasSchema } from "@/lib/turmas"
 import { ensureAuditSchema } from "@/lib/audit-schema"
+import { isMaterialAccessPolicyReady, materialAccessSql } from "@/lib/material-access"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -31,6 +32,25 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   if (!teacher) {
     return NextResponse.json({ error: "Professor nao encontrado" }, { status: 404 })
   }
+
+  const policyReady = await isMaterialAccessPolicyReady()
+  const buildMaterialAccessFilter = () => policyReady
+    ? materialAccessSql(id, teacher.locale === "es" ? "es" : "pt-BR")
+    : db`
+        m.language = ${teacher.locale}
+        AND (m.category_id IS NULL OR EXISTS (
+          SELECT 1 FROM teacher_categories tc
+          WHERE tc.teacher_id = ${id} AND tc.category_id = m.category_id
+        ))
+        AND (m.student_year IS NULL OR EXISTS (
+          SELECT 1 FROM teacher_student_years tys
+          WHERE tys.teacher_id = ${id} AND tys.student_year = m.student_year
+        ))
+        AND (COALESCE(m.access_scope, 'all') = 'all' OR EXISTS (
+          SELECT 1 FROM material_teacher_access mta
+          WHERE mta.material_id = m.id AND mta.teacher_id = ${id}
+        ))
+      `
 
   // Intentionally no automatic delete here.
   // Reconciliation/deletion must be explicit to avoid accidental grade loss.
@@ -90,42 +110,11 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   }
 
   const [summary] = await db`
-    WITH teacher_turmas AS (
-      SELECT category_id
-      FROM teacher_categories
-      WHERE teacher_id = ${id}
-    ),
-    videos AS (
+    WITH videos AS (
       SELECT m.id
       FROM materials m
       WHERE m.file_type = 'video'
-        AND m.language = ${teacher.locale}
-        AND (
-          m.category_id IS NULL
-          OR EXISTS (
-            SELECT 1
-            FROM teacher_turmas tt
-            WHERE tt.category_id = m.category_id
-          )
-        )
-        AND (
-          m.student_year IS NULL
-          OR EXISTS (
-            SELECT 1
-            FROM teacher_student_years tys
-            WHERE tys.teacher_id = ${id}
-              AND tys.student_year = m.student_year
-          )
-        )
-        AND (
-          COALESCE(m.access_scope, 'all') = 'all'
-          OR EXISTS (
-            SELECT 1
-            FROM material_teacher_access mta
-            WHERE mta.material_id = m.id
-              AND mta.teacher_id = ${id}
-          )
-        )
+        AND ${buildMaterialAccessFilter()}
     ),
     progress AS (
       SELECT p.progress_percent, p.watched_at
@@ -141,42 +130,11 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   `
 
   const recentProgress = await db`
-    WITH teacher_turmas AS (
-      SELECT category_id
-      FROM teacher_categories
-      WHERE teacher_id = ${id}
-    ),
-    videos AS (
+    WITH videos AS (
       SELECT m.id, m.title
       FROM materials m
       WHERE m.file_type = 'video'
-        AND m.language = ${teacher.locale}
-        AND (
-          m.category_id IS NULL
-          OR EXISTS (
-            SELECT 1
-            FROM teacher_turmas tt
-            WHERE tt.category_id = m.category_id
-          )
-        )
-        AND (
-          m.student_year IS NULL
-          OR EXISTS (
-            SELECT 1
-            FROM teacher_student_years tys
-            WHERE tys.teacher_id = ${id}
-              AND tys.student_year = m.student_year
-          )
-        )
-        AND (
-          COALESCE(m.access_scope, 'all') = 'all'
-          OR EXISTS (
-            SELECT 1
-            FROM material_teacher_access mta
-            WHERE mta.material_id = m.id
-              AND mta.teacher_id = ${id}
-          )
-        )
+        AND ${buildMaterialAccessFilter()}
     )
     SELECT v.id, v.title, p.progress_percent, p.updated_at
     FROM teacher_video_progress p
@@ -275,12 +233,20 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
         COUNT(*) FILTER (WHERE e.attendance = 'present')::int AS presence_count,
         COUNT(*) FILTER (WHERE e.attendance = 'absent')::int AS absence_count,
         ROUND(
-          AVG((e.c1 + e.c2 + e.c3 + e.c4) / 4.0)
+          AVG(
+            CASE
+              WHEN e.attendance = 'absent' THEN 0
+              ELSE (e.c1 + e.c2 + e.c3 + e.c4) / 4.0
+            END
+          )
           FILTER (
-            WHERE e.c1 IS NOT NULL
-              AND e.c2 IS NOT NULL
-              AND e.c3 IS NOT NULL
-              AND e.c4 IS NOT NULL
+            WHERE e.attendance = 'absent'
+               OR (
+                e.c1 IS NOT NULL
+                AND e.c2 IS NOT NULL
+                AND e.c3 IS NOT NULL
+                AND e.c4 IS NOT NULL
+              )
           )::numeric,
           2
         ) AS note1

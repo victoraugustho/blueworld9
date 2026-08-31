@@ -5,7 +5,7 @@ import { writeAuditLog } from "@/lib/audit"
 import { createBlogRevision, ensureBlogSchema, normalizeBlogStatus } from "@/lib/blog"
 import { loadPostForAdmin, parseNullableDate } from "@/lib/blog-post-service"
 
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   const admin = await requireRestrictedAdminApi()

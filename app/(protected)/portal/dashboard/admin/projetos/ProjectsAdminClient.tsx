@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ImagePlus, Pencil, Save, Trash2, X } from "lucide-react"
+import { Globe2, ImagePlus, Pencil, Save, ShieldCheck, Trash2, Users, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -14,8 +14,17 @@ type ProjectStatus = "draft" | "published" | "archived"
 type ProjectLocale = "pt-BR" | "es"
 type CategoryStatus = "active" | "archived"
 
+type TeacherOption = {
+  id: string
+  name: string
+  email: string
+  country?: string | null
+  locale?: ProjectLocale | null
+}
+
 type ProjectRow = {
   id: string
+  category_id?: string | null
   status: ProjectStatus
   title_pt: string
   title_es: string
@@ -40,6 +49,10 @@ type CategoryRow = {
   description?: string | null
   cover_image_url?: string | null
   sort_order: number
+  access_scope: "all" | "targeted"
+  target_teacher_ids: string[]
+  target_countries: string[]
+  target_locales: ProjectLocale[]
   projects_count: number
   updated_at: string
 }
@@ -51,6 +64,10 @@ type CategoryForm = {
   description: string
   cover_image_url: string
   sort_order: string
+  access_scope: "all" | "targeted"
+  target_teacher_ids: string[]
+  target_countries: string[]
+  target_locales: ProjectLocale[]
 }
 
 const STATUS_LABEL: Record<ProjectStatus, string> = {
@@ -82,6 +99,14 @@ const EMPTY_CATEGORY_FORM: CategoryForm = {
   description: "",
   cover_image_url: "",
   sort_order: "0",
+  access_scope: "all",
+  target_teacher_ids: [],
+  target_countries: [],
+  target_locales: [],
+}
+
+function toggleStringValue(values: string[], value: string) {
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value]
 }
 
 function formatDate(value: string | null | undefined) {
@@ -107,6 +132,8 @@ export default function ProjectsAdminClient() {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [savingCategory, setSavingCategory] = useState(false)
   const [uploadingCategoryCover, setUploadingCategoryCover] = useState(false)
+  const [teachers, setTeachers] = useState<TeacherOption[]>([])
+  const [teacherQuery, setTeacherQuery] = useState("")
 
   const { confirm, confirmDialog } = useConfirmDialog()
 
@@ -131,9 +158,16 @@ export default function ProjectsAdminClient() {
     if (categoryQuery.trim()) params.set("q", categoryQuery.trim())
     if (categoryStatus !== "all") params.set("status", categoryStatus)
 
-    const res = await fetch(`/api/admin/projects/categories?${params.toString()}`, { cache: "no-store" })
-    const data = await res.json().catch(() => ({}))
+    const [res, optionsRes] = await Promise.all([
+      fetch(`/api/admin/projects/categories?${params.toString()}`, { cache: "no-store" }),
+      fetch("/api/admin/projects/options", { cache: "no-store" }),
+    ])
+    const [data, options] = await Promise.all([
+      res.json().catch(() => ({})),
+      optionsRes.json().catch(() => ({})),
+    ])
     setCategories(Array.isArray(data?.items) ? data.items : [])
+    setTeachers(Array.isArray(options?.teachers) ? options.teachers : [])
     setCategoriesLoading(false)
   }
 
@@ -157,9 +191,41 @@ export default function ProjectsAdminClient() {
     )
   }, [items])
 
+  const filteredTeachers = useMemo(() => {
+    const normalizedQuery = teacherQuery.trim().toLocaleLowerCase("pt-BR")
+    if (!normalizedQuery) return teachers
+    return teachers.filter((teacher) =>
+      `${teacher.name} ${teacher.email}`.toLocaleLowerCase("pt-BR").includes(normalizedQuery),
+    )
+  }, [teacherQuery, teachers])
+
+  const effectiveCategoryTeachers = useMemo(() => {
+    if (categoryForm.access_scope === "all") return teachers
+    return teachers.filter((teacher) => {
+      if (categoryForm.target_teacher_ids.includes(teacher.id)) return true
+      if (teacher.country && categoryForm.target_countries.includes(teacher.country)) return true
+      return Boolean(teacher.locale && categoryForm.target_locales.includes(teacher.locale))
+    })
+  }, [categoryForm, teachers])
+
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories],
+  )
+
+  function categoryTeacherCount(category: CategoryRow | undefined) {
+    if (!category || category.access_scope === "all") return teachers.length
+    return teachers.filter((teacher) => {
+      if (category.target_teacher_ids.includes(teacher.id)) return true
+      if (teacher.country && category.target_countries.includes(teacher.country)) return true
+      return Boolean(teacher.locale && category.target_locales.includes(teacher.locale))
+    }).length
+  }
+
   function resetCategoryForm() {
     setEditingCategoryId(null)
     setCategoryForm(EMPTY_CATEGORY_FORM)
+    setTeacherQuery("")
   }
 
   function editCategory(category: CategoryRow) {
@@ -171,6 +237,10 @@ export default function ProjectsAdminClient() {
       description: String(category.description ?? ""),
       cover_image_url: String(category.cover_image_url ?? ""),
       sort_order: String(category.sort_order ?? 0),
+      access_scope: category.access_scope === "targeted" ? "targeted" : "all",
+      target_teacher_ids: Array.isArray(category.target_teacher_ids) ? category.target_teacher_ids : [],
+      target_countries: Array.isArray(category.target_countries) ? category.target_countries : [],
+      target_locales: Array.isArray(category.target_locales) ? category.target_locales : [],
     })
   }
 
@@ -201,6 +271,15 @@ export default function ProjectsAdminClient() {
       alert("Preencha o título da categoria.")
       return
     }
+    if (
+      categoryForm.access_scope === "targeted" &&
+      categoryForm.target_teacher_ids.length === 0 &&
+      categoryForm.target_countries.length === 0 &&
+      categoryForm.target_locales.length === 0
+    ) {
+      alert("Selecione ao menos um professor, país ou idioma para restringir a categoria.")
+      return
+    }
 
     setSavingCategory(true)
     try {
@@ -211,6 +290,10 @@ export default function ProjectsAdminClient() {
         description: categoryForm.description.trim() || null,
         cover_image_url: categoryForm.cover_image_url.trim() || null,
         sort_order: Number.isInteger(Number(categoryForm.sort_order)) ? Number(categoryForm.sort_order) : 0,
+        access_scope: categoryForm.access_scope,
+        target_teacher_ids: categoryForm.access_scope === "targeted" ? categoryForm.target_teacher_ids : [],
+        target_countries: categoryForm.access_scope === "targeted" ? categoryForm.target_countries : [],
+        target_locales: categoryForm.access_scope === "targeted" ? categoryForm.target_locales : [],
       }
 
       const url = editingCategoryId
@@ -413,7 +496,15 @@ export default function ProjectsAdminClient() {
                             {STATUS_LABEL[item.status]}
                           </span>
                         </td>
-                        <td className="px-3 py-3 align-top text-slate-200">{item.access_scope === "all" ? "Todos" : "Segmentado"}</td>
+                        <td className="px-3 py-3 align-top text-slate-200">
+                          {item.access_scope === "targeted" ? (
+                            <span>Segmentação própria</span>
+                          ) : (() => {
+                            const category = item.category_id ? categoryById.get(item.category_id) : undefined
+                            if (!category || category.access_scope === "all") return <span>Herda: sem restrição</span>
+                            return <span>Herda: {categoryTeacherCount(category)} professores</span>
+                          })()}
+                        </td>
                         <td className="px-3 py-3 align-top text-slate-200">{item.images_count}</td>
                         <td className="px-3 py-3 align-top text-slate-200">{item.documents_count}</td>
                         <td className="px-3 py-3 align-top text-slate-200">{item.links_count}</td>
@@ -459,7 +550,7 @@ export default function ProjectsAdminClient() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-slate-200">Idioma</Label>
+                  <Label className="text-slate-200">Idioma do conteúdo</Label>
                   <select
                     className="h-10 rounded-md bg-slate-800/60 border border-slate-700 px-3 text-white w-full"
                     value={categoryForm.locale}
@@ -468,6 +559,7 @@ export default function ProjectsAdminClient() {
                     <option className="bg-slate-800 text-white" value="pt-BR">Português</option>
                     <option className="bg-slate-800 text-white" value="es">Espanhol</option>
                   </select>
+                  <p className="text-xs text-slate-400">Organiza o conteúdo, mas não restringe o acesso.</p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-slate-200">Status</Label>
@@ -529,6 +621,145 @@ export default function ProjectsAdminClient() {
                 </div>
               </div>
 
+              <div className="space-y-4 rounded-xl border border-cyan-300/20 bg-cyan-500/5 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                      <ShieldCheck className="h-4 w-4 text-cyan-300" />
+                      Regra de acesso da categoria
+                    </p>
+                    <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-300">
+                      Projetos marcados como “Para todos” herdam esta regra. Em uma categoria segmentada,
+                      basta o professor atender a uma das condições selecionadas.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2 text-xs text-slate-200">
+                    <strong className="text-white">{effectiveCategoryTeachers.length}</strong> de {teachers.length} professores com acesso
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCategoryForm((prev) => ({ ...prev, access_scope: "all" }))}
+                    className={`rounded-md border px-3 py-2 text-sm transition ${
+                      categoryForm.access_scope === "all"
+                        ? "border-emerald-300/50 bg-emerald-500/20 text-emerald-100"
+                        : "border-white/15 bg-white/5 text-slate-200 hover:bg-white/10"
+                    }`}
+                  >
+                    Sem restrição
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryForm((prev) => ({ ...prev, access_scope: "targeted" }))}
+                    className={`rounded-md border px-3 py-2 text-sm transition ${
+                      categoryForm.access_scope === "targeted"
+                        ? "border-cyan-300/50 bg-cyan-500/20 text-cyan-100"
+                        : "border-white/15 bg-white/5 text-slate-200 hover:bg-white/10"
+                    }`}
+                  >
+                    Segmentar categoria
+                  </button>
+                </div>
+
+                {categoryForm.access_scope === "targeted" ? (
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(300px,1.3fr)_minmax(180px,.7fr)_minmax(180px,.7fr)]">
+                    <div className="space-y-2">
+                      <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                        <Users className="h-4 w-4 text-cyan-300" /> Professores específicos
+                      </p>
+                      <Input
+                        className="h-9 bg-slate-900/70 border-slate-700 text-white"
+                        value={teacherQuery}
+                        onChange={(event) => setTeacherQuery(event.target.value)}
+                        placeholder="Buscar por nome ou e-mail..."
+                      />
+                      <div className="max-h-52 space-y-1 overflow-auto rounded-lg border border-white/10 bg-slate-950/35 p-2">
+                        {filteredTeachers.map((teacher) => (
+                          <label key={teacher.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 hover:bg-white/5">
+                            <input
+                              type="checkbox"
+                              className="mt-0.5"
+                              checked={categoryForm.target_teacher_ids.includes(teacher.id)}
+                              onChange={() =>
+                                setCategoryForm((prev) => ({
+                                  ...prev,
+                                  target_teacher_ids: toggleStringValue(prev.target_teacher_ids, teacher.id),
+                                }))
+                              }
+                            />
+                            <span className="min-w-0 text-xs text-slate-200">
+                              <span className="block truncate font-medium text-white">{teacher.name}</span>
+                              <span className="block truncate text-slate-400">{teacher.email}</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                        <Globe2 className="h-4 w-4 text-cyan-300" /> País ou região
+                      </p>
+                      <div className="space-y-2">
+                        {[
+                          ["BR", "Brasil"],
+                          ["UY", "Uruguai"],
+                          ["PY", "Paraguai"],
+                        ].map(([value, label]) => (
+                          <label key={value} className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-sm text-slate-200 hover:bg-white/5">
+                            <input
+                              type="checkbox"
+                              checked={categoryForm.target_countries.includes(value)}
+                              onChange={() =>
+                                setCategoryForm((prev) => ({
+                                  ...prev,
+                                  target_countries: toggleStringValue(prev.target_countries, value),
+                                }))
+                              }
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                        <Globe2 className="h-4 w-4 text-cyan-300" /> Idioma da conta
+                      </p>
+                      <div className="space-y-2">
+                        {[
+                          ["pt-BR", "Português"],
+                          ["es", "Espanhol"],
+                        ].map(([value, label]) => (
+                          <label key={value} className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2 text-sm text-slate-200 hover:bg-white/5">
+                            <input
+                              type="checkbox"
+                              checked={categoryForm.target_locales.includes(value as ProjectLocale)}
+                              onChange={() =>
+                                setCategoryForm((prev) => ({
+                                  ...prev,
+                                  target_locales: toggleStringValue(prev.target_locales, value) as ProjectLocale[],
+                                }))
+                              }
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {categoryForm.access_scope === "targeted" && effectiveCategoryTeachers.length > 0 ? (
+                  <p className="text-xs leading-relaxed text-slate-400">
+                    Acesso efetivo: {effectiveCategoryTeachers.map((teacher) => teacher.name).join(", ")}
+                  </p>
+                ) : null}
+              </div>
+
               <div className="flex flex-wrap items-end gap-3">
                 <div className="space-y-1">
                   <Label className="text-slate-200">Ordem</Label>
@@ -580,12 +811,13 @@ export default function ProjectsAdminClient() {
               </div>
 
               <div className="overflow-x-auto rounded-lg border border-white/10">
-                <table className="w-full min-w-[880px] text-sm">
+                <table className="w-full min-w-[1040px] text-sm">
                   <thead>
                     <tr className="border-b border-white/10 bg-white/5 text-slate-200">
                       <th className="text-left font-semibold px-4 py-3">Categoria</th>
-                      <th className="text-left font-semibold px-3 py-3">Idioma</th>
+                      <th className="text-left font-semibold px-3 py-3">Conteúdo</th>
                       <th className="text-left font-semibold px-3 py-3">Status</th>
+                      <th className="text-left font-semibold px-3 py-3">Acesso</th>
                       <th className="text-left font-semibold px-3 py-3">Projetos</th>
                       <th className="text-left font-semibold px-3 py-3">Ordem</th>
                       <th className="text-left font-semibold px-3 py-3">Atualizada</th>
@@ -616,6 +848,17 @@ export default function ProjectsAdminClient() {
                             {CATEGORY_STATUS_LABEL[category.status]}
                           </span>
                         </td>
+                        <td className="px-3 py-3 align-top">
+                          <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${
+                            category.access_scope === "targeted"
+                              ? "border-cyan-300/35 bg-cyan-500/15 text-cyan-100"
+                              : "border-emerald-300/30 bg-emerald-500/15 text-emerald-100"
+                          }`}>
+                            {category.access_scope === "targeted"
+                              ? `Segmentada · ${categoryTeacherCount(category)} professores`
+                              : "Sem restrição"}
+                          </span>
+                        </td>
                         <td className="px-3 py-3 align-top text-slate-200">{category.projects_count}</td>
                         <td className="px-3 py-3 align-top text-slate-200">{category.sort_order}</td>
                         <td className="px-3 py-3 align-top text-slate-300 whitespace-nowrap">{formatDate(category.updated_at)}</td>
@@ -633,7 +876,7 @@ export default function ProjectsAdminClient() {
                     ))}
                     {!categoriesLoading && categories.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-slate-300">
+                        <td colSpan={8} className="px-4 py-8 text-center text-slate-300">
                           Nenhuma categoria encontrada.
                         </td>
                       </tr>

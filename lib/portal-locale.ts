@@ -1,4 +1,5 @@
 import { cookies } from "next/headers"
+import { isAdminUser } from "@/lib/auth/authorization"
 
 export type PortalLocale = "pt-BR" | "es"
 
@@ -15,7 +16,7 @@ export function normalizePortalLocale(value: unknown): PortalLocale {
 }
 
 export function isAdminLocaleSwitcherAllowed(teacher: TeacherLocaleSource) {
-  return teacher.is_admin === true || teacher.role === "admin"
+  return isAdminUser(teacher)
 }
 
 export function resolveEffectivePortalLocale(

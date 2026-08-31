@@ -1,6 +1,7 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { isAdminUser } from "@/lib/auth/authorization"
 import { getDefaultTimezone } from "@/lib/timezones"
 import {
   ensureGradebookSchema,
@@ -383,7 +384,7 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
 
   await ensureGradebookSchema()
 
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
   if (!isAdmin) {
     return NextResponse.json(
       { error: "Somente administradores podem excluir aulas." },

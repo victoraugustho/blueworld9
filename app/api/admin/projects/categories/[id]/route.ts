@@ -5,9 +5,15 @@ import { requireProjectAdminApi } from "@/lib/auth/project-admin-server"
 import {
   ensureProjectsSchema,
   isUuid,
+  isProjectCategoryAccessReady,
   normalizeProjectCategoryStatus,
   normalizeProjectLocale,
 } from "@/lib/projects"
+import {
+  normalizeProjectCategoryAccessBody,
+  validateProjectCategoryAccessPolicy,
+  validateProjectCategoryTeachers,
+} from "@/lib/project-category-access-server"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -27,16 +33,29 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   if (!auth.ok) return auth.response
 
   await ensureProjectsSchema()
+  const categoryAccessReady = await isProjectCategoryAccessReady()
 
   const { id } = await ctx.params
   if (!isUuid(id)) return NextResponse.json({ error: "ID inválido." }, { status: 400 })
 
   const body = await req.json().catch(() => ({}))
   const payload = normalizeCategoryPayload(body)
+  const accessPolicy = normalizeProjectCategoryAccessBody(body)
 
   if (!payload.title) {
     return NextResponse.json({ error: "Título da categoria é obrigatório." }, { status: 400 })
   }
+
+  const policyError = validateProjectCategoryAccessPolicy(accessPolicy)
+  if (policyError) return NextResponse.json({ error: policyError }, { status: 400 })
+  if (!categoryAccessReady) {
+    return NextResponse.json(
+      { error: "A migração 044_project_category_access.sql precisa ser aplicada antes de salvar acessos por categoria." },
+      { status: 503 },
+    )
+  }
+  const teacherError = await validateProjectCategoryTeachers(accessPolicy)
+  if (teacherError) return NextResponse.json({ error: teacherError }, { status: 400 })
 
   const [updated] = await db`
     UPDATE public.teacher_project_categories
@@ -47,6 +66,10 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       description = ${payload.description},
       cover_image_url = ${payload.cover_image_url},
       sort_order = ${payload.sort_order},
+      access_scope = ${accessPolicy.access_scope},
+      target_teacher_ids = ${accessPolicy.target_teacher_ids}::uuid[],
+      target_countries = ${accessPolicy.target_countries}::text[],
+      target_locales = ${accessPolicy.target_locales}::text[],
       updated_by = ${auth.teacherId},
       updated_at = NOW()
     WHERE id = ${id}
@@ -62,10 +85,10 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     status: "success",
     actor: { id: auth.teacherId, email: auth.teacher.email, role: "admin", sessionId: auth.sessionId },
     target: { type: "project_category", id },
-    metadata: payload,
+    metadata: { ...payload, ...accessPolicy },
   })
 
-  return NextResponse.json({ id, ...payload })
+  return NextResponse.json({ id, ...payload, ...accessPolicy })
 }
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {

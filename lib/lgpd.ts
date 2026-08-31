@@ -13,6 +13,45 @@ const LGPD_DEFAULT_POLICY_VERSION = "2026.04"
 
 type LgpdActiveVersions = Record<LgpdPolicyType, string>
 
+export const LGPD_SCHEMA_NOT_READY_CODE = "LGPD_SCHEMA_NOT_READY"
+
+export class LgpdSchemaNotReadyError extends Error {
+  readonly code = LGPD_SCHEMA_NOT_READY_CODE
+
+  constructor(readonly missingRelations: string[]) {
+    super(`Estrutura LGPD ausente: ${missingRelations.join(", ")}`)
+    this.name = "LgpdSchemaNotReadyError"
+  }
+}
+
+export function isLgpdSchemaNotReadyError(error: unknown): error is LgpdSchemaNotReadyError {
+  return (
+    error instanceof LgpdSchemaNotReadyError ||
+    (typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === LGPD_SCHEMA_NOT_READY_CODE)
+  )
+}
+
+async function assertLgpdSchemaReady() {
+  const [status] = await db`
+    SELECT
+      to_regclass('public.policy_versions') AS policy_versions,
+      to_regclass('public.teacher_policy_acceptances') AS teacher_policy_acceptances
+  `
+
+  const missingRelations: string[] = []
+  if (!status?.policy_versions) missingRelations.push("public.policy_versions")
+  if (!status?.teacher_policy_acceptances) {
+    missingRelations.push("public.teacher_policy_acceptances")
+  }
+
+  if (missingRelations.length > 0) {
+    throw new LgpdSchemaNotReadyError(missingRelations)
+  }
+}
+
 export async function ensureLgpdSchema() {
   await ensureRuntimeSchema("schema:lgpd:v1", async () => {
     await db`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`
@@ -103,6 +142,8 @@ export async function ensureLgpdSchema() {
       )
     `
   })
+
+  await assertLgpdSchemaReady()
 }
 
 export async function getActiveLgpdVersions(): Promise<LgpdActiveVersions> {

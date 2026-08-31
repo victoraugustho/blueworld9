@@ -21,6 +21,20 @@ export interface TurmaYear {
 
 export type MaterialLanguage = "pt-BR" | "es"
 export type MaterialAccessScope = "all" | "specific"
+export type MaterialAccessMode = "all" | "dynamic" | "specific"
+export type MaterialAccessMatchStrategy = "all" | "any"
+
+export interface MaterialAccessPolicyV2 {
+  version: 2
+  mode: MaterialAccessMode
+  match_strategy: MaterialAccessMatchStrategy
+  locales: MaterialLanguage[]
+  countries: TeacherCountry[]
+  student_years: number[]
+  category_ids: number[]
+  include_teacher_ids: string[]
+  exclude_teacher_ids: string[]
+}
 
 export interface Material {
   id: string
@@ -34,8 +48,11 @@ export interface Material {
   language: MaterialLanguage
   student_year?: number | null
   access_scope?: MaterialAccessScope
+  access_policy?: MaterialAccessPolicyV2 | null
   teacher_ids?: string[]
   teacher_names?: string[]
+  effective_teacher_count?: number
+  effective_teacher_names?: string[]
   category_name?: string
 }
 

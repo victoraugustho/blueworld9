@@ -1,6 +1,7 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { isAdminUser } from "@/lib/auth/authorization"
 import {
   ensureGradebookSchema,
   getScoreMaxByCountry,
@@ -53,10 +54,10 @@ async function loadClass(classId: string) {
   return row
 }
 
-export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> | { id: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
 
   await ensureGradebookSchema()
 
@@ -99,18 +100,29 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       COUNT(*) FILTER (WHERE e.attendance = 'present')::int AS presence_count,
       COUNT(*) FILTER (WHERE e.attendance = 'absent')::int AS absence_count,
       COUNT(*) FILTER (
-        WHERE e.c1 IS NOT NULL
-          AND e.c2 IS NOT NULL
-          AND e.c3 IS NOT NULL
-          AND e.c4 IS NOT NULL
-      )::int AS graded_lessons,
-      ROUND(
-        AVG((e.c1 + e.c2 + e.c3 + e.c4) / 4.0)
-        FILTER (
-          WHERE e.c1 IS NOT NULL
+        WHERE e.attendance = 'absent'
+           OR (
+            e.c1 IS NOT NULL
             AND e.c2 IS NOT NULL
             AND e.c3 IS NOT NULL
             AND e.c4 IS NOT NULL
+          )
+      )::int AS graded_lessons,
+      ROUND(
+        AVG(
+          CASE
+            WHEN e.attendance = 'absent' THEN 0
+            ELSE (e.c1 + e.c2 + e.c3 + e.c4) / 4.0
+          END
+        )
+        FILTER (
+          WHERE e.attendance = 'absent'
+             OR (
+              e.c1 IS NOT NULL
+              AND e.c2 IS NOT NULL
+              AND e.c3 IS NOT NULL
+              AND e.c4 IS NOT NULL
+            )
         )::numeric,
         2
       ) AS note1

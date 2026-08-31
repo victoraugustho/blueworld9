@@ -1,6 +1,7 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { isAdminUser } from "@/lib/auth/authorization"
 import {
   ensureGradebookSchema,
   getScoreMaxByCountry,
@@ -55,11 +56,11 @@ async function loadClass(classId: string) {
 
 export async function GET(
   req: NextRequest,
-  ctx: { params: Promise<{ id: string; studentId: string }> | { id: string; studentId: string } },
+  ctx: { params: Promise<{ id: string; studentId: string }> },
 ) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
 
   await ensureGradebookSchema()
 
@@ -115,18 +116,29 @@ export async function GET(
       COUNT(*) FILTER (WHERE e.attendance = 'present')::int AS presence_count,
       COUNT(*) FILTER (WHERE e.attendance = 'absent')::int AS absence_count,
       COUNT(*) FILTER (
-        WHERE e.c1 IS NOT NULL
-          AND e.c2 IS NOT NULL
-          AND e.c3 IS NOT NULL
-          AND e.c4 IS NOT NULL
-      )::int AS graded_lessons,
-      ROUND(
-        AVG((e.c1 + e.c2 + e.c3 + e.c4) / 4.0)
-        FILTER (
-          WHERE e.c1 IS NOT NULL
+        WHERE e.attendance = 'absent'
+           OR (
+            e.c1 IS NOT NULL
             AND e.c2 IS NOT NULL
             AND e.c3 IS NOT NULL
             AND e.c4 IS NOT NULL
+          )
+      )::int AS graded_lessons,
+      ROUND(
+        AVG(
+          CASE
+            WHEN e.attendance = 'absent' THEN 0
+            ELSE (e.c1 + e.c2 + e.c3 + e.c4) / 4.0
+          END
+        )
+        FILTER (
+          WHERE e.attendance = 'absent'
+             OR (
+              e.c1 IS NOT NULL
+              AND e.c2 IS NOT NULL
+              AND e.c3 IS NOT NULL
+              AND e.c4 IS NOT NULL
+            )
         )::numeric,
         2
       ) AS note1
@@ -266,8 +278,13 @@ export async function GET(
       const c3 = row?.c3 === null || row?.c3 === undefined ? null : Number(row.c3)
       const c4 = row?.c4 === null || row?.c4 === undefined ? null : Number(row.c4)
 
+      const attendance = row.attendance ?? null
       const lessonAverage =
-        c1 !== null && c2 !== null && c3 !== null && c4 !== null ? round((c1 + c2 + c3 + c4) / 4, 2) : null
+        attendance === "absent"
+          ? 0
+          : c1 !== null && c2 !== null && c3 !== null && c4 !== null
+            ? round((c1 + c2 + c3 + c4) / 4, 2)
+            : null
 
       return {
         lesson_id: row.lesson_id,
@@ -275,7 +292,7 @@ export async function GET(
         lesson_number: Number(row.lesson_number),
         lesson_date: row.lesson_date,
         lesson_notes: row.lesson_notes ?? null,
-        attendance: row.attendance ?? null,
+        attendance,
         c1,
         c2,
         c3,

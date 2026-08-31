@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { ensureAuditSchema } from "@/lib/audit-schema"
 import { SESSION_COOKIE } from "@/lib/auth/constants"
 import { hashSessionToken } from "@/lib/auth/session"
+import { getPortalUserRole } from "@/lib/auth/authorization"
 
 type AuditStatus = "success" | "failed"
 
@@ -117,12 +118,7 @@ async function inferActorFromRequest(req?: NextRequest): Promise<AuditActor | nu
 
     if (!row) return null
 
-    const role =
-      row.is_admin === true
-        ? "admin"
-        : row.role
-          ? String(row.role)
-          : "teacher"
+    const role = getPortalUserRole(row)
 
     return {
       id: row.id ? String(row.id) : null,

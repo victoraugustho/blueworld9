@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import type { Category, Teacher } from "@/app/types/portal"
+import type { Category, MaterialAccessPolicyV2, Teacher } from "@/app/types/portal"
+import MaterialAccessPolicyEditor from "@/components/admin/MaterialAccessPolicyEditor"
+import { createDefaultMaterialAccessPolicy } from "@/lib/material-access-policy"
 
 type MaterialForm = {
   title: string
@@ -21,10 +23,7 @@ type MaterialForm = {
   language: "pt-BR" | "es"
   access_scope: "all" | "specific"
   teacher_ids: string[]
-}
-
-function normalizeSearch(value: string) {
-  return value.trim().toLowerCase()
+  access_policy: MaterialAccessPolicyV2
 }
 
 export default function NewMaterialPage() {
@@ -34,7 +33,6 @@ export default function NewMaterialPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [teacherQuery, setTeacherQuery] = useState("")
 
   const [form, setForm] = useState<MaterialForm>({
     title: "",
@@ -47,6 +45,7 @@ export default function NewMaterialPage() {
     language: "pt-BR",
     access_scope: "all",
     teacher_ids: [],
+    access_policy: createDefaultMaterialAccessPolicy("pt-BR"),
   })
 
   const ageYears = [3, 4, 5]
@@ -76,20 +75,6 @@ export default function NewMaterialPage() {
     loadData()
   }, [])
 
-  function toggleTeacher(teacherId: string) {
-    setForm((prev) => {
-      const current = new Set(prev.teacher_ids)
-      if (current.has(teacherId)) current.delete(teacherId)
-      else current.add(teacherId)
-      const nextIds = Array.from(current)
-      return {
-        ...prev,
-        teacher_ids: nextIds,
-        access_scope: nextIds.length > 0 ? "specific" : prev.access_scope,
-      }
-    })
-  }
-
   function setMaterialType(nextType: MaterialForm["file_type"]) {
     setForm((prev) => ({
       ...prev,
@@ -100,11 +85,6 @@ export default function NewMaterialPage() {
 
   async function submitMaterial(e: React.FormEvent) {
     e.preventDefault()
-
-    if (form.access_scope === "specific" && form.teacher_ids.length === 0) {
-      alert("Selecione ao menos um professor para acesso especifico.")
-      return
-    }
 
     setSaving(true)
     const res = await fetch("/api/admin/materials/create", {
@@ -123,15 +103,6 @@ export default function NewMaterialPage() {
     router.push("/portal/dashboard/admin/materials")
   }
 
-  const filteredTeachers = useMemo(() => {
-    const query = normalizeSearch(teacherQuery)
-    if (!query) return teachers
-    return teachers.filter((teacher) => {
-      const hay = `${teacher.name} ${teacher.email}`.toLowerCase()
-      return hay.includes(query)
-    })
-  }, [teacherQuery, teachers])
-
   return (
     <div className="min-h-screen flex flex-col gap-8 items-start justify-center px-4 py-10 text-white">
       <Card className="w-full max-w-4xl bg-slate-900/20 backdrop-blur-xl border border-cyan-500/20 shadow-2xl">
@@ -140,7 +111,7 @@ export default function NewMaterialPage() {
             Novo Material
           </CardTitle>
           <p className="text-sm text-slate-300">
-            Controle dinamico por categoria, turma (ano) e material.
+            Organização do conteúdo e controle de acesso são independentes e transparentes.
             {" "}
             <Link href="/portal/dashboard/admin/materials?section=turmas" className="text-cyan-300 hover:text-cyan-200 underline">
               Gerenciar categorias e turmas
@@ -184,9 +155,9 @@ export default function NewMaterialPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-white">Titulo</Label>
+                <Label className="text-white">Título</Label>
               <Input
-                placeholder="Ex: Introducao a Robotica"
+                  placeholder="Ex: Introdução à Robótica"
                 className="bg-slate-800/50 border-slate-700 text-white"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -246,21 +217,31 @@ export default function NewMaterialPage() {
 
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
-                <Label className="text-white">Idioma</Label>
+                <Label className="text-white">Idioma do conteúdo</Label>
                 <select
                   className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-white"
                   value={form.language}
-                  onChange={(e) => setForm({ ...form, language: e.target.value as MaterialForm["language"] })}
+                  onChange={(e) => {
+                    const language = e.target.value as MaterialForm["language"]
+                    setForm((prev) => ({
+                      ...prev,
+                      language,
+                      access_policy:
+                        prev.access_policy.locales.length === 1 && prev.access_policy.locales[0] === prev.language
+                          ? { ...prev.access_policy, locales: [language] }
+                          : prev.access_policy,
+                    }))
+                  }}
                 >
-                  <option className="text-white" value="pt-BR">Portugues (BR)</option>
-                  <option className="text-white" value="es">Espanol</option>
+                  <option className="text-white" value="pt-BR">Português (BR)</option>
+                  <option className="text-white" value="es">Español</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-white">Categoria (opcional)</Label>
+                <Label className="text-white">Categoria de organização (opcional)</Label>
                 <select
                   className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-white"
                   value={form.category_id}
@@ -275,12 +256,12 @@ export default function NewMaterialPage() {
                   ))}
                 </select>
                 <p className="text-xs text-slate-400">
-                  Se preencher, o material aparece somente para professores vinculados a esta categoria.
+                  Organiza o material nas telas. O acesso é definido separadamente abaixo.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label className="text-white">Turma (Ano) opcional</Label>
+                <Label className="text-white">Ano/turma de organização (opcional)</Label>
                 <select
                   className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-white"
                   value={form.student_year}
@@ -310,80 +291,20 @@ export default function NewMaterialPage() {
                   </optgroup>
                 </select>
                 <p className="text-xs text-slate-400">
-                  Se preencher, o material aparece somente para professores vinculados a este ano/turma.
+                  Classifica o conteúdo por etapa. O acesso é definido separadamente abaixo.
                 </p>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <Label className="text-white">Acesso ao material</Label>
-              <p className="text-xs text-slate-400">
-                Regras aplicadas em conjunto: categoria + turma (ano) + acesso do material.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, access_scope: "all", teacher_ids: [] }))}
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs border transition ${
-                    form.access_scope === "all"
-                      ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/40"
-                      : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
-                  }`}
-                >
-                  Todos os professores
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, access_scope: "specific" }))}
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs border transition ${
-                    form.access_scope === "specific"
-                      ? "bg-blue-500/20 text-blue-200 border-blue-500/40"
-                      : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
-                  }`}
-                >
-                  Professores especificos
-                </button>
-              </div>
-
-              {form.access_scope === "specific" && (
-                <div className="space-y-2">
-                  <Input
-                    className="bg-slate-800/50 border-slate-700 text-white"
-                    placeholder="Buscar professor..."
-                    value={teacherQuery}
-                    onChange={(e) => setTeacherQuery(e.target.value)}
-                  />
-                  <div className="max-h-52 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900/40">
-                    {filteredTeachers.length === 0 && (
-                      <div className="p-3 text-sm text-slate-400">Nenhum professor encontrado.</div>
-                    )}
-                    {filteredTeachers.map((teacher) => {
-                      const checked = form.teacher_ids.includes(teacher.id)
-                      return (
-                        <label
-                          key={teacher.id}
-                          className="flex items-start gap-2 px-3 py-2 border-b border-white/5 last:border-none cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            className="mt-1"
-                            checked={checked}
-                            onChange={() => toggleTeacher(teacher.id)}
-                          />
-                          <div className="min-w-0">
-                            <div className="text-sm text-white truncate">{teacher.name}</div>
-                            <div className="text-xs text-slate-400 truncate">{teacher.email}</div>
-                          </div>
-                        </label>
-                      )
-                    })}
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Selecionados: {form.teacher_ids.length}
-                  </p>
-                </div>
-              )}
-            </div>
+            <MaterialAccessPolicyEditor
+              policy={form.access_policy}
+              onChange={(access_policy) => {
+                if (access_policy) setForm((prev) => ({ ...prev, access_policy }))
+              }}
+              teachers={teachers}
+              categories={categories}
+              contentLanguage={form.language}
+            />
 
             <Button
               type="submit"

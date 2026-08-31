@@ -5,7 +5,7 @@ import { normalizeSchoolYear, ensureGradebookSchema } from "@/lib/gradebook"
 import { ensureTurmasSchema } from "@/lib/turmas"
 import { ensureAuditSchema } from "@/lib/audit-schema"
 
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -1026,10 +1026,13 @@ export async function GET(req: NextRequest, ctx: Ctx) {
         l.has_grades,
         COUNT(ls.student_id)::int AS expected_students,
         COUNT(*) FILTER (
-          WHERE e.c1 IS NOT NULL
-            AND e.c2 IS NOT NULL
-            AND e.c3 IS NOT NULL
-            AND e.c4 IS NOT NULL
+          WHERE e.attendance = 'absent'
+             OR (
+              e.c1 IS NOT NULL
+              AND e.c2 IS NOT NULL
+              AND e.c3 IS NOT NULL
+              AND e.c4 IS NOT NULL
+            )
         )::int AS graded_students,
         COUNT(*) FILTER (
           WHERE e.attendance = 'absent'
@@ -1105,10 +1108,13 @@ export async function GET(req: NextRequest, ctx: Ctx) {
         l.has_grades,
         COUNT(ls.student_id)::int AS expected_students,
         COUNT(*) FILTER (
-          WHERE e.c1 IS NOT NULL
-            AND e.c2 IS NOT NULL
-            AND e.c3 IS NOT NULL
-            AND e.c4 IS NOT NULL
+          WHERE e.attendance = 'absent'
+             OR (
+              e.c1 IS NOT NULL
+              AND e.c2 IS NOT NULL
+              AND e.c3 IS NOT NULL
+              AND e.c4 IS NOT NULL
+            )
         )::int AS graded_students,
         COUNT(*) FILTER (
           WHERE e.attendance = 'absent'

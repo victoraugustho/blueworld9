@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
+import { isAdminUser } from "@/lib/auth/authorization"
 import {
   ensureGradebookSchema,
   isUuid,
@@ -10,7 +11,7 @@ import {
 } from "@/lib/gradebook"
 import { ensureTurmasSchema } from "@/lib/turmas"
 
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 async function loadClass(classId: string) {
   const [row] = await db`
@@ -25,7 +26,7 @@ async function loadClass(classId: string) {
 export async function GET(_req: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
 
   await ensureTurmasSchema()
   await ensureGradebookSchema()
@@ -67,7 +68,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 export async function PUT(req: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
   if (!isAdmin) {
     return NextResponse.json({ error: "Apenas admin pode editar turmas." }, { status: 403 })
   }
@@ -176,7 +177,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 export async function DELETE(_req: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
-  const isAdmin = auth.teacher.is_admin === true || auth.teacher.role === "admin"
+  const isAdmin = isAdminUser(auth.teacher)
   if (!isAdmin) {
     return NextResponse.json({ error: "Apenas admin pode excluir turmas." }, { status: 403 })
   }

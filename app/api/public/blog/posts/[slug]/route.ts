@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import {
   BLOG_LANGUAGES,
@@ -10,7 +10,7 @@ import {
   normalizeBlogLanguage,
 } from "@/lib/blog"
 
-type Ctx = { params: Promise<{ slug: string }> | { slug: string } }
+type Ctx = { params: Promise<{ slug: string }> }
 
 export async function GET(req: NextRequest, ctx: Ctx) {
   await ensureBlogSchema()

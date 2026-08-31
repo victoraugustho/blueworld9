@@ -36,9 +36,12 @@ export async function ensureRuntimeSchema(key: string, run: () => Promise<void>)
     const warned = getSchemaWarnedSet()
     if (!warned.has(key)) {
       warned.add(key)
+      const guidance =
+        process.env.NODE_ENV === "production"
+          ? "Apply the matching SQL migration during controlled maintenance before deployment."
+          : "Set ENABLE_RUNTIME_SCHEMA_WRITES=true only during controlled local maintenance."
       console.warn(
-        `[runtime-schema] mutation skipped for "${key}" in production. ` +
-          `Set ENABLE_RUNTIME_SCHEMA_WRITES=true only during controlled maintenance.`,
+        `[runtime-schema] mutation skipped for "${key}". ${guidance}`,
       )
     }
     return

@@ -2,35 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
 import {
-  canTeacherAccessProject,
   ensureProjectsSchema,
   isUuid,
-  loadTeacherScopeData,
 } from "@/lib/projects"
+import { ensurePublishedProjectAccess } from "@/lib/project-access-server"
 
 type Ctx = { params: Promise<{ id: string }> }
-
-async function ensureProjectVisibility(projectId: string, teacherId: string, teacherCountry: string | null) {
-  const [project] = await db`
-    SELECT *
-    FROM public.teacher_projects
-    WHERE id = ${projectId}
-      AND deleted_at IS NULL
-      AND status = 'published'
-    LIMIT 1
-  `
-  if (!project) return { ok: false as const, code: 404 as const }
-
-  const scope = await loadTeacherScopeData(teacherId)
-  const canAccess = canTeacherAccessProject(project as any, {
-    teacherId,
-    teacherCountry,
-    teacherYears: scope.years,
-    teacherClassIds: scope.classIds,
-  })
-  if (!canAccess) return { ok: false as const, code: 403 as const }
-  return { ok: true as const }
-}
 
 export async function GET(_: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
@@ -41,11 +18,11 @@ export async function GET(_: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params
   if (!isUuid(id)) return NextResponse.json({ error: "ID inválido." }, { status: 400 })
 
-  const visibility = await ensureProjectVisibility(
-    id,
-    auth.teacherId,
-    auth.teacher.country ? String(auth.teacher.country) : null,
-  )
+  const visibility = await ensurePublishedProjectAccess(id, {
+    id: auth.teacherId,
+    country: auth.teacher.country ? String(auth.teacher.country) : null,
+    locale: auth.teacher.locale,
+  })
   if (!visibility.ok) {
     return NextResponse.json(
       { error: visibility.code === 404 ? "Projeto não encontrado." : "Sem permissão." },
@@ -76,11 +53,11 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params
   if (!isUuid(id)) return NextResponse.json({ error: "ID inválido." }, { status: 400 })
 
-  const visibility = await ensureProjectVisibility(
-    id,
-    auth.teacherId,
-    auth.teacher.country ? String(auth.teacher.country) : null,
-  )
+  const visibility = await ensurePublishedProjectAccess(id, {
+    id: auth.teacherId,
+    country: auth.teacher.country ? String(auth.teacher.country) : null,
+    locale: auth.teacher.locale,
+  })
   if (!visibility.ok) {
     return NextResponse.json(
       { error: visibility.code === 404 ? "Projeto não encontrado." : "Sem permissão." },

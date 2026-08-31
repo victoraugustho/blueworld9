@@ -4,7 +4,7 @@ import { requireAdminApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
 import { ensureTurmasSchema, normalizeTeacherIds } from "@/lib/turmas"
 
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 function parseCategoryId(value: string) {
   const id = Number(value)

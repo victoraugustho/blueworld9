@@ -26,6 +26,12 @@ async function loadOwnedClass(teacherId: string, classId: string) {
   return row
 }
 
+function buildFallbackNote2Component(finalScore: number | null) {
+  if (finalScore === null) return null
+  const value = Math.min(5, Math.max(0, finalScore / 2))
+  return Math.round(value * 100) / 100
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
@@ -140,15 +146,9 @@ export async function PUT(req: NextRequest) {
     if (!isUuid(studentId)) continue
 
     const examScoreRaw = item?.exam_score
-    const examScoreRawText = String(examScoreRaw ?? "").trim()
-    if (!examScoreRawText) {
-      return NextResponse.json(
-        { error: "Campo Prova/Atividade obrigatorio para todos os alunos" },
-        { status: 400 },
-      )
-    }
-    const examScore = normalizeScore(examScoreRaw, note2ComponentMax)
-    if (examScore === null) {
+    const hasExamScoreRaw =
+      examScoreRaw !== undefined && examScoreRaw !== null && String(examScoreRaw).trim() !== ""
+    if (hasExamScoreRaw && normalizeScore(examScoreRaw, note2ComponentMax) === null) {
       return NextResponse.json(
         { error: `Campo Prova/Atividade invalido (use valores de 0 a ${note2ComponentMax})` },
         { status: 400 },
@@ -189,10 +189,16 @@ export async function PUT(req: NextRequest) {
       if (!isUuid(studentId)) continue
 
       const hasExam = true
-      const examScore = normalizeScore(item?.exam_score, note2ComponentMax)
-      const c5Score = normalizeScore(item?.c5_score, note2ComponentMax)
+      let examScore = normalizeScore(item?.exam_score, note2ComponentMax)
+      let c5Score = normalizeScore(item?.c5_score, note2ComponentMax)
       const manualFinalScore = normalizeScore(item?.manual_final_score, scoreMax)
       const notes = typeof item?.notes === "string" ? item.notes.trim() : null
+
+      if (manualFinalScore !== null && (examScore === null || c5Score === null)) {
+        const fallbackScore = buildFallbackNote2Component(manualFinalScore)
+        examScore = fallbackScore
+        c5Score = fallbackScore
+      }
 
       await sql`
         INSERT INTO teacher_bimester_grades (

@@ -5,10 +5,11 @@ import { requireTeacherPage } from "@/lib/auth/server"
 import { isRestrictedAdminUser } from "@/lib/auth/restricted-admin"
 import { canManageProjects } from "@/lib/auth/project-admin"
 import { getEffectivePortalLocale } from "@/lib/portal-locale"
+import { isAdminUser } from "@/lib/auth/authorization"
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const teacher = await requireTeacherPage()
-  const isAdmin = teacher.is_admin === true || teacher.role === "admin"
+  const isAdmin = isAdminUser(teacher)
   const canAccessRestrictedAdminAreas = isAdmin && isRestrictedAdminUser(teacher.id)
   const canAccessProjectsAdminArea = isAdmin && canManageProjects(teacher.id)
   const locale = await getEffectivePortalLocale(teacher)
@@ -45,4 +46,3 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     </div>
   )
 }
-

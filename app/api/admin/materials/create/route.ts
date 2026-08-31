@@ -3,6 +3,10 @@ import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
 import { ensureTurmasSchema, normalizeTeacherIds } from "@/lib/turmas"
+import {
+  isMaterialAccessPolicyReady,
+  normalizeMaterialAccessPolicy,
+} from "@/lib/material-access"
 
 type MaterialLanguage = "pt-BR" | "es"
 type AccessScope = "all" | "specific"
@@ -35,8 +39,32 @@ export async function POST(request: NextRequest) {
       ? [body.teacher_id]
       : []
   const teacher_ids = normalizeTeacherIds(teacherIdsRaw)
-  const access_scope: AccessScope =
-    body.access_scope === "specific" || teacher_ids.length > 0 ? "specific" : "all"
+  let accessPolicy
+  try {
+    accessPolicy = normalizeMaterialAccessPolicy(body.access_policy)
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Política de acesso inválida" },
+      { status: 400 },
+    )
+  }
+
+  if (accessPolicy && !(await isMaterialAccessPolicyReady())) {
+    return NextResponse.json(
+      { error: "A migração 043_material_access_policy_v2.sql precisa ser executada antes de usar grupos dinâmicos." },
+      { status: 503 },
+    )
+  }
+
+  const effectiveTeacherIds = accessPolicy
+    ? accessPolicy.include_teacher_ids
+    : teacher_ids
+  const referencedTeacherIds = accessPolicy
+    ? normalizeTeacherIds([...accessPolicy.include_teacher_ids, ...accessPolicy.exclude_teacher_ids])
+    : teacher_ids
+  const access_scope: AccessScope = accessPolicy
+    ? accessPolicy.mode === "specific" ? "specific" : "all"
+    : body.access_scope === "specific" || teacher_ids.length > 0 ? "specific" : "all"
 
   if (!title || !file_url || !file_type) {
     return NextResponse.json({ error: "Dados incompletos" }, { status: 400 })
@@ -86,54 +114,57 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Escopo de acesso invalido" }, { status: 400 })
   }
 
-  if (access_scope === "specific" && teacher_ids.length === 0) {
+  if (!accessPolicy && access_scope === "specific" && teacher_ids.length === 0) {
     return NextResponse.json({ error: "Selecione ao menos um professor" }, { status: 400 })
   }
 
-  if (teacher_ids.length > 0) {
+  if (referencedTeacherIds.length > 0) {
     const validTeachers = await db`
       SELECT id
       FROM teachers
-      WHERE id = ANY(${teacher_ids}::uuid[])
+      WHERE id = ANY(${referencedTeacherIds}::uuid[])
     `
-    if (validTeachers.length !== teacher_ids.length) {
+    if (validTeachers.length !== referencedTeacherIds.length) {
       return NextResponse.json({ error: "Existe professor invalido na selecao" }, { status: 400 })
     }
   }
 
-  const [created] = await db`
-    INSERT INTO materials (
-      title,
-      description,
-      video_notes,
-      file_url,
-      file_type,
-      category_id,
-      language,
-      student_year,
-      access_scope
-    )
-    VALUES (
-      ${title},
-      ${description},
-      ${video_notes},
-      ${file_url},
-      ${file_type},
-      ${category_id},
-      ${language},
-      ${student_year},
-      ${access_scope}
-    )
-    RETURNING id
-  `
+  const created = await db.begin(async (tx) => {
+    const sql = (tx as any).sql ?? tx
+    const [row] = accessPolicy
+      ? await sql`
+          INSERT INTO materials (
+            title, description, video_notes, file_url, file_type,
+            category_id, language, student_year, access_scope, access_policy
+          )
+          VALUES (
+            ${title}, ${description}, ${video_notes}, ${file_url}, ${file_type},
+            ${category_id}, ${language}, ${student_year}, ${access_scope}, ${db.json(accessPolicy)}
+          )
+          RETURNING id
+        `
+      : await sql`
+          INSERT INTO materials (
+            title, description, video_notes, file_url, file_type,
+            category_id, language, student_year, access_scope
+          )
+          VALUES (
+            ${title}, ${description}, ${video_notes}, ${file_url}, ${file_type},
+            ${category_id}, ${language}, ${student_year}, ${access_scope}
+          )
+          RETURNING id
+        `
 
-  if (created?.id && access_scope === "specific" && teacher_ids.length > 0) {
-    await db`
-      INSERT INTO material_teacher_access (material_id, teacher_id)
-      SELECT ${created.id}::uuid, UNNEST(${teacher_ids}::uuid[])
-      ON CONFLICT (material_id, teacher_id) DO NOTHING
-    `
-  }
+    if (row?.id && effectiveTeacherIds.length > 0) {
+      await sql`
+        INSERT INTO material_teacher_access (material_id, teacher_id)
+        SELECT ${row.id}::uuid, UNNEST(${effectiveTeacherIds}::uuid[])
+        ON CONFLICT (material_id, teacher_id) DO NOTHING
+      `
+    }
+
+    return row
+  })
 
   await writeAuditLog({
     req: request,
@@ -149,7 +180,9 @@ export async function POST(request: NextRequest) {
       language,
       student_year,
       access_scope,
-      teacher_count: teacher_ids.length,
+      access_policy_version: accessPolicy?.version ?? null,
+      access_mode: accessPolicy?.mode ?? "legacy",
+      teacher_count: effectiveTeacherIds.length,
     },
   })
 

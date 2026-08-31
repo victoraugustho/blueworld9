@@ -4,7 +4,7 @@ import { requireRestrictedAdminApi } from "@/lib/auth/restricted-admin-server"
 import { writeAuditLog } from "@/lib/audit"
 import { ensureBlogSchema, slugify } from "@/lib/blog"
 
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 function parseId(value: string) {
   const parsed = Number(value)

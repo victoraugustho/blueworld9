@@ -5,35 +5,48 @@ import {
   canTeacherAccessProject,
   ensureProjectsSchema,
   isUuid,
+  isProjectCategoryAccessReady,
   loadTeacherScopeData,
   normalizeProjectLocale,
 } from "@/lib/projects"
 import { normalizeProjectFileUrl } from "@/lib/project-file-url"
-import { getEffectivePortalLocale } from "@/lib/portal-locale"
+import { canTeacherAccessProjectWithCategory } from "@/lib/project-category-access"
 
 type Ctx = { params: Promise<{ id: string }> }
 
-export async function GET(req: NextRequest, ctx: Ctx) {
+export async function GET(_req: NextRequest, ctx: Ctx) {
   const auth = await requireTeacherApi()
   if (!auth.ok) return auth.response
 
   await ensureProjectsSchema()
+  const categoryAccessReady = await isProjectCategoryAccessReady()
 
   const { id } = await ctx.params
   if (!isUuid(id)) return NextResponse.json({ error: "ID inválido." }, { status: 400 })
 
-  const effectiveLocale = await getEffectivePortalLocale(auth.teacher)
-  const locale = normalizeProjectLocale(req.nextUrl.searchParams.get("locale") ?? effectiveLocale)
-
   let project: any = null
   try {
+    const categoryAccessSelect = categoryAccessReady
+      ? db`
+          category.access_scope AS category_access_scope,
+          category.target_teacher_ids AS category_target_teacher_ids,
+          category.target_countries AS category_target_countries,
+          category.target_locales AS category_target_locales
+        `
+      : db`
+          'all'::text AS category_access_scope,
+          ARRAY[]::uuid[] AS category_target_teacher_ids,
+          ARRAY[]::text[] AS category_target_countries,
+          ARRAY[]::text[] AS category_target_locales
+        `
     ;[project] = await db`
       SELECT
         p.*,
         creator.name AS created_by_name,
         category.title AS category_title,
         category.description AS category_description,
-        category.cover_image_url AS category_cover_image_url
+        category.cover_image_url AS category_cover_image_url,
+        ${categoryAccessSelect}
       FROM public.teacher_projects p
       LEFT JOIN public.teachers creator ON creator.id = p.created_by
       LEFT JOIN public.teacher_project_categories category
@@ -47,13 +60,18 @@ export async function GET(req: NextRequest, ctx: Ctx) {
     `
   } catch (error) {
     console.error("[portal.projects.detail] category join failed", error)
+    if (categoryAccessReady) throw error
     ;[project] = await db`
       SELECT
         p.*,
         creator.name AS created_by_name,
         NULL::text AS category_title,
         NULL::text AS category_description,
-        NULL::text AS category_cover_image_url
+        NULL::text AS category_cover_image_url,
+        'all'::text AS category_access_scope,
+        ARRAY[]::uuid[] AS category_target_teacher_ids,
+        ARRAY[]::text[] AS category_target_countries,
+        ARRAY[]::text[] AS category_target_locales
       FROM public.teacher_projects p
       LEFT JOIN public.teachers creator ON creator.id = p.created_by
       WHERE p.id = ${id}
@@ -64,14 +82,26 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   }
 
   if (!project) return NextResponse.json({ error: "Projeto não encontrado." }, { status: 404 })
+  const locale = normalizeProjectLocale(project.locale)
 
   const scope = await loadTeacherScopeData(auth.teacherId)
-  const canAccess = canTeacherAccessProject(project as any, {
-    teacherId: auth.teacherId,
-    teacherCountry: auth.teacher.country ? String(auth.teacher.country) : null,
-    teacherYears: scope.years,
-    teacherClassIds: scope.classIds,
-  })
+  const canAccess = canTeacherAccessProjectWithCategory(
+    project,
+    {
+      access_scope: project.category_access_scope,
+      target_teacher_ids: project.category_target_teacher_ids,
+      target_countries: project.category_target_countries,
+      target_locales: project.category_target_locales,
+    },
+    {
+      id: auth.teacherId,
+      country: auth.teacher.country ? String(auth.teacher.country) : null,
+      locale: auth.teacher.locale,
+      years: scope.years,
+      classIds: scope.classIds,
+    },
+    canTeacherAccessProject,
+  )
   if (!canAccess) return NextResponse.json({ error: "Sem permissão para visualizar este projeto." }, { status: 403 })
 
   const assets = await db`

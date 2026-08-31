@@ -6,7 +6,7 @@ import { ensureTurmasSchema, normalizeCategoryIds, normalizeStudentYears } from 
 
 type Country = "BR" | "UY" | "PY"
 type DocType = "CPF" | "CI_UY" | "CI_PY"
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 function onlyDigits(v: string) {
   return (v ?? "").replace(/\D/g, "")

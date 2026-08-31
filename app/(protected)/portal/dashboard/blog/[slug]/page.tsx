@@ -6,7 +6,7 @@ import { requireTeacherPage } from "@/lib/auth/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
-type Params = { params: Promise<{ slug: string }> | { slug: string } }
+type Params = { params: Promise<{ slug: string }> }
 
 type BlogPostDetails = {
   title: string

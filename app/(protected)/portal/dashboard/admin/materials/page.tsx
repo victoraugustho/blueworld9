@@ -38,19 +38,57 @@ function typeBadge(type: MaterialType) {
 }
 
 function accessBadge(material: MaterialView) {
+  const effectiveCount = Number(material.effective_teacher_count ?? 0)
+  if (material.access_policy?.version === 2) {
+    const modeLabel = material.access_policy.mode === "all"
+      ? "Acesso geral"
+      : material.access_policy.mode === "dynamic"
+        ? "Grupo dinâmico"
+        : "Lista específica"
+    return {
+      label: `${modeLabel} · ${effectiveCount} ${effectiveCount === 1 ? "professor" : "professores"}`,
+      cls: material.access_policy.mode === "dynamic"
+        ? "bg-cyan-500/15 text-cyan-200"
+        : "bg-emerald-500/15 text-emerald-300",
+    }
+  }
+
   const ids = Array.isArray(material.teacher_ids) ? material.teacher_ids : []
   if (material.access_scope === "specific") {
     const label = ids.length === 1 ? "1 professor selecionado" : `${ids.length} professores selecionados`
     return {
-      label,
+      label: `Legado · ${label} · ${effectiveCount} com acesso`,
       cls: "bg-amber-500/15 text-amber-300",
     }
   }
 
   return {
-    label: "Todos os professores",
+    label: `Legado · ${effectiveCount} com acesso`,
     cls: "bg-emerald-500/15 text-emerald-300",
   }
+}
+
+function accessDetails(material: MaterialView) {
+  const policy = material.access_policy
+  if (!policy || policy.version !== 2) {
+    return "Idioma, categoria, ano/turma e lista específica são combinados pela regra antiga."
+  }
+  if (policy.mode === "all") {
+    return policy.exclude_teacher_ids.length > 0
+      ? `${policy.exclude_teacher_ids.length} exclusões individuais`
+      : "Sem restrições adicionais"
+  }
+  if (policy.mode === "specific") {
+    return `${policy.include_teacher_ids.length} inclusões · ${policy.exclude_teacher_ids.length} exclusões`
+  }
+
+  const conditions = [
+    policy.locales.length > 0 ? `idiomas: ${policy.locales.join(", ")}` : null,
+    policy.countries.length > 0 ? `países: ${policy.countries.join(", ")}` : null,
+    policy.student_years.length > 0 ? `${policy.student_years.length} anos/turmas` : null,
+    policy.category_ids.length > 0 ? `${policy.category_ids.length} categorias` : null,
+  ].filter(Boolean)
+  return `${policy.match_strategy === "all" ? "Todas" : "Qualquer"}: ${conditions.join(" · ")} · ${policy.include_teacher_ids.length} inclusões · ${policy.exclude_teacher_ids.length} exclusões`
 }
 
 function yearInfo(value: any) {
@@ -218,6 +256,8 @@ function MaterialsPanel() {
         m.file_url,
         m.id,
         ...(m.teacher_names ?? []),
+        ...(m.effective_teacher_names ?? []),
+        m.access_policy?.mode,
         m.access_scope === "specific" ? "específico selecionado" : "todos professores",
       ]
         .map(normalizeText)
@@ -400,11 +440,13 @@ function MaterialsPanel() {
                           <span className={`inline-block px-3 py-1 rounded-full text-xs ${aBadge.cls}`}>
                             {aBadge.label}
                           </span>
-                          {m.access_scope === "specific" && (
+                          <p className="text-[11px] leading-relaxed text-slate-400">{accessDetails(m)}</p>
+                          {(m.effective_teacher_names ?? []).length > 0 && (
                             <p className="text-[11px] text-slate-400">
-                              {(m.teacher_names ?? []).length > 0
-                                ? `Professores: ${(m.teacher_names ?? []).join(", ")}`
-                                : "Nenhum professor listado."}
+                              Professores: {(m.effective_teacher_names ?? []).slice(0, 4).join(", ")}
+                              {(m.effective_teacher_names ?? []).length > 4
+                                ? ` e mais ${(m.effective_teacher_names ?? []).length - 4}`
+                                : ""}
                             </p>
                           )}
                         </div>

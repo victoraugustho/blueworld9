@@ -1,7 +1,7 @@
 import { requireRestrictedAdminPage } from "@/lib/auth/restricted-admin-server"
 import EditBlogPostClient from "./EditBlogPostClient"
 
-type Props = { params: Promise<{ id: string }> | { id: string } }
+type Props = { params: Promise<{ id: string }> }
 
 export default async function EditBlogPostPage({ params }: Props) {
   await requireRestrictedAdminPage()

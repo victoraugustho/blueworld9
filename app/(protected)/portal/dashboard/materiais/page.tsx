@@ -4,6 +4,7 @@ import { ensureTurmasSchema } from "@/lib/turmas"
 import { FileText, Eye } from "lucide-react"
 import Link from "next/link"
 import { getEffectivePortalLocale } from "@/lib/portal-locale"
+import { isMaterialAccessPolicyReady, materialAccessSql } from "@/lib/material-access"
 
 type SearchParams = { year?: string | string[] }
 
@@ -29,43 +30,31 @@ export default async function MateriaisPage({
     highLabel: locale === "es" ? "Ensenanza Media" : "Ensino Medio",
   }
 
+  const policyReady = await isMaterialAccessPolicyReady()
+  const accessFilter = policyReady
+    ? materialAccessSql(teacher.id, locale)
+    : db`
+        m.language = ${locale}
+        AND (m.category_id IS NULL OR EXISTS (
+          SELECT 1 FROM teacher_categories tc
+          WHERE tc.teacher_id = ${teacher.id} AND tc.category_id = m.category_id
+        ))
+        AND (m.student_year IS NULL OR EXISTS (
+          SELECT 1 FROM teacher_student_years tys
+          WHERE tys.teacher_id = ${teacher.id} AND tys.student_year = m.student_year
+        ))
+        AND (COALESCE(m.access_scope, 'all') = 'all' OR EXISTS (
+          SELECT 1 FROM material_teacher_access mta
+          WHERE mta.material_id = m.id AND mta.teacher_id = ${teacher.id}
+        ))
+      `
+
   const materiais = await db`
-    WITH teacher_turmas AS (
-      SELECT category_id
-      FROM teacher_categories
-      WHERE teacher_id = ${teacher.id}
-    )
     SELECT m.*, c.name AS category_name
     FROM materials m
     LEFT JOIN categories c ON m.category_id = c.id
     WHERE m.file_type = 'document'
-      AND m.language = ${locale}
-      AND (
-        m.category_id IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM teacher_turmas tt
-          WHERE tt.category_id = m.category_id
-        )
-      )
-      AND (
-        m.student_year IS NULL
-        OR EXISTS (
-          SELECT 1
-          FROM teacher_student_years tys
-          WHERE tys.teacher_id = ${teacher.id}
-            AND tys.student_year = m.student_year
-        )
-      )
-      AND (
-        COALESCE(m.access_scope, 'all') = 'all'
-        OR EXISTS (
-          SELECT 1
-          FROM material_teacher_access mta
-          WHERE mta.material_id = m.id
-            AND mta.teacher_id = ${teacher.id}
-        )
-      )
+      AND ${accessFilter}
     ORDER BY c.name ASC NULLS LAST, m.created_at DESC
   `
 

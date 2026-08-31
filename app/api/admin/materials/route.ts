@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { ensureTurmasSchema } from "@/lib/turmas"
+import {
+  evaluateMaterialAccessPolicy,
+  normalizeMaterialAccessPolicy,
+} from "@/lib/material-access"
 
 export async function GET() {
   const admin = await requireAdminApi()
@@ -30,5 +34,46 @@ export async function GET() {
     ORDER BY m.created_at DESC
   `
 
-  return NextResponse.json(materials)
+  const teachers = await db`
+    SELECT
+      t.id, t.name, t.email, t.country, t.locale,
+      COALESCE((
+        SELECT ARRAY_AGG(tc.category_id ORDER BY tc.category_id)
+        FROM teacher_categories tc
+        WHERE tc.teacher_id = t.id
+      ), ARRAY[]::int[]) AS category_ids,
+      COALESCE((
+        SELECT ARRAY_AGG(tys.student_year ORDER BY tys.student_year)
+        FROM teacher_student_years tys
+        WHERE tys.teacher_id = t.id
+      ), ARRAY[]::smallint[]) AS student_years
+    FROM teachers t
+    WHERE t.approved = TRUE AND t.active = TRUE
+  `
+
+  const materialsWithEffectiveAccess = materials.map((material) => {
+    let policy = null
+    try {
+      policy = normalizeMaterialAccessPolicy(material.access_policy)
+    } catch {
+      policy = null
+    }
+
+    const legacyTeacherIds = new Set((material.teacher_ids ?? []).map(String))
+    const allowedTeachers = teachers.filter((teacher) => {
+      if (policy) return evaluateMaterialAccessPolicy(policy, teacher as any).allowed
+      if (teacher.locale !== material.language) return false
+      if (material.category_id && !(teacher.category_ids ?? []).includes(material.category_id)) return false
+      if (material.student_year && !(teacher.student_years ?? []).includes(material.student_year)) return false
+      return material.access_scope !== "specific" || legacyTeacherIds.has(String(teacher.id))
+    })
+
+    return {
+      ...material,
+      effective_teacher_count: allowedTeachers.length,
+      effective_teacher_names: allowedTeachers.map((teacher) => teacher.name),
+    }
+  })
+
+  return NextResponse.json(materialsWithEffectiveAccess)
 }

@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
-import { canTeacherAccessProject, ensureProjectsSchema, loadTeacherScopeData, normalizeProjectLocale } from "@/lib/projects"
+import {
+  canTeacherAccessProject,
+  ensureProjectsSchema,
+  isProjectCategoryAccessReady,
+  loadTeacherScopeData,
+  normalizeProjectLocale,
+} from "@/lib/projects"
 import { normalizeProjectFileUrl } from "@/lib/project-file-url"
-import { getEffectivePortalLocale } from "@/lib/portal-locale"
+import { canTeacherAccessProjectWithCategory } from "@/lib/project-category-access"
 
 function parsePagination(params: URLSearchParams) {
   const pageRaw = Number(params.get("page") ?? 1)
@@ -19,10 +25,10 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return auth.response
 
   await ensureProjectsSchema()
+  const categoryAccessReady = await isProjectCategoryAccessReady()
 
   const params = req.nextUrl.searchParams
   const { page, page_size, offset } = parsePagination(params)
-  const locale = normalizeProjectLocale(await getEffectivePortalLocale(auth.teacher))
   const q = String(params.get("q") ?? "").trim()
 
   const qFilter = q
@@ -47,6 +53,19 @@ export async function GET(req: NextRequest) {
 
   let rows: any[] = []
   try {
+    const categoryAccessSelect = categoryAccessReady
+      ? db`
+          category.access_scope AS category_access_scope,
+          category.target_teacher_ids AS category_target_teacher_ids,
+          category.target_countries AS category_target_countries,
+          category.target_locales AS category_target_locales,
+        `
+      : db`
+          'all'::text AS category_access_scope,
+          ARRAY[]::uuid[] AS category_target_teacher_ids,
+          ARRAY[]::text[] AS category_target_countries,
+          ARRAY[]::text[] AS category_target_locales,
+        `
     rows = await db`
       SELECT
         p.id,
@@ -72,6 +91,7 @@ export async function GET(req: NextRequest) {
         category.description AS category_description,
         category.cover_image_url AS category_cover_image_url,
         category.sort_order AS category_sort_order,
+        ${categoryAccessSelect}
         (
           SELECT COUNT(*)::int
           FROM public.teacher_project_assets a
@@ -93,12 +113,12 @@ export async function GET(req: NextRequest) {
         AND category.deleted_at IS NULL
       WHERE p.deleted_at IS NULL
         AND p.status = 'published'
-        AND COALESCE(p.locale, 'pt-BR') = ${locale}
         ${qFilter}
       ORDER BY COALESCE(p.published_at, p.updated_at, p.created_at) DESC
     `
   } catch (error) {
     console.error("[portal.projects.GET] category query failed, using project-only fallback", error)
+    if (categoryAccessReady) throw error
     rows = await db`
       SELECT
         p.id,
@@ -124,6 +144,10 @@ export async function GET(req: NextRequest) {
         NULL::text AS category_description,
         NULL::text AS category_cover_image_url,
         999999::int AS category_sort_order,
+        'all'::text AS category_access_scope,
+        ARRAY[]::uuid[] AS category_target_teacher_ids,
+        ARRAY[]::text[] AS category_target_countries,
+        ARRAY[]::text[] AS category_target_locales,
         (
           SELECT COUNT(*)::int
           FROM public.teacher_project_assets a
@@ -141,7 +165,6 @@ export async function GET(req: NextRequest) {
       LEFT JOIN public.teachers creator ON creator.id = p.created_by
       WHERE p.deleted_at IS NULL
         AND p.status = 'published'
-        AND COALESCE(p.locale, 'pt-BR') = ${locale}
         ${qFilter}
       ORDER BY COALESCE(p.published_at, p.updated_at, p.created_at) DESC
     `
@@ -149,30 +172,44 @@ export async function GET(req: NextRequest) {
 
   const scope = await loadTeacherScopeData(auth.teacherId)
   const visible = rows.filter((item: any) =>
-    canTeacherAccessProject(item, {
-      teacherId: auth.teacherId,
-      teacherCountry: auth.teacher.country ? String(auth.teacher.country) : null,
-      teacherYears: scope.years,
-      teacherClassIds: scope.classIds,
-    }),
+    canTeacherAccessProjectWithCategory(
+      item,
+      {
+        access_scope: item.category_access_scope,
+        target_teacher_ids: item.category_target_teacher_ids,
+        target_countries: item.category_target_countries,
+        target_locales: item.category_target_locales,
+      },
+      {
+        id: auth.teacherId,
+        country: auth.teacher.country ? String(auth.teacher.country) : null,
+        locale: auth.teacher.locale,
+        years: scope.years,
+        classIds: scope.classIds,
+      },
+      canTeacherAccessProject,
+    ),
   )
 
   const total = visible.length
-  const paginated = visible.slice(offset, offset + page_size).map((item: any) => ({
-    ...item,
-    title: locale === "es" ? String(item.title_es ?? "") : String(item.title_pt ?? ""),
-    summary: locale === "es" ? String(item.summary_es ?? "") : String(item.summary_pt ?? ""),
-    locale,
-    cover_image_url: normalizeProjectFileUrl(item.cover_image_url),
-    images_count: Number(item.images_count ?? 0),
-    documents_count: Number(item.documents_count ?? 0),
-    links_count: Number(item.links_count ?? 0),
-    category_id: item.category_title ? item.category_id : null,
-    category_title: item.category_title ? String(item.category_title ?? "") : null,
-    category_description: item.category_title ? String(item.category_description ?? "") : null,
-    category_cover_image_url: item.category_title ? normalizeProjectFileUrl(item.category_cover_image_url) : null,
-    category_sort_order: item.category_title ? Number(item.category_sort_order ?? 0) : 999999,
-  }))
+  const paginated = visible.slice(offset, offset + page_size).map((item: any) => {
+    const contentLocale = normalizeProjectLocale(item.project_locale)
+    return {
+      ...item,
+      title: contentLocale === "es" ? String(item.title_es ?? "") : String(item.title_pt ?? ""),
+      summary: contentLocale === "es" ? String(item.summary_es ?? "") : String(item.summary_pt ?? ""),
+      locale: contentLocale,
+      cover_image_url: normalizeProjectFileUrl(item.cover_image_url),
+      images_count: Number(item.images_count ?? 0),
+      documents_count: Number(item.documents_count ?? 0),
+      links_count: Number(item.links_count ?? 0),
+      category_id: item.category_title ? item.category_id : null,
+      category_title: item.category_title ? String(item.category_title ?? "") : null,
+      category_description: item.category_title ? String(item.category_description ?? "") : null,
+      category_cover_image_url: item.category_title ? normalizeProjectFileUrl(item.category_cover_image_url) : null,
+      category_sort_order: item.category_title ? Number(item.category_sort_order ?? 0) : 999999,
+    }
+  })
 
   return NextResponse.json({
     items: paginated,

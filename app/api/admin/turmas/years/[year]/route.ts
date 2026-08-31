@@ -1,10 +1,10 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
 import { ensureTurmasSchema, getTurmaYearLabel, isValidStudentYear, normalizeTeacherIds } from "@/lib/turmas"
 
-type Ctx = { params: Promise<{ year: string }> | { year: string } }
+type Ctx = { params: Promise<{ year: string }> }
 
 function parseStudentYear(value: string) {
   const parsed = Number(value)

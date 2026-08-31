@@ -4,10 +4,16 @@ import { writeAuditLog } from "@/lib/audit"
 import { requireProjectAdminApi } from "@/lib/auth/project-admin-server"
 import {
   ensureProjectsSchema,
+  isProjectCategoryAccessReady,
   normalizeProjectCategoryStatus,
   normalizeProjectLocale,
 } from "@/lib/projects"
 import { normalizeProjectFileUrl } from "@/lib/project-file-url"
+import {
+  normalizeProjectCategoryAccessBody,
+  validateProjectCategoryAccessPolicy,
+  validateProjectCategoryTeachers,
+} from "@/lib/project-category-access-server"
 
 function normalizeCategoryPayload(body: any) {
   return {
@@ -25,6 +31,7 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return auth.response
 
   await ensureProjectsSchema()
+  const categoryAccessReady = await isProjectCategoryAccessReady()
 
   const params = req.nextUrl.searchParams
   const q = String(params.get("q") ?? "").trim()
@@ -38,6 +45,20 @@ export async function GET(req: NextRequest) {
     status === "active" || status === "archived" ? db`AND c.status = ${status}` : db``
   const localeFilter = locale === "pt-BR" || locale === "es" ? db`AND c.locale = ${locale}` : db``
 
+  const accessSelect = categoryAccessReady
+    ? db`
+        c.access_scope,
+        c.target_teacher_ids,
+        c.target_countries,
+        c.target_locales,
+      `
+    : db`
+        'all'::text AS access_scope,
+        ARRAY[]::uuid[] AS target_teacher_ids,
+        ARRAY[]::text[] AS target_countries,
+        ARRAY[]::text[] AS target_locales,
+      `
+
   const items = await db`
     SELECT
       c.id,
@@ -47,6 +68,7 @@ export async function GET(req: NextRequest) {
       c.description,
       c.cover_image_url,
       c.sort_order,
+      ${accessSelect}
       c.created_at,
       c.updated_at,
       creator.name AS created_by_name,
@@ -81,13 +103,26 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return auth.response
 
   await ensureProjectsSchema()
+  const categoryAccessReady = await isProjectCategoryAccessReady()
 
   const body = await req.json().catch(() => ({}))
   const payload = normalizeCategoryPayload(body)
+  const accessPolicy = normalizeProjectCategoryAccessBody(body)
 
   if (!payload.title) {
     return NextResponse.json({ error: "Título da categoria é obrigatório." }, { status: 400 })
   }
+
+  const policyError = validateProjectCategoryAccessPolicy(accessPolicy)
+  if (policyError) return NextResponse.json({ error: policyError }, { status: 400 })
+  if (!categoryAccessReady) {
+    return NextResponse.json(
+      { error: "A migração 044_project_category_access.sql precisa ser aplicada antes de salvar acessos por categoria." },
+      { status: 503 },
+    )
+  }
+  const teacherError = await validateProjectCategoryTeachers(accessPolicy)
+  if (teacherError) return NextResponse.json({ error: teacherError }, { status: 400 })
 
   const [created] = await db`
     INSERT INTO public.teacher_project_categories (
@@ -97,6 +132,10 @@ export async function POST(req: NextRequest) {
       description,
       cover_image_url,
       sort_order,
+      access_scope,
+      target_teacher_ids,
+      target_countries,
+      target_locales,
       created_by,
       updated_by
     )
@@ -107,6 +146,10 @@ export async function POST(req: NextRequest) {
       ${payload.description},
       ${payload.cover_image_url},
       ${payload.sort_order},
+      ${accessPolicy.access_scope},
+      ${accessPolicy.target_teacher_ids}::uuid[],
+      ${accessPolicy.target_countries}::text[],
+      ${accessPolicy.target_locales}::text[],
       ${auth.teacherId},
       ${auth.teacherId}
     )
@@ -121,8 +164,8 @@ export async function POST(req: NextRequest) {
     status: "success",
     actor: { id: auth.teacherId, email: auth.teacher.email, role: "admin", sessionId: auth.sessionId },
     target: { type: "project_category", id: categoryId },
-    metadata: payload,
+    metadata: { ...payload, ...accessPolicy },
   })
 
-  return NextResponse.json({ id: categoryId, ...payload }, { status: 201 })
+  return NextResponse.json({ id: categoryId, ...payload, ...accessPolicy }, { status: 201 })
 }

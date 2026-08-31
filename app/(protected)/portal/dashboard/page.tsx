@@ -1,5 +1,5 @@
 import { getEffectivePortalLocale } from "@/lib/portal-locale"
-﻿import Link from "next/link"
+import Link from "next/link"
 import { db } from "@/lib/db"
 import { requireTeacherPage } from "@/lib/auth/server"
 import { getDefaultTimezone } from "@/lib/timezones"
@@ -132,7 +132,7 @@ function findNextSchedule(schedules: ScheduleRow[], fallbackTimezone: string) {
 }
 
 type PageProps = {
-  searchParams?: Promise<{ blog_category?: string | string[] }> | { blog_category?: string | string[] }
+  searchParams?: Promise<{ blog_category?: string | string[] }>
 }
 
 export default async function PortalDashboardPage({ searchParams }: PageProps) {

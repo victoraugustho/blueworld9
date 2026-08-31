@@ -3,7 +3,7 @@ import NovaTurmaClient from "./NovaTurmaClient"
 import { getEffectivePortalLocale } from "@/lib/portal-locale"
 
 type Search = {
-  searchParams?: Promise<{ teacherId?: string }> | { teacherId?: string }
+  searchParams?: Promise<{ teacherId?: string }>
 }
 
 export default async function NotasNovaTurmaPage({ searchParams }: Search) {

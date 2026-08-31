@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireProjectAdminApi } from "@/lib/auth/project-admin-server"
-import { ensureProjectsSchema, getProjectUploadLimits } from "@/lib/projects"
+import { ensureProjectsSchema, getProjectUploadLimits, isProjectCategoryAccessReady } from "@/lib/projects"
 import { db } from "@/lib/db"
 import { TURMA_YEAR_OPTIONS } from "@/lib/turma-years"
 
@@ -9,19 +9,44 @@ export async function GET() {
   if (!auth.ok) return auth.response
 
   await ensureProjectsSchema()
+  const categoryAccessReady = await isProjectCategoryAccessReady()
 
   const teachers = await db`
-    SELECT id, name, email, country
-    FROM public.teachers
-    WHERE active = TRUE
-      AND approved = TRUE
+    SELECT
+      t.id, t.name, t.email, t.country, t.locale,
+      COALESCE((
+        SELECT ARRAY_AGG(DISTINCT tc.student_year ORDER BY tc.student_year)
+        FROM public.teacher_classes tc
+        WHERE tc.teacher_id = t.id
+          AND tc.active = TRUE
+          AND tc.student_year IS NOT NULL
+      ), ARRAY[]::smallint[]) AS student_years
+    FROM public.teachers t
+    WHERE t.active = TRUE
+      AND t.approved = TRUE
     ORDER BY name ASC
   `
 
   let categories: any[] = []
   try {
+    const categoryAccessSelect = categoryAccessReady
+      ? db`access_scope, target_teacher_ids, target_countries, target_locales,`
+      : db`
+          'all'::text AS access_scope,
+          ARRAY[]::uuid[] AS target_teacher_ids,
+          ARRAY[]::text[] AS target_countries,
+          ARRAY[]::text[] AS target_locales,
+        `
     categories = await db`
-      SELECT id, locale, title, description, cover_image_url, sort_order
+      SELECT
+        id,
+        locale,
+        title,
+        description,
+        cover_image_url,
+        sort_order,
+        ${categoryAccessSelect}
+        status
       FROM public.teacher_project_categories
       WHERE status = 'active'
         AND deleted_at IS NULL

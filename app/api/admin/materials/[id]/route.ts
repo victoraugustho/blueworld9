@@ -3,10 +3,14 @@ import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
 import { ensureTurmasSchema, normalizeTeacherIds } from "@/lib/turmas"
+import {
+  isMaterialAccessPolicyReady,
+  normalizeMaterialAccessPolicy,
+} from "@/lib/material-access"
 
 type MaterialLanguage = "pt-BR" | "es"
 type AccessScope = "all" | "specific"
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 function parseOptionalNumber(value: unknown) {
   if (value === "" || value === null || value === undefined) return null
@@ -80,6 +84,10 @@ export async function PUT(req: NextRequest, context: Ctx) {
   }
 
   const body = await req.json().catch(() => ({}))
+  const currentMaterial = await loadMaterialById(id)
+  if (!currentMaterial) {
+    return NextResponse.json({ error: "Material não encontrado" }, { status: 404 })
+  }
 
   const title = String(body.title ?? "").trim()
   const description = String(body.description ?? "").trim()
@@ -96,7 +104,36 @@ export async function PUT(req: NextRequest, context: Ctx) {
       ? [body.teacher_id]
       : []
   const teacher_ids = normalizeTeacherIds(teacherIdsRaw)
-  const access_scope = normalizeAccessScope(body.access_scope, teacher_ids.length)
+  const policyReady = await isMaterialAccessPolicyReady()
+  const policyWasProvided = Object.prototype.hasOwnProperty.call(body, "access_policy")
+  let accessPolicy
+  try {
+    accessPolicy = normalizeMaterialAccessPolicy(
+      policyWasProvided ? body.access_policy : currentMaterial.access_policy,
+    )
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Política de acesso inválida" },
+      { status: 400 },
+    )
+  }
+
+  if (accessPolicy && !policyReady) {
+    return NextResponse.json(
+      { error: "A migração 043_material_access_policy_v2.sql precisa ser executada antes de usar grupos dinâmicos." },
+      { status: 503 },
+    )
+  }
+
+  const effectiveTeacherIds = accessPolicy
+    ? accessPolicy.include_teacher_ids
+    : teacher_ids
+  const referencedTeacherIds = accessPolicy
+    ? normalizeTeacherIds([...accessPolicy.include_teacher_ids, ...accessPolicy.exclude_teacher_ids])
+    : teacher_ids
+  const access_scope = accessPolicy
+    ? accessPolicy.mode === "specific" ? "specific" : "all"
+    : normalizeAccessScope(body.access_scope, teacher_ids.length)
 
   if (!title || !file_url || !file_type) {
     return NextResponse.json({ error: "Dados incompletos" }, { status: 400 })
@@ -146,53 +183,57 @@ export async function PUT(req: NextRequest, context: Ctx) {
     return NextResponse.json({ error: "Escopo de acesso invalido" }, { status: 400 })
   }
 
-  if (access_scope === "specific" && teacher_ids.length === 0) {
+  if (!accessPolicy && access_scope === "specific" && teacher_ids.length === 0) {
     return NextResponse.json({ error: "Selecione ao menos um professor" }, { status: 400 })
   }
 
-  if (teacher_ids.length > 0) {
+  if (referencedTeacherIds.length > 0) {
     const validTeachers = await db`
       SELECT id
       FROM teachers
-      WHERE id = ANY(${teacher_ids}::uuid[])
+      WHERE id = ANY(${referencedTeacherIds}::uuid[])
     `
-    if (validTeachers.length !== teacher_ids.length) {
+    if (validTeachers.length !== referencedTeacherIds.length) {
       return NextResponse.json({ error: "Existe professor invalido na selecao" }, { status: 400 })
     }
   }
 
-  const [updated] = await db`
-    UPDATE materials
-    SET
-      title = ${title},
-      description = ${description},
-      video_notes = ${video_notes},
-      file_url = ${file_url},
-      file_type = ${file_type},
-      category_id = ${category_id},
-      language = ${language},
-      student_year = ${student_year},
-      access_scope = ${access_scope}
-    WHERE id = ${id}
-    RETURNING id
-  `
+  await db.begin(async (tx) => {
+    const sql = (tx as any).sql ?? tx
+    if (policyReady) {
+      await sql`
+        UPDATE materials
+        SET
+          title = ${title}, description = ${description}, video_notes = ${video_notes},
+          file_url = ${file_url}, file_type = ${file_type}, category_id = ${category_id},
+          language = ${language}, student_year = ${student_year}, access_scope = ${access_scope},
+          access_policy = ${accessPolicy ? db.json(accessPolicy) : null}
+        WHERE id = ${id}
+      `
+    } else {
+      await sql`
+        UPDATE materials
+        SET
+          title = ${title}, description = ${description}, video_notes = ${video_notes},
+          file_url = ${file_url}, file_type = ${file_type}, category_id = ${category_id},
+          language = ${language}, student_year = ${student_year}, access_scope = ${access_scope}
+        WHERE id = ${id}
+      `
+    }
 
-  if (!updated) {
-    return NextResponse.json({ error: "Material nao encontrado" }, { status: 404 })
-  }
-
-  await db`
-    DELETE FROM material_teacher_access
-    WHERE material_id = ${id}
-  `
-
-  if (access_scope === "specific" && teacher_ids.length > 0) {
-    await db`
-      INSERT INTO material_teacher_access (material_id, teacher_id)
-      SELECT ${id}::uuid, UNNEST(${teacher_ids}::uuid[])
-      ON CONFLICT (material_id, teacher_id) DO NOTHING
+    await sql`
+      DELETE FROM material_teacher_access
+      WHERE material_id = ${id}
     `
-  }
+
+    if (effectiveTeacherIds.length > 0) {
+      await sql`
+        INSERT INTO material_teacher_access (material_id, teacher_id)
+        SELECT ${id}::uuid, UNNEST(${effectiveTeacherIds}::uuid[])
+        ON CONFLICT (material_id, teacher_id) DO NOTHING
+      `
+    }
+  })
 
   await writeAuditLog({
     req,
@@ -208,7 +249,9 @@ export async function PUT(req: NextRequest, context: Ctx) {
       language,
       student_year,
       access_scope,
-      teacher_count: teacher_ids.length,
+      access_policy_version: accessPolicy?.version ?? null,
+      access_mode: accessPolicy?.mode ?? "legacy",
+      teacher_count: effectiveTeacherIds.length,
     },
   })
 

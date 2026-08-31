@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireTeacherApi } from "@/lib/auth/require"
 import { getDefaultTimezone } from "@/lib/timezones"
@@ -111,10 +111,13 @@ export async function GET(req: NextRequest) {
       CASE
         WHEN COALESCE(l.has_grades, TRUE) = FALSE THEN 0
         ELSE COUNT(*) FILTER (
-          WHERE e.c1 IS NOT NULL
-            AND e.c2 IS NOT NULL
-            AND e.c3 IS NOT NULL
-            AND e.c4 IS NOT NULL
+          WHERE e.attendance = 'absent'
+             OR (
+              e.c1 IS NOT NULL
+              AND e.c2 IS NOT NULL
+              AND e.c3 IS NOT NULL
+              AND e.c4 IS NOT NULL
+            )
         )::int
       END AS graded_entries_count,
       COUNT(ls.student_id)::int AS total_students,

@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireRestrictedAdminApi } from "@/lib/auth/restricted-admin-server"
 import { writeAuditLog } from "@/lib/audit"
@@ -24,7 +24,7 @@ import {
   replacePostRelations,
 } from "@/lib/blog-post-service"
 
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 function parseBoolean(value: unknown, fallback: boolean) {
   if (value === undefined) return fallback

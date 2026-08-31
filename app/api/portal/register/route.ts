@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import { writeAuditLog } from "@/lib/audit"
-import { ensureLgpdSchema, getActiveLgpdVersions, getRequestIp, LGPD_POLICY_TYPES } from "@/lib/lgpd"
+import {
+  ensureLgpdSchema,
+  getActiveLgpdVersions,
+  getRequestIp,
+  isLgpdSchemaNotReadyError,
+  LGPD_POLICY_TYPES,
+  LGPD_SCHEMA_NOT_READY_CODE,
+} from "@/lib/lgpd"
 
 type Country = "BR" | "UY" | "PY"
 
@@ -18,8 +25,6 @@ function getDocumentConfig(country: Country) {
 
 export async function POST(request: NextRequest) {
   try {
-    await ensureLgpdSchema()
-
     const body = await request.json()
 
     const name = String(body.name ?? "").trim()
@@ -111,6 +116,41 @@ export async function POST(request: NextRequest) {
         metadata: { reason: "already_exists", country, email },
       })
       return NextResponse.json({ error: "E-mail ou documento ja cadastrado" }, { status: 400 })
+    }
+
+    try {
+      await ensureLgpdSchema()
+    } catch (error) {
+      if (!isLgpdSchemaNotReadyError(error)) throw error
+
+      console.error(
+        `[register] ${error.message}. Execute scripts/031_lgpd_register_consents.sql no banco deste ambiente.`,
+      )
+      await writeAuditLog({
+        req: request,
+        action: "auth.register",
+        status: "failed",
+        metadata: {
+          reason: "lgpd_schema_not_ready",
+          country,
+          email,
+          missingRelations: error.missingRelations,
+        },
+      })
+
+      return NextResponse.json(
+        {
+          error:
+            country === "BR"
+              ? "Cadastro temporariamente indisponível. A configuração de privacidade está sendo atualizada."
+              : "Registro temporalmente no disponible. La configuración de privacidad se está actualizando.",
+          code: LGPD_SCHEMA_NOT_READY_CODE,
+        },
+        {
+          status: 503,
+          headers: { "Retry-After": "300" },
+        },
+      )
     }
 
     const passwordHash = await bcrypt.hash(password, 10)

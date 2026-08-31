@@ -3,7 +3,7 @@ import { db } from "@/lib/db"
 import { requireRestrictedAdminApi } from "@/lib/auth/restricted-admin-server"
 import { ensureBlogSchema, parsePagination } from "@/lib/blog"
 
-type Ctx = { params: Promise<{ id: string }> | { id: string } }
+type Ctx = { params: Promise<{ id: string }> }
 
 export async function GET(req: NextRequest, ctx: Ctx) {
   const admin = await requireRestrictedAdminApi()

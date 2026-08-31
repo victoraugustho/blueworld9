@@ -18,6 +18,20 @@ function docTypeForCountry(country: Country): DocType {
   return "CI_PY"
 }
 
+async function hasDownloadPermissionColumn() {
+  const [row] = await db`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'teachers'
+        AND column_name = 'can_download'
+    ) AS ready
+  `
+
+  return row?.ready === true
+}
+
 async function getTeacherWithTurmas(id: string) {
   const [teacher] = await db`
     SELECT
@@ -31,7 +45,10 @@ async function getTeacherWithTurmas(id: string) {
       document_number,
       approved,
       active,
-      can_download,
+      COALESCE(
+        NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean,
+        TRUE
+      ) AS can_download,
       created_at,
       updated_at
     FROM teachers
@@ -135,35 +152,65 @@ export async function PUT(req: NextRequest, context: Ctx) {
   const document_type: DocType = docTypeForCountry(country)
   const locale = country === "BR" ? "pt-BR" : "es"
 
-  const [teacherRow] = await db`
-    UPDATE teachers
-    SET
-      name = ${name},
-      email = ${email},
-      phone = ${phone},
-      country = ${country},
-      locale = ${locale},
-      document_type = ${document_type},
-      document_number = ${document_number},
-      approved = ${approved},
-      active = ${active},
-      can_download = ${can_download}
-    WHERE id = ${id}
-    RETURNING
-      id,
-      name,
-      email,
-      phone,
-      country,
-      locale,
-      document_type,
-      document_number,
-      approved,
-      active,
-      can_download,
-      created_at,
-      updated_at
-  `
+  const downloadPermissionReady = await hasDownloadPermissionColumn()
+  const [teacherRow] = downloadPermissionReady
+    ? await db`
+        UPDATE teachers
+        SET
+          name = ${name},
+          email = ${email},
+          phone = ${phone},
+          country = ${country},
+          locale = ${locale},
+          document_type = ${document_type},
+          document_number = ${document_number},
+          approved = ${approved},
+          active = ${active},
+          can_download = ${can_download}
+        WHERE id = ${id}
+        RETURNING
+          id,
+          name,
+          email,
+          phone,
+          country,
+          locale,
+          document_type,
+          document_number,
+          approved,
+          active,
+          can_download,
+          created_at,
+          updated_at
+      `
+    : await db`
+        UPDATE teachers
+        SET
+          name = ${name},
+          email = ${email},
+          phone = ${phone},
+          country = ${country},
+          locale = ${locale},
+          document_type = ${document_type},
+          document_number = ${document_number},
+          approved = ${approved},
+          active = ${active}
+        WHERE id = ${id}
+        RETURNING
+          id,
+          name,
+          email,
+          phone,
+          country,
+          locale,
+          document_type,
+          document_number,
+          approved,
+          active,
+          TRUE AS can_download,
+          created_at,
+          updated_at
+      `
 
   if (!teacherRow) {
     return NextResponse.json({ error: "Professor nao encontrado" }, { status: 404 })

@@ -14,7 +14,9 @@ export async function GET() {
       id, name, email, phone,
       avatar_url,
       country, locale, document_type, document_number,
-      approved, active, can_download, created_at, updated_at,
+      approved, active,
+      COALESCE(NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean, TRUE) AS can_download,
+      created_at, updated_at,
       COALESCE(
         (SELECT ARRAY_AGG(tc.category_id ORDER BY tc.category_id) FROM teacher_categories tc WHERE tc.teacher_id = teachers.id),
         ARRAY[]::int[]
@@ -41,7 +43,9 @@ export async function GET() {
       id, name, email, phone,
       avatar_url,
       country, locale, document_type, document_number,
-      approved, active, can_download, created_at, updated_at,
+      approved, active,
+      COALESCE(NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean, TRUE) AS can_download,
+      created_at, updated_at,
       COALESCE(
         (SELECT ARRAY_AGG(tc.category_id ORDER BY tc.category_id) FROM teacher_categories tc WHERE tc.teacher_id = teachers.id),
         ARRAY[]::int[]
@@ -68,7 +72,9 @@ export async function GET() {
       id, name, email, phone,
       avatar_url,
       country, locale, document_type, document_number,
-      approved, active, can_download, created_at, updated_at,
+      approved, active,
+      COALESCE(NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean, TRUE) AS can_download,
+      created_at, updated_at,
       COALESCE(
         (SELECT ARRAY_AGG(tc.category_id ORDER BY tc.category_id) FROM teacher_categories tc WHERE tc.teacher_id = teachers.id),
         ARRAY[]::int[]

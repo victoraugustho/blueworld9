@@ -50,7 +50,10 @@ export async function requireTeacherApi() {
       t.name,
       t.email,
       t.avatar_url,
-      t.can_download
+      COALESCE(
+        NULLIF(to_jsonb(t)->>'can_download', '')::boolean,
+        TRUE
+      ) AS can_download
     FROM teacher_sessions s
     JOIN teachers t ON t.id = s.teacher_id
     WHERE s.token_hash = ${tokenHash}

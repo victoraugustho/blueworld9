@@ -80,11 +80,11 @@ export function materialAccessSql(teacherId: string, legacyLocale: MaterialAcces
                 COALESCE(m.access_policy->>'match_strategy', 'all') = 'all'
                 AND (
                   jsonb_array_length(COALESCE(m.access_policy->'locales', '[]'::jsonb)) = 0
-                  OR COALESCE(m.access_policy->'locales', '[]'::jsonb) ? COALESCE((SELECT locale FROM teachers WHERE id = ${teacherId}), '')
+                  OR COALESCE(m.access_policy->'locales', '[]'::jsonb) ? COALESCE((SELECT locale::text FROM teachers WHERE id = ${teacherId}), '')
                 )
                 AND (
                   jsonb_array_length(COALESCE(m.access_policy->'countries', '[]'::jsonb)) = 0
-                  OR COALESCE(m.access_policy->'countries', '[]'::jsonb) ? COALESCE((SELECT country FROM teachers WHERE id = ${teacherId}), '')
+                  OR COALESCE(m.access_policy->'countries', '[]'::jsonb) ? COALESCE((SELECT country::text FROM teachers WHERE id = ${teacherId}), '')
                 )
                 AND (
                   jsonb_array_length(COALESCE(m.access_policy->'student_years', '[]'::jsonb)) = 0
@@ -118,11 +118,11 @@ export function materialAccessSql(teacherId: string, legacyLocale: MaterialAcces
                 AND (
                   (
                     jsonb_array_length(COALESCE(m.access_policy->'locales', '[]'::jsonb)) > 0
-                    AND COALESCE(m.access_policy->'locales', '[]'::jsonb) ? COALESCE((SELECT locale FROM teachers WHERE id = ${teacherId}), '')
+                    AND COALESCE(m.access_policy->'locales', '[]'::jsonb) ? COALESCE((SELECT locale::text FROM teachers WHERE id = ${teacherId}), '')
                   )
                   OR (
                     jsonb_array_length(COALESCE(m.access_policy->'countries', '[]'::jsonb)) > 0
-                    AND COALESCE(m.access_policy->'countries', '[]'::jsonb) ? COALESCE((SELECT country FROM teachers WHERE id = ${teacherId}), '')
+                    AND COALESCE(m.access_policy->'countries', '[]'::jsonb) ? COALESCE((SELECT country::text FROM teachers WHERE id = ${teacherId}), '')
                   )
                   OR EXISTS (
                     SELECT 1

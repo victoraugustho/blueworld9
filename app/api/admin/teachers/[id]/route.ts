@@ -3,6 +3,8 @@ import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
 import { ensureTurmasSchema, normalizeCategoryIds, normalizeStudentYears } from "@/lib/turmas"
+import { normalizeTeacherPortalPermissions } from "@/lib/auth/teacher-permissions"
+import { normalizeTeacherContentPermissions } from "@/lib/auth/teacher-content-permissions"
 
 type Country = "BR" | "UY" | "PY"
 type DocType = "CPF" | "CI_UY" | "CI_PY"
@@ -18,18 +20,23 @@ function docTypeForCountry(country: Country): DocType {
   return "CI_PY"
 }
 
-async function hasDownloadPermissionColumn() {
+async function getTeacherPermissionSchema() {
   const [row] = await db`
-    SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'teachers'
-        AND column_name = 'can_download'
-    ) AS ready
+    SELECT
+      BOOL_OR(column_name = 'can_download') AS has_download,
+      BOOL_OR(column_name = 'portal_permissions') AS has_permissions,
+      BOOL_OR(column_name = 'content_permissions') AS has_content_permissions
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'teachers'
+      AND column_name IN ('can_download', 'portal_permissions', 'content_permissions')
   `
 
-  return row?.ready === true
+  return {
+    hasDownload: row?.has_download === true,
+    hasPermissions: row?.has_permissions === true,
+    hasContentPermissions: row?.has_content_permissions === true,
+  }
 }
 
 async function getTeacherWithTurmas(id: string) {
@@ -49,6 +56,14 @@ async function getTeacherWithTurmas(id: string) {
         NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean,
         TRUE
       ) AS can_download,
+      COALESCE(
+        to_jsonb(teachers)->'portal_permissions',
+        '{"aulas":true,"agenda_notas":true,"materiais":true,"projetos":true,"ia":true}'::jsonb
+      ) AS portal_permissions,
+      COALESCE(
+        to_jsonb(teachers)->'content_permissions',
+        '{"aulas":{"mode":"inherit","category_ids":[],"item_ids":[]},"materiais":{"mode":"inherit","category_ids":[],"item_ids":[]},"projetos":{"mode":"inherit","category_ids":[],"item_ids":[]}}'::jsonb
+      ) AS content_permissions,
       created_at,
       updated_at
     FROM teachers
@@ -100,7 +115,7 @@ export async function GET(_req: NextRequest, context: Ctx) {
   const teacher = await getTeacherWithTurmas(id)
 
   if (!teacher) {
-    return NextResponse.json({ error: "Professor nao encontrado" }, { status: 404 })
+    return NextResponse.json({ error: "Professor não encontrado" }, { status: 404 })
   }
 
   return NextResponse.json(teacher)
@@ -128,13 +143,15 @@ export async function PUT(req: NextRequest, context: Ctx) {
   const approved = !!body.approved
   const active = body.active !== undefined ? !!body.active : true
   const can_download = body.can_download !== undefined ? !!body.can_download : true
+  const portal_permissions = normalizeTeacherPortalPermissions(body.portal_permissions)
+  const content_permissions = normalizeTeacherContentPermissions(body.content_permissions)
 
   if (!name || !email || !phone || !country || !document_number) {
     return NextResponse.json({ error: "Dados incompletos" }, { status: 400 })
   }
 
   if (!["BR", "UY", "PY"].includes(country)) {
-    return NextResponse.json({ error: "Pais invalido" }, { status: 400 })
+    return NextResponse.json({ error: "País inválido" }, { status: 400 })
   }
 
   if (category_ids.length > 0) {
@@ -145,75 +162,92 @@ export async function PUT(req: NextRequest, context: Ctx) {
     `
 
     if (validCategories.length !== category_ids.length) {
-      return NextResponse.json({ error: "Existe categoria invalida na selecao" }, { status: 400 })
+      return NextResponse.json({ error: "Existe categoria inválida na seleção" }, { status: 400 })
     }
   }
 
   const document_type: DocType = docTypeForCountry(country)
   const locale = country === "BR" ? "pt-BR" : "es"
 
-  const downloadPermissionReady = await hasDownloadPermissionColumn()
-  const [teacherRow] = downloadPermissionReady
-    ? await db`
-        UPDATE teachers
-        SET
-          name = ${name},
-          email = ${email},
-          phone = ${phone},
-          country = ${country},
-          locale = ${locale},
-          document_type = ${document_type},
-          document_number = ${document_number},
-          approved = ${approved},
-          active = ${active},
-          can_download = ${can_download}
-        WHERE id = ${id}
-        RETURNING
-          id,
-          name,
-          email,
-          phone,
-          country,
-          locale,
-          document_type,
-          document_number,
-          approved,
-          active,
-          can_download,
-          created_at,
-          updated_at
-      `
-    : await db`
-        UPDATE teachers
-        SET
-          name = ${name},
-          email = ${email},
-          phone = ${phone},
-          country = ${country},
-          locale = ${locale},
-          document_type = ${document_type},
-          document_number = ${document_number},
-          approved = ${approved},
-          active = ${active}
-        WHERE id = ${id}
-        RETURNING
-          id,
-          name,
-          email,
-          phone,
-          country,
-          locale,
-          document_type,
-          document_number,
-          approved,
-          active,
-          TRUE AS can_download,
-          created_at,
-          updated_at
-      `
+  const permissionSchema = await getTeacherPermissionSchema()
+  const [currentTeacher] = await db`
+    SELECT approved
+    FROM public.teachers
+    WHERE id = ${id}
+    LIMIT 1
+  `
+
+  if (!currentTeacher) {
+    return NextResponse.json({ error: "Professor não encontrado" }, { status: 404 })
+  }
+
+  const isNewApproval = currentTeacher.approved !== true && approved === true
+  if (
+    isNewApproval
+    && (
+      !permissionSchema.hasDownload
+      || !permissionSchema.hasPermissions
+      || !permissionSchema.hasContentPermissions
+    )
+  ) {
+    return NextResponse.json(
+      { error: "A estrutura de permissões ainda não foi instalada. Execute a migração 045 antes de aprovar o cadastro." },
+      { status: 409 },
+    )
+  }
+
+  const downloadUpdate = permissionSchema.hasDownload
+    ? db`, can_download = ${can_download}`
+    : db``
+  const permissionsUpdate = permissionSchema.hasPermissions
+    ? db`, portal_permissions = ${JSON.stringify(portal_permissions)}::jsonb`
+    : db``
+  const contentPermissionsUpdate = permissionSchema.hasContentPermissions
+    ? db`, content_permissions = ${JSON.stringify(content_permissions)}::jsonb`
+    : db``
+
+  const [teacherRow] = await db`
+    UPDATE teachers
+    SET
+      name = ${name},
+      email = ${email},
+      phone = ${phone},
+      country = ${country},
+      locale = ${locale},
+      document_type = ${document_type},
+      document_number = ${document_number},
+      approved = ${approved},
+      active = ${active}
+      ${downloadUpdate}
+      ${permissionsUpdate}
+      ${contentPermissionsUpdate}
+    WHERE id = ${id}
+    RETURNING
+      id,
+      name,
+      email,
+      phone,
+      country,
+      locale,
+      document_type,
+      document_number,
+      approved,
+      active,
+      COALESCE(NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean, TRUE) AS can_download,
+      COALESCE(
+        to_jsonb(teachers)->'portal_permissions',
+        '{"aulas":true,"agenda_notas":true,"materiais":true,"projetos":true,"ia":true}'::jsonb
+      ) AS portal_permissions,
+      COALESCE(
+        to_jsonb(teachers)->'content_permissions',
+        '{"aulas":{"mode":"inherit","category_ids":[],"item_ids":[]},"materiais":{"mode":"inherit","category_ids":[],"item_ids":[]},"projetos":{"mode":"inherit","category_ids":[],"item_ids":[]}}'::jsonb
+      ) AS content_permissions,
+      created_at,
+      updated_at
+  `
 
   if (!teacherRow) {
-    return NextResponse.json({ error: "Professor nao encontrado" }, { status: 404 })
+    return NextResponse.json({ error: "Professor não encontrado" }, { status: 404 })
   }
 
   await db`
@@ -270,6 +304,8 @@ export async function PUT(req: NextRequest, context: Ctx) {
       approved,
       active,
       can_download,
+      portal_permissions,
+      content_permissions,
       category_count: category_ids.length,
       turma_year_count: student_years.length,
     },
@@ -278,48 +314,15 @@ export async function PUT(req: NextRequest, context: Ctx) {
   return NextResponse.json(updated)
 }
 
-export async function PATCH(req: NextRequest, context: Ctx) {
+export async function PATCH(_req: NextRequest, context: Ctx) {
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
+  await context.params
 
-  await ensureTurmasSchema()
-
-  const resolved = await context.params
-  const id = String(resolved?.id ?? "").trim()
-
-  const [result] = await db`
-    UPDATE teachers
-    SET approved = TRUE
-    WHERE id = ${id}
-    RETURNING
-      id,
-      name,
-      email,
-      phone,
-      country,
-      locale,
-      document_type,
-      document_number,
-      approved,
-      active,
-      created_at,
-      updated_at
-  `
-
-  if (!result) {
-    return NextResponse.json({ error: "Professor nao encontrado" }, { status: 404 })
-  }
-
-  await writeAuditLog({
-    req,
-    action: "admin.teachers.approve",
-    status: "success",
-    actor: { id: admin.teacherId, email: admin.teacher.email, role: "admin", sessionId: admin.sessionId },
-    target: { type: "teacher", id },
-  })
-
-  const teacher = await getTeacherWithTurmas(id)
-  return NextResponse.json(teacher ?? result)
+  return NextResponse.json(
+    { error: "Use o fluxo de análise do cadastro para definir as permissões antes da aprovação." },
+    { status: 400 },
+  )
 }
 
 export async function DELETE(req: NextRequest, context: Ctx) {

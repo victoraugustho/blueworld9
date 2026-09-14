@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 import {
   ensureProjectsSchema,
   isUuid,
@@ -10,7 +10,7 @@ import { ensurePublishedProjectAccess } from "@/lib/project-access-server"
 type Ctx = { params: Promise<{ id: string }> }
 
 export async function GET(_: NextRequest, ctx: Ctx) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("projetos")
   if (!auth.ok) return auth.response
 
   await ensureProjectsSchema()
@@ -45,7 +45,7 @@ export async function GET(_: NextRequest, ctx: Ctx) {
 }
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("projetos")
   if (!auth.ok) return auth.response
 
   await ensureProjectsSchema()

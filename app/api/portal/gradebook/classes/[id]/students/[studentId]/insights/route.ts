@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 import { isAdminUser } from "@/lib/auth/authorization"
 import {
   ensureGradebookSchema,
@@ -58,7 +58,7 @@ export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; studentId: string }> },
 ) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
   const isAdmin = isAdminUser(auth.teacher)
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 import { isAdminUser } from "@/lib/auth/authorization"
 import { getDefaultTimezone } from "@/lib/timezones"
 import {
@@ -110,7 +110,7 @@ async function loadLinkedLessonLog(params: {
 }
 
 export async function GET(_req: NextRequest, ctx: Ctx) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
 
   await ensureGradebookSchema()
@@ -168,7 +168,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 }
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
 
   await ensureGradebookSchema()
@@ -379,7 +379,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, ctx: Ctx) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
 
   await ensureGradebookSchema()

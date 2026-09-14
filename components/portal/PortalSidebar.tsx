@@ -26,6 +26,7 @@ import {
   ArrowRightLeft,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import type { TeacherPortalPermissions } from "@/app/types/portal"
 
 type Locale = "pt-BR" | "es"
 
@@ -43,6 +44,7 @@ export function PortalSidebar({
   locale,
   teacher,
   systemVersion,
+  portalPermissions,
   logoSrc = "/webp/logo-branca-bw9.webp", // garanta que exista em /public ou altere
 }: {
   isAdmin: boolean
@@ -51,6 +53,7 @@ export function PortalSidebar({
   locale: Locale
   teacher?: TeacherMini
   systemVersion?: string
+  portalPermissions?: TeacherPortalPermissions
   logoSrc?: string
 }) {
   const pathname = usePathname()
@@ -99,15 +102,19 @@ export function PortalSidebar({
 
   const teacherMenu = useMemo(
     () => [
-      { href: "/portal/dashboard", label: t.menu.home, icon: Home },
-      { href: "/portal/dashboard/aulas", label: t.menu.aulas, icon: BookOpen },
-      { href: "/portal/dashboard/notas/lancamentos", label: t.menu.agenda, icon: CalendarDays },
-      { href: "/portal/dashboard/materiais", label: t.menu.materiais, icon: FileText },
-      { href: "/portal/dashboard/projetos", label: t.menu.projetos, icon: FolderKanban },
-      { href: "/portal/dashboard/ia", label: t.menu.ai, icon: Sparkles },
-    ],
+      { href: "/portal/dashboard", label: t.menu.home, icon: Home, permission: null },
+      { href: "/portal/dashboard/aulas", label: t.menu.aulas, icon: BookOpen, permission: "aulas" as const },
+      { href: "/portal/dashboard/notas/lancamentos", label: t.menu.agenda, icon: CalendarDays, permission: "agenda_notas" as const },
+      { href: "/portal/dashboard/materiais", label: t.menu.materiais, icon: FileText, permission: "materiais" as const },
+      { href: "/portal/dashboard/projetos", label: t.menu.projetos, icon: FolderKanban, permission: "projetos" as const },
+      { href: "/portal/dashboard/ia", label: t.menu.ai, icon: Sparkles, permission: "ia" as const },
+    ].filter((item) => (
+      item.permission === null
+      || isAdmin
+      || portalPermissions?.[item.permission] !== false
+    )),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [locale]
+    [locale, isAdmin, portalPermissions]
   )
 
   const adminMenu = useMemo(

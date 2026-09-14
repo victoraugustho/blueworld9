@@ -4,6 +4,16 @@ import { db } from "@/lib/db"
 import { SESSION_COOKIE } from "@/lib/auth/constants"
 import { hashSessionToken } from "@/lib/auth/session"
 import { isAdminUser } from "@/lib/auth/authorization"
+import {
+  hasTeacherPortalPermission,
+  normalizeTeacherPortalPermissions,
+  type TeacherPortalPermissionKey,
+  type TeacherPortalPermissions,
+} from "@/lib/auth/teacher-permissions"
+import {
+  normalizeTeacherContentPermissions,
+  type TeacherContentPermissions,
+} from "@/lib/auth/teacher-content-permissions"
 
 type TeacherRow = {
   id: string
@@ -18,6 +28,8 @@ type TeacherRow = {
   is_admin: boolean | null
   avatar_url: string | null
   can_download: boolean
+  portal_permissions: TeacherPortalPermissions
+  content_permissions: TeacherContentPermissions
 }
 
 export async function getTeacherFromSession() {
@@ -43,7 +55,15 @@ export async function getTeacherFromSession() {
       COALESCE(
         NULLIF(to_jsonb(t)->>'can_download', '')::boolean,
         TRUE
-      ) AS can_download
+      ) AS can_download,
+      COALESCE(
+        to_jsonb(t)->'portal_permissions',
+        '{"aulas":true,"agenda_notas":true,"materiais":true,"projetos":true,"ia":true}'::jsonb
+      ) AS portal_permissions,
+      COALESCE(
+        to_jsonb(t)->'content_permissions',
+        '{"aulas":{"mode":"inherit","category_ids":[],"item_ids":[]},"materiais":{"mode":"inherit","category_ids":[],"item_ids":[]},"projetos":{"mode":"inherit","category_ids":[],"item_ids":[]}}'::jsonb
+      ) AS content_permissions
     FROM teacher_sessions s
     JOIN teachers t ON t.id = s.teacher_id
     WHERE s.token_hash = ${tokenHash}
@@ -54,7 +74,19 @@ export async function getTeacherFromSession() {
   if (row.revoked_at) return null
   if (new Date(row.session_expires_at).getTime() <= Date.now()) return null
 
-  return row as TeacherRow
+  return {
+    ...row,
+    portal_permissions: normalizeTeacherPortalPermissions(row.portal_permissions),
+    content_permissions: normalizeTeacherContentPermissions(row.content_permissions),
+  } as TeacherRow
+}
+
+export async function requireTeacherPermissionPage(permission: TeacherPortalPermissionKey) {
+  const teacher = await requireTeacherPage()
+  if (!hasTeacherPortalPermission(teacher, permission)) {
+    redirect("/portal/dashboard?acesso=negado")
+  }
+  return teacher
 }
 
 export async function requireTeacherPage() {

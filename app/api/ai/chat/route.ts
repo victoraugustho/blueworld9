@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import OpenAI from "openai"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 
 type Role = "user" | "assistant" | "system"
 type Locale = "pt-BR" | "es"
@@ -122,7 +122,7 @@ async function maybeUpdateSummary(conversationId: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireTeacherApi()
+    const auth = await requireTeacherPermissionApi("ia")
     if (!auth.ok) return auth.response
     const teacherId = auth.teacherId
 

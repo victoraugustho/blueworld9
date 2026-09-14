@@ -6,6 +6,7 @@ import {
   isProjectCategoryAccessReady,
   loadTeacherScopeData,
 } from "@/lib/projects"
+import { resolveTeacherContentAccess } from "@/lib/auth/teacher-content-permissions"
 
 export async function ensurePublishedProjectAccess(
   projectId: string,
@@ -84,6 +85,30 @@ export async function ensurePublishedProjectAccess(
     canTeacherAccessProject,
   )
 
-  if (!canAccess) return { ok: false as const, code: 403 as const }
+  const [teacherAccess] = await db`
+    SELECT
+      role,
+      is_admin,
+      COALESCE(
+        to_jsonb(teachers)->'content_permissions',
+        '{"aulas":{"mode":"inherit","category_ids":[],"item_ids":[]},"materiais":{"mode":"inherit","category_ids":[],"item_ids":[]},"projetos":{"mode":"inherit","category_ids":[],"item_ids":[]}}'::jsonb
+      ) AS content_permissions
+    FROM public.teachers
+    WHERE id = ${teacher.id}
+    LIMIT 1
+  `
+  const hasEffectiveAccess = teacherAccess
+    ? resolveTeacherContentAccess(
+        teacherAccess,
+        "projetos",
+        canAccess,
+        project.id,
+        project.category_id,
+      )
+    : false
+
+  if (!hasEffectiveAccess) {
+    return { ok: false as const, code: 403 as const }
+  }
   return { ok: true as const, project }
 }

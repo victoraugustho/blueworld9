@@ -5,8 +5,12 @@ import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import type { Category, Teacher } from "@/app/types/portal"
+import type { Category, Teacher, TeacherPortalPermissionKey } from "@/app/types/portal"
 import { TURMA_YEAR_OPTIONS } from "@/lib/turma-years"
+import {
+  DEFAULT_CONTENT_PERMISSIONS,
+  TeacherContentPermissionsEditor,
+} from "../TeacherContentPermissionsEditor"
 
 function normalizeSearch(value: string) {
   return value.trim().toLowerCase()
@@ -46,6 +50,18 @@ export default function EditTeacherPage({
               student_years: Array.isArray(teacherData.student_years)
                 ? teacherData.student_years.map((value: any) => Number(value))
                 : [],
+              portal_permissions: {
+                aulas: teacherData.portal_permissions?.aulas !== false,
+                agenda_notas: teacherData.portal_permissions?.agenda_notas !== false,
+                materiais: teacherData.portal_permissions?.materiais !== false,
+                projetos: teacherData.portal_permissions?.projetos !== false,
+                ia: teacherData.portal_permissions?.ia !== false,
+              },
+              content_permissions: {
+                aulas: { ...DEFAULT_CONTENT_PERMISSIONS.aulas, ...(teacherData.content_permissions?.aulas ?? {}) },
+                materiais: { ...DEFAULT_CONTENT_PERMISSIONS.materiais, ...(teacherData.content_permissions?.materiais ?? {}) },
+                projetos: { ...DEFAULT_CONTENT_PERMISSIONS.projetos, ...(teacherData.content_permissions?.projetos ?? {}) },
+              },
             }
           : null
       )
@@ -71,6 +87,24 @@ export default function EditTeacherPage({
     else current.add(studentYear)
 
     setTeacher({ ...teacher, student_years: Array.from(current).sort((a, b) => a - b) })
+  }
+
+  function togglePortalPermission(permission: TeacherPortalPermissionKey) {
+    if (!teacher) return
+    const current = teacher.portal_permissions ?? {
+      aulas: true,
+      agenda_notas: true,
+      materiais: true,
+      projetos: true,
+      ia: true,
+    }
+    setTeacher({
+      ...teacher,
+      portal_permissions: {
+        ...current,
+        [permission]: !current[permission],
+      },
+    })
   }
 
   async function save(e: React.FormEvent) {
@@ -316,6 +350,52 @@ export default function EditTeacherPage({
                 </p>
               </div>
             </div>
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-white/15 bg-slate-950/30 p-4">
+            <div>
+              <Label className="text-white">Módulos liberados para o professor</Label>
+              <p className="mt-1 text-xs text-slate-300">
+                O papel administrativo não pode ser alterado nesta página.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {([
+                ["aulas", "Aulas em vídeo"],
+                ["agenda_notas", "Agenda + Notas"],
+                ["materiais", "Materiais"],
+                ["projetos", "Projetos"],
+                ["ia", "Assistente de IA"],
+              ] as Array<[TeacherPortalPermissionKey, string]>).map(([permission, label]) => (
+                <label
+                  key={permission}
+                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white hover:bg-white/10"
+                >
+                  <input
+                    type="checkbox"
+                    checked={teacher.portal_permissions?.[permission] !== false}
+                    onChange={() => togglePortalPermission(permission)}
+                    className="h-4 w-4 accent-cyan-500"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-white/15 bg-slate-950/30 p-4">
+            <div>
+              <Label className="text-white">Categorias e conteúdos liberados</Label>
+              <p className="mt-1 text-xs text-slate-300">
+                Use o modo específico somente quando este professor precisar de uma seleção diferente das regras atuais.
+              </p>
+            </div>
+            <TeacherContentPermissionsEditor
+              value={teacher.content_permissions ?? DEFAULT_CONTENT_PERMISSIONS}
+              onChange={(content_permissions) => setTeacher({ ...teacher, content_permissions })}
+              portalPermissions={teacher.portal_permissions}
+              disabled={saving}
+            />
           </div>
 
           <div className="text-sm text-slate-300 pt-2">

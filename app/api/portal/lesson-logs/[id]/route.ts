@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
 
 function isValidDate(value: string) {
@@ -23,7 +23,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: RouteParams | Promise<RouteParams> },
 ) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
 
   const { id } = await params

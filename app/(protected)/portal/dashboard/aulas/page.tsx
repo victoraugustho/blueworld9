@@ -3,7 +3,12 @@ import { requireTeacherPage } from "@/lib/auth/server"
 import { ensureTurmasSchema } from "@/lib/turmas"
 import AulasCategories from "./AulasCategories"
 import { getEffectivePortalLocale } from "@/lib/portal-locale"
-import { isMaterialAccessPolicyReady, materialAccessSql } from "@/lib/material-access"
+import {
+  isMaterialAccessPolicyReady,
+  materialAccessSql,
+  materialContentAccessSql,
+} from "@/lib/material-access"
+import { isAdminUser } from "@/lib/auth/authorization"
 
 export default async function AulasPage() {
   const teacher = await requireTeacherPage()
@@ -43,6 +48,11 @@ export default async function AulasPage() {
           WHERE mta.material_id = m.id AND mta.teacher_id = ${teacher.id}
         ))
       `
+  const contentAccess = materialContentAccessSql(
+    teacher.id,
+    "aulas",
+    isAdminUser(teacher),
+  )
 
   const rows = await db`
     SELECT m.*, c.name AS category_name, p.progress_percent, p.watched_at
@@ -51,7 +61,10 @@ export default async function AulasPage() {
     LEFT JOIN teacher_video_progress p
       ON p.material_id = m.id AND p.teacher_id = ${teacher.id}
     WHERE m.file_type = 'video'
-      AND ${accessFilter}
+      AND (
+        (${contentAccess.isSpecific} AND ${contentAccess.isSelected})
+        OR (NOT (${contentAccess.isSpecific}) AND (${accessFilter}))
+      )
     ORDER BY c.name ASC NULLS LAST, m.created_at ASC
   `
 

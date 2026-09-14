@@ -1,11 +1,11 @@
 ﻿import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
 import { ensureGradebookSchema, isUuid } from "@/lib/gradebook"
 
 export async function GET() {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
 
   await ensureGradebookSchema()
@@ -21,7 +21,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
 
   await ensureGradebookSchema()

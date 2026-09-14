@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 import { isAdminUser } from "@/lib/auth/authorization"
 import {
   ensureGradebookSchema,
@@ -27,7 +27,7 @@ async function loadStudent(studentId: string) {
 }
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
   const isAdmin = isAdminUser(auth.teacher)
   if (!isAdmin) {
@@ -82,7 +82,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 }
 
 export async function DELETE(_req: NextRequest, ctx: Ctx) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
   const isAdmin = isAdminUser(auth.teacher)
   if (!isAdmin) {

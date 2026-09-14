@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
 import { getDefaultTimezone } from "@/lib/timezones"
 import {
@@ -46,7 +46,7 @@ function inferBimesterFromDate(value: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
 
   await ensureGradebookSchema()
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
 
   await ensureGradebookSchema()

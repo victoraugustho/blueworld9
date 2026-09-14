@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 
 const WATCH_THRESHOLD = 70
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireTeacherApi()
+    const auth = await requireTeacherPermissionApi("aulas")
     if (!auth.ok) return auth.response
 
     const body = await req.json()

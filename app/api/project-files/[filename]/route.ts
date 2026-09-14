@@ -1,7 +1,7 @@
 import path from "node:path"
 import { access, constants, readdir, readFile } from "node:fs/promises"
 import { NextRequest, NextResponse } from "next/server"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 import { isAdminUser } from "@/lib/auth/authorization"
 import { canManageProjects } from "@/lib/auth/project-admin"
 import { db } from "@/lib/db"
@@ -12,6 +12,7 @@ import {
   loadTeacherScopeData,
 } from "@/lib/projects"
 import { canTeacherAccessProjectWithCategory } from "@/lib/project-category-access"
+import { resolveTeacherContentAccess } from "@/lib/auth/teacher-content-permissions"
 
 export const runtime = "nodejs"
 
@@ -125,7 +126,7 @@ async function resolveFileByFilename(filename: string) {
   return null
 }
 
-async function canReadProjectFile(filename: string, auth: Awaited<ReturnType<typeof requireTeacherApi>>) {
+async function canReadProjectFile(filename: string, auth: Awaited<ReturnType<typeof requireTeacherPermissionApi>>) {
   if (!auth.ok) return false
   if (isAdminUser(auth.teacher) && canManageProjects(auth.teacherId)) return true
 
@@ -151,6 +152,7 @@ async function canReadProjectFile(filename: string, auth: Awaited<ReturnType<typ
     projects = await db`
       SELECT DISTINCT
         p.id,
+        p.category_id,
         p.locale,
         p.access_scope,
         p.target_teacher_ids,
@@ -181,6 +183,7 @@ async function canReadProjectFile(filename: string, auth: Awaited<ReturnType<typ
     projects = await db`
       SELECT DISTINCT
         p.id,
+        p.category_id,
         p.locale,
         p.access_scope,
         p.target_teacher_ids,
@@ -210,8 +213,8 @@ async function canReadProjectFile(filename: string, auth: Awaited<ReturnType<typ
 
   const scope = await loadTeacherScopeData(auth.teacherId)
 
-  return projects.some((project) =>
-    canTeacherAccessProjectWithCategory(
+  return projects.some((project) => {
+    const allowedByCurrentPolicy = canTeacherAccessProjectWithCategory(
       project as any,
       {
         access_scope: project.category_access_scope,
@@ -227,12 +230,20 @@ async function canReadProjectFile(filename: string, auth: Awaited<ReturnType<typ
         classIds: scope.classIds,
       },
       canTeacherAccessProject,
-    ),
-  )
+    )
+
+    return resolveTeacherContentAccess(
+      auth.teacher,
+      "projetos",
+      allowedByCurrentPolicy,
+      project.id,
+      project.category_id,
+    )
+  })
 }
 
 export async function GET(_: NextRequest, ctx: { params: Promise<{ filename: string }> }) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("projetos")
   if (!auth.ok) return auth.response
 
   const { filename } = await ctx.params

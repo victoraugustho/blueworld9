@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button"
 import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
 import type { Teacher } from "@/app/types/portal"
 import {
+  TeacherApprovalDialog,
+  type TeacherApprovalDecision,
+  type TeacherApprovalPayload,
+} from "./TeacherApprovalDialog"
+import {
   Search,
   X,
   Info,
@@ -126,6 +131,9 @@ export default function AdminTeachersPage() {
   const [data, setData] = useState<TeachersGrouped>({ approved: [], pending: [], disabled: [] })
   const [activeTab, setActiveTab] = useState<Tab>("approved")
   const [loading, setLoading] = useState(true)
+  const [approvalTeacher, setApprovalTeacher] = useState<Teacher | null>(null)
+  const [approvalBusy, setApprovalBusy] = useState(false)
+  const [approvalError, setApprovalError] = useState("")
 
   const [query, setQuery] = useState("")
 
@@ -151,20 +159,33 @@ export default function AdminTeachersPage() {
     load()
   }, [])
 
-  async function approve(teacher: Teacher) {
-    const ok = await confirm({
-      title: "Aprovar professor",
-      description: `Confirma a aprovação do acesso de ${teacher.name}?`,
-      confirmText: "Aprovar",
-    })
-    if (!ok) return
+  function openApproval(teacher: Teacher) {
+    setApprovalTeacher(teacher)
+    setApprovalError("")
+  }
 
-    const res = await fetch(`/api/admin/teachers/${teacher.id}/approve`, { method: "PATCH" })
+  async function decideRegistration(
+    decision: TeacherApprovalDecision,
+    payload: TeacherApprovalPayload,
+  ) {
+    if (!approvalTeacher || approvalBusy) return
+
+    setApprovalBusy(true)
+    setApprovalError("")
+    const res = await fetch(`/api/admin/teachers/${approvalTeacher.id}/approve`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision, ...payload }),
+    })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      alert(data?.error ?? "Não foi possível aprovar o professor.")
+      setApprovalError(data?.error ?? "Não foi possível salvar a decisão.")
+      setApprovalBusy(false)
       return
     }
+
+    setApprovalTeacher(null)
+    setApprovalBusy(false)
     await load()
   }
 
@@ -429,8 +450,8 @@ export default function AdminTeachersPage() {
 
                             {activeTab === "pending" && (
                               <IconButton
-                                title="Aprovar"
-                                onClick={() => approve(t)}
+                                title="Analisar cadastro e permissões"
+                                onClick={() => openApproval(t)}
                                 className="border-green-500/20 bg-green-500/10 hover:bg-green-500/15 text-green-200"
                               >
                                 <CheckCircle2 className="w-4 h-4" />
@@ -465,6 +486,18 @@ export default function AdminTeachersPage() {
           })}
         </div>
       )}
+      <TeacherApprovalDialog
+        teacher={approvalTeacher}
+        open={approvalTeacher !== null}
+        busy={approvalBusy}
+        error={approvalError}
+        onClose={() => {
+          if (approvalBusy) return
+          setApprovalTeacher(null)
+          setApprovalError("")
+        }}
+        onDecision={decideRegistration}
+      />
       {confirmDialog}
     </div>
   )

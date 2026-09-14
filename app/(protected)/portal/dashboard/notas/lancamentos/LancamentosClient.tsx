@@ -14,6 +14,8 @@ import {
   ChevronUp,
   ClipboardCheck,
   Eye,
+  FileText,
+  NotebookTabs,
   Pencil,
   RefreshCcw,
   Save,
@@ -41,6 +43,7 @@ type WorkspaceTab = "agenda" | "lancamentos" | "turmas"
 type ShiftPeriod = "morning" | "afternoon"
 type ScoreField = "c1" | "c2" | "c3" | "c4"
 type TurmaScoreField = "exam_score" | "c5_score" | "manual_final_score"
+type ExportReport = "grades" | "complete"
 
 type TurmaSummaryRow = {
   student_id: string
@@ -394,6 +397,8 @@ export default function LancamentosClient({
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [pendingExportFormat, setPendingExportFormat] = useState<"" | "xlsx" | "pdf">("")
   const [exportBimesterChoice, setExportBimesterChoice] = useState(1)
+  const [exportReportChoice, setExportReportChoice] = useState<ExportReport>("grades")
+  const [exportIncludeLessonGrades, setExportIncludeLessonGrades] = useState(true)
   const [resolvingClassBimester, setResolvingClassBimester] = useState(false)
   const [formFeedbackModalOpen, setFormFeedbackModalOpen] = useState(false)
   const [quickLaunchCloseWarningOpen, setQuickLaunchCloseWarningOpen] = useState(false)
@@ -1078,6 +1083,8 @@ export default function LancamentosClient({
   async function exportClassGrades(
     format: "xlsx" | "pdf",
     targetBimesterOverride?: number,
+    report: ExportReport = "grades",
+    includeLessonGrades = true,
   ) {
     if (!selectedClassId) return false
     const targetExportBimester = Math.max(
@@ -1088,7 +1095,7 @@ export default function LancamentosClient({
     setError("")
     try {
       const res = await fetch(
-        `/api/portal/gradebook/classes/${selectedClassId}/export?format=${format}&bimester=${targetExportBimester}&schoolYear=${schoolYear}`,
+        `/api/portal/gradebook/classes/${selectedClassId}/export?format=${format}&bimester=${targetExportBimester}&schoolYear=${schoolYear}&report=${report}&includeLessonGrades=${includeLessonGrades ? "1" : "0"}`,
       )
       if (!res.ok) {
         const data = await res.json().catch(() => null)
@@ -1104,7 +1111,9 @@ export default function LancamentosClient({
       const blob = await res.blob()
       const contentDisposition = res.headers.get("content-disposition") || ""
       const match = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
-      const fallback = `turma-b${targetExportBimester}-${schoolYear}.${format}`
+      const fallback = `turma-b${targetExportBimester}-${schoolYear}${
+        report === "complete" ? "-relatorio-completo" : ""
+      }.${format}`
       const filename = match?.[1] || fallback
 
       const url = window.URL.createObjectURL(blob)
@@ -1125,12 +1134,19 @@ export default function LancamentosClient({
     if (!selectedClassId) return
     setPendingExportFormat(format)
     setExportBimesterChoice(Math.max(1, Math.min(4, Number(bimester || 1))))
+    setExportReportChoice("grades")
+    setExportIncludeLessonGrades(true)
     setExportModalOpen(true)
   }
 
   async function confirmExportFromModal() {
     if (!pendingExportFormat) return
-    const ok = await exportClassGrades(pendingExportFormat, exportBimesterChoice)
+    const ok = await exportClassGrades(
+      pendingExportFormat,
+      exportBimesterChoice,
+      exportReportChoice,
+      exportIncludeLessonGrades,
+    )
     if (ok) {
       setExportModalOpen(false)
       setPendingExportFormat("")
@@ -3320,7 +3336,7 @@ export default function LancamentosClient({
       ) : null}
 
       {canDownload && exportModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
           <button
             type="button"
             onClick={() => {
@@ -3331,10 +3347,22 @@ export default function LancamentosClient({
             className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
             aria-label={isEs ? "Cerrar" : "Fechar"}
           />
-          <Card className="relative z-10 w-full max-w-md bg-slate-900/95 border border-white/10 text-white">
-            <CardHeader className="border-b border-white/10">
+          <Card className="relative z-10 flex max-h-[calc(100vh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-cyan-300/15 bg-slate-900/95 text-white shadow-2xl shadow-slate-950/60 backdrop-blur-xl sm:max-h-[calc(100vh-2rem)]">
+            <CardHeader className="border-b border-white/10 bg-gradient-to-r from-cyan-500/10 via-slate-900/40 to-emerald-500/10 px-4 py-3 sm:px-5">
               <CardTitle className="flex items-center justify-between gap-3">
-                <span>{isEs ? "Exportar turma" : "Exportar turma"}</span>
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-400/10">
+                    <FileText className="h-4 w-4 text-cyan-200" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-base font-semibold text-white sm:text-lg">
+                      {isEs ? "Crear informe" : "Criar relatório"}
+                    </span>
+                    <span className="block text-xs font-normal text-slate-400">
+                      {isEs ? "Configure el archivo antes de exportar" : "Configure o arquivo antes de exportar"}
+                    </span>
+                  </span>
+                </span>
                 <Button
                   type="button"
                   onClick={() => {
@@ -3342,45 +3370,118 @@ export default function LancamentosClient({
                     setExportModalOpen(false)
                     setPendingExportFormat("")
                   }}
-                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                  aria-label={isEs ? "Cerrar" : "Fechar"}
+                  className="h-9 w-9 shrink-0 border border-white/10 bg-white/5 p-0 hover:bg-white/10"
                   disabled={!!exportingFormat}
                 >
-                  <X className="w-4 h-4 mr-2" />
-                  {isEs ? "Cerrar" : "Fechar"}
+                  <X className="h-4 w-4" />
                 </Button>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              <div className="space-y-1">
-                <p className="text-sm text-slate-200">
-                  {selectedClass?.name ?? (isEs ? "Turma seleccionada" : "Turma selecionada")}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {pendingExportFormat === "pdf"
-                    ? isEs
-                      ? "Formato: PDF"
-                      : "Formato: PDF"
-                    : isEs
-                      ? "Formato: XLSX"
-                      : "Formato: XLSX"}
-                </p>
+            <CardContent className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
+                <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                  <span className="min-w-0">
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      {isEs ? "Grupo" : "Turma"}
+                    </span>
+                    <span className="block truncate text-sm font-semibold text-slate-100">
+                      {selectedClass?.name ?? (isEs ? "Grupo seleccionado" : "Turma selecionada")}
+                    </span>
+                  </span>
+                  <span className="shrink-0 rounded-lg border border-cyan-300/20 bg-cyan-400/10 px-2 py-1 text-[10px] font-bold tracking-wider text-cyan-200">
+                    {pendingExportFormat === "pdf" ? "PDF" : "XLSX"}
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-300">
+                    {isEs ? "Bimestre" : "Bimestre"}
+                  </Label>
+                  <select
+                    value={exportBimesterChoice}
+                    onChange={(e) => setExportBimesterChoice(Number(e.target.value || 1))}
+                    className="h-9 w-full rounded-lg border border-slate-700 bg-slate-800/80 px-3 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/10"
+                  >
+                    <option value={1}>{isEs ? "Bimestre 1" : "Bimestre 1"}</option>
+                    <option value={2}>{isEs ? "Bimestre 2" : "Bimestre 2"}</option>
+                    <option value={3}>{isEs ? "Bimestre 3" : "Bimestre 3"}</option>
+                    <option value={4}>{isEs ? "Bimestre 4" : "Bimestre 4"}</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-white">{isEs ? "Bimestre para exportar" : "Bimestre para exportar"}</Label>
-                <select
-                  value={exportBimesterChoice}
-                  onChange={(e) => setExportBimesterChoice(Number(e.target.value || 1))}
-                  className="w-full h-10 rounded-md border border-slate-700 bg-slate-800/70 px-3 text-white"
-                >
-                  <option value={1}>{isEs ? "Bimestre 1" : "Bimestre 1"}</option>
-                  <option value={2}>{isEs ? "Bimestre 2" : "Bimestre 2"}</option>
-                  <option value={3}>{isEs ? "Bimestre 3" : "Bimestre 3"}</option>
-                  <option value={4}>{isEs ? "Bimestre 4" : "Bimestre 4"}</option>
-                </select>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-300">
+                  {isEs ? "Contenido del informe" : "Conteúdo do relatório"}
+                </Label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    aria-pressed={exportReportChoice === "grades"}
+                    onClick={() => setExportReportChoice("grades")}
+                    className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                      exportReportChoice === "grades"
+                        ? "border-cyan-400/50 bg-cyan-500/15 text-white"
+                        : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <FileText className="h-4 w-4 text-cyan-300" />
+                      {isEs ? "Resumen de notas" : "Resumo de notas"}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] leading-snug text-slate-400">
+                      {isEs
+                        ? "Notas finales, asistencia y observaciones del bimestre."
+                        : "Notas finais, frequência e observações do bimestre."}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    aria-pressed={exportReportChoice === "complete"}
+                    onClick={() => setExportReportChoice("complete")}
+                    className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                      exportReportChoice === "complete"
+                        ? "border-emerald-400/50 bg-emerald-500/15 text-white"
+                        : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <NotebookTabs className="h-4 w-4 text-emerald-300" />
+                      {isEs ? "Informe completo" : "Relatório completo"}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] leading-snug text-slate-400">
+                      {isEs
+                        ? "Incluye notas, historial, diario y observaciones de cada clase."
+                        : "Inclui notas, histórico, diário e observações de cada aula."}
+                    </span>
+                  </button>
+                </div>
+
+                {exportReportChoice === "complete" ? (
+                  <label className="mt-2 flex cursor-pointer items-center gap-3 rounded-xl border border-emerald-300/15 bg-emerald-400/[0.06] px-3 py-2.5 transition hover:bg-emerald-400/10">
+                    <input
+                      type="checkbox"
+                      checked={exportIncludeLessonGrades}
+                      onChange={(event) => setExportIncludeLessonGrades(event.target.checked)}
+                      className="h-4 w-4 shrink-0 accent-emerald-500"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-white">
+                        {isEs ? "Incluir notas de cada clase" : "Incluir notas de cada aula"}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] leading-snug text-slate-400">
+                        {isEs
+                          ? "Agrega asistencia, C1–C4, promedio y observación individual por alumno."
+                          : "Adiciona presença, C1–C4, média e observação individual por aluno."}
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
               </div>
 
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-2 border-t border-white/10 pt-3">
                 <Button
                   type="button"
                   onClick={() => {
@@ -3388,7 +3489,7 @@ export default function LancamentosClient({
                     setExportModalOpen(false)
                     setPendingExportFormat("")
                   }}
-                  className="bg-white/10 hover:bg-white/15 border border-white/10"
+                  className="h-9 border border-white/10 bg-white/5 px-4 text-sm hover:bg-white/10"
                   disabled={!!exportingFormat}
                 >
                   {isEs ? "Cancelar" : "Cancelar"}
@@ -3396,7 +3497,7 @@ export default function LancamentosClient({
                 <Button
                   type="button"
                   onClick={() => void confirmExportFromModal()}
-                  className="bg-cyan-600 hover:bg-cyan-700"
+                  className="h-9 bg-cyan-600 px-4 text-sm shadow-lg shadow-cyan-950/30 hover:bg-cyan-500"
                   disabled={!pendingExportFormat || !!exportingFormat}
                 >
                   {exportingFormat
@@ -3404,8 +3505,8 @@ export default function LancamentosClient({
                       ? "Exportando..."
                       : "Exportando..."
                     : isEs
-                      ? "Exportar"
-                      : "Exportar"}
+                      ? "Generar informe"
+                      : "Gerar relatório"}
                 </Button>
               </div>
             </CardContent>

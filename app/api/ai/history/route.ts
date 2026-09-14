@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 
 export async function GET() {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("ia")
   if (!auth.ok) return auth.response
   const teacherId = auth.teacherId
 

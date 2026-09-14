@@ -59,6 +59,15 @@ export interface Material {
 export type TeacherCountry = "BR" | "UY" | "PY"
 export type TeacherLocale = "pt-BR" | "es"
 export type TeacherDocumentType = "CPF" | "CI_UY" | "CI_PY"
+export type TeacherPortalPermissionKey = "aulas" | "agenda_notas" | "materiais" | "projetos" | "ia"
+export type TeacherPortalPermissions = Record<TeacherPortalPermissionKey, boolean>
+export type TeacherContentArea = "aulas" | "materiais" | "projetos"
+export type TeacherContentScope = {
+  mode: "inherit" | "specific"
+  category_ids: string[]
+  item_ids: string[]
+}
+export type TeacherContentPermissions = Record<TeacherContentArea, TeacherContentScope>
 
 export interface Teacher {
   id: string
@@ -73,6 +82,8 @@ export interface Teacher {
   approved: boolean
   active?: boolean
   can_download?: boolean
+  portal_permissions?: TeacherPortalPermissions
+  content_permissions?: TeacherContentPermissions
   created_at?: string
   updated_at?: string
   role?: string | null

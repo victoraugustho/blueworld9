@@ -23,6 +23,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         canAccessProjectsAdminArea={canAccessProjectsAdminArea}
         locale={locale}
         systemVersion={systemVersion}
+        portalPermissions={teacher.portal_permissions}
         teacher={{
           name: teacher.name,
           avatarUrl: teacher.avatar_url ?? null,

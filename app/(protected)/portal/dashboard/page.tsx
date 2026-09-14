@@ -2,6 +2,7 @@ import { getEffectivePortalLocale } from "@/lib/portal-locale"
 import Link from "next/link"
 import { db } from "@/lib/db"
 import { requireTeacherPage } from "@/lib/auth/server"
+import { hasTeacherPortalPermission } from "@/lib/auth/teacher-permissions"
 import { getDefaultTimezone } from "@/lib/timezones"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -132,7 +133,10 @@ function findNextSchedule(schedules: ScheduleRow[], fallbackTimezone: string) {
 }
 
 type PageProps = {
-  searchParams?: Promise<{ blog_category?: string | string[] }>
+  searchParams?: Promise<{
+    blog_category?: string | string[]
+    acesso?: string | string[]
+  }>
 }
 
 export default async function PortalDashboardPage({ searchParams }: PageProps) {
@@ -143,6 +147,12 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
     ? resolvedSearch?.blog_category[0]
     : resolvedSearch?.blog_category
   const blogCategory = String(categoryRaw ?? "").trim()
+  const accessRaw = Array.isArray(resolvedSearch?.acesso)
+    ? resolvedSearch?.acesso[0]
+    : resolvedSearch?.acesso
+  const accessDenied = accessRaw === "negado"
+  const canAccessAgenda = hasTeacherPortalPermission(teacher, "agenda_notas")
+  const canAccessMaterials = hasTeacherPortalPermission(teacher, "materiais")
 
   const t = {
     title: locale === "es" ? "Panel del Profesor" : "Painel do Professor",
@@ -182,6 +192,10 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
     authorLabel: locale === "es" ? "Autor" : "Autor",
     unknownAuthor: locale === "es" ? "Autor no informado" : "Autor nao informado",
     publishedAt: locale === "es" ? "Publicado em" : "Publicado em",
+    accessDenied:
+      locale === "es"
+        ? "Este módulo no está habilitado para tu acceso. Habla con la coordinación si necesitas utilizarlo."
+        : "Este módulo não está habilitado para o seu acesso. Fale com a coordenação caso precise utilizá-lo.",
   }
 
   const schedules: ScheduleRow[] = await db`
@@ -334,6 +348,11 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
   return (
     <div className="relative min-h-screen rounded-xl bg-cyan-900/10">
       <main className="container mx-auto px-4 py-8 space-y-6">
+        {accessDenied ? (
+          <div className="rounded-2xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-xl">
+            {t.accessDenied}
+          </div>
+        ) : null}
         <section className="rounded-2xl border border-white/10 bg-slate-900/45 p-5 backdrop-blur">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div>
@@ -419,19 +438,25 @@ export default async function PortalDashboardPage({ searchParams }: PageProps) {
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-slate-300 mb-2">{t.quickActions}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2">
-                  <Link href="/portal/dashboard/notas/lancamentos">
-                    <Button className="w-full bg-cyan-600 hover:bg-cyan-700">{t.registerClass}</Button>
-                  </Link>
-                  <Link href="/portal/dashboard/notas/lancamentos">
-                    <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
-                      {t.openAgenda}
-                    </Button>
-                  </Link>
-                  <Link href="/portal/dashboard/materiais">
-                    <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
-                      {t.openMaterials}
-                    </Button>
-                  </Link>
+                  {canAccessAgenda ? (
+                    <>
+                      <Link href="/portal/dashboard/notas/lancamentos">
+                        <Button className="w-full bg-cyan-600 hover:bg-cyan-700">{t.registerClass}</Button>
+                      </Link>
+                      <Link href="/portal/dashboard/notas/lancamentos">
+                        <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
+                          {t.openAgenda}
+                        </Button>
+                      </Link>
+                    </>
+                  ) : null}
+                  {canAccessMaterials ? (
+                    <Link href="/portal/dashboard/materiais">
+                      <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
+                        {t.openMaterials}
+                      </Button>
+                    </Link>
+                  ) : null}
                   <Link href="/portal/dashboard/notificacoes">
                     <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10">
                       {t.openNotifications}

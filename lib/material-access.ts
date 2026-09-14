@@ -27,6 +27,52 @@ export async function isMaterialAccessPolicyReady() {
   return row?.ready === true
 }
 
+export function materialContentAccessSql(
+  teacherId: string,
+  area: "aulas" | "materiais",
+  isAdmin: boolean,
+) {
+  if (isAdmin) {
+    return {
+      isSpecific: db`FALSE`,
+      isSelected: db`FALSE`,
+    }
+  }
+
+  const isSpecific = db`
+    COALESCE(
+      (
+        SELECT to_jsonb(content_teacher)->'content_permissions'->${area}->>'mode'
+        FROM public.teachers content_teacher
+        WHERE content_teacher.id = ${teacherId}
+      ),
+      'inherit'
+    ) = 'specific'
+  `
+  const isSelected = db`
+    (
+      COALESCE(
+        (
+          SELECT to_jsonb(content_teacher)->'content_permissions'->${area}->'item_ids'
+          FROM public.teachers content_teacher
+          WHERE content_teacher.id = ${teacherId}
+        ),
+        '[]'::jsonb
+      ) ? m.id::text
+      OR COALESCE(
+        (
+          SELECT to_jsonb(content_teacher)->'content_permissions'->${area}->'category_ids'
+          FROM public.teachers content_teacher
+          WHERE content_teacher.id = ${teacherId}
+        ),
+        '[]'::jsonb
+      ) ? COALESCE(m.category_id::text, '')
+    )
+  `
+
+  return { isSpecific, isSelected }
+}
+
 export function materialAccessSql(teacherId: string, legacyLocale: MaterialAccessLocale) {
   return db`
     (

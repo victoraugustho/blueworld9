@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 import {
   canTeacherAccessProject,
   ensureProjectsSchema,
@@ -10,6 +10,7 @@ import {
 } from "@/lib/projects"
 import { normalizeProjectFileUrl } from "@/lib/project-file-url"
 import { canTeacherAccessProjectWithCategory } from "@/lib/project-category-access"
+import { resolveTeacherContentAccess } from "@/lib/auth/teacher-content-permissions"
 
 function parsePagination(params: URLSearchParams) {
   const pageRaw = Number(params.get("page") ?? 1)
@@ -21,7 +22,7 @@ function parsePagination(params: URLSearchParams) {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("projetos")
   if (!auth.ok) return auth.response
 
   await ensureProjectsSchema()
@@ -171,8 +172,8 @@ export async function GET(req: NextRequest) {
   }
 
   const scope = await loadTeacherScopeData(auth.teacherId)
-  const visible = rows.filter((item: any) =>
-    canTeacherAccessProjectWithCategory(
+  const visible = rows.filter((item: any) => {
+    const allowedByCurrentPolicy = canTeacherAccessProjectWithCategory(
       item,
       {
         access_scope: item.category_access_scope,
@@ -188,8 +189,16 @@ export async function GET(req: NextRequest) {
         classIds: scope.classIds,
       },
       canTeacherAccessProject,
-    ),
-  )
+    )
+
+    return resolveTeacherContentAccess(
+      auth.teacher,
+      "projetos",
+      allowedByCurrentPolicy,
+      item.id,
+      item.category_id,
+    )
+  })
 
   const total = visible.length
   const paginated = visible.slice(offset, offset + page_size).map((item: any) => {

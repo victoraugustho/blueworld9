@@ -4,7 +4,12 @@ import { ensureTurmasSchema } from "@/lib/turmas"
 import { FileText, Eye } from "lucide-react"
 import Link from "next/link"
 import { getEffectivePortalLocale } from "@/lib/portal-locale"
-import { isMaterialAccessPolicyReady, materialAccessSql } from "@/lib/material-access"
+import {
+  isMaterialAccessPolicyReady,
+  materialAccessSql,
+  materialContentAccessSql,
+} from "@/lib/material-access"
+import { isAdminUser } from "@/lib/auth/authorization"
 
 type SearchParams = { year?: string | string[] }
 
@@ -48,13 +53,21 @@ export default async function MateriaisPage({
           WHERE mta.material_id = m.id AND mta.teacher_id = ${teacher.id}
         ))
       `
+  const contentAccess = materialContentAccessSql(
+    teacher.id,
+    "materiais",
+    isAdminUser(teacher),
+  )
 
   const materiais = await db`
     SELECT m.*, c.name AS category_name
     FROM materials m
     LEFT JOIN categories c ON m.category_id = c.id
     WHERE m.file_type = 'document'
-      AND ${accessFilter}
+      AND (
+        (${contentAccess.isSpecific} AND ${contentAccess.isSelected})
+        OR (NOT (${contentAccess.isSpecific}) AND (${accessFilter}))
+      )
     ORDER BY c.name ASC NULLS LAST, m.created_at DESC
   `
 

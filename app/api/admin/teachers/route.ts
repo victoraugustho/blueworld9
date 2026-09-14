@@ -16,6 +16,14 @@ export async function GET() {
       country, locale, document_type, document_number,
       approved, active,
       COALESCE(NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean, TRUE) AS can_download,
+      COALESCE(
+        to_jsonb(teachers)->'portal_permissions',
+        '{"aulas":true,"agenda_notas":true,"materiais":true,"projetos":true,"ia":true}'::jsonb
+      ) AS portal_permissions,
+      COALESCE(
+        to_jsonb(teachers)->'content_permissions',
+        '{"aulas":{"mode":"inherit","category_ids":[],"item_ids":[]},"materiais":{"mode":"inherit","category_ids":[],"item_ids":[]},"projetos":{"mode":"inherit","category_ids":[],"item_ids":[]}}'::jsonb
+      ) AS content_permissions,
       created_at, updated_at,
       COALESCE(
         (SELECT ARRAY_AGG(tc.category_id ORDER BY tc.category_id) FROM teacher_categories tc WHERE tc.teacher_id = teachers.id),
@@ -45,6 +53,14 @@ export async function GET() {
       country, locale, document_type, document_number,
       approved, active,
       COALESCE(NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean, TRUE) AS can_download,
+      COALESCE(
+        to_jsonb(teachers)->'portal_permissions',
+        '{"aulas":true,"agenda_notas":true,"materiais":true,"projetos":true,"ia":true}'::jsonb
+      ) AS portal_permissions,
+      COALESCE(
+        to_jsonb(teachers)->'content_permissions',
+        '{"aulas":{"mode":"inherit","category_ids":[],"item_ids":[]},"materiais":{"mode":"inherit","category_ids":[],"item_ids":[]},"projetos":{"mode":"inherit","category_ids":[],"item_ids":[]}}'::jsonb
+      ) AS content_permissions,
       created_at, updated_at,
       COALESCE(
         (SELECT ARRAY_AGG(tc.category_id ORDER BY tc.category_id) FROM teacher_categories tc WHERE tc.teacher_id = teachers.id),
@@ -74,6 +90,14 @@ export async function GET() {
       country, locale, document_type, document_number,
       approved, active,
       COALESCE(NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean, TRUE) AS can_download,
+      COALESCE(
+        to_jsonb(teachers)->'portal_permissions',
+        '{"aulas":true,"agenda_notas":true,"materiais":true,"projetos":true,"ia":true}'::jsonb
+      ) AS portal_permissions,
+      COALESCE(
+        to_jsonb(teachers)->'content_permissions',
+        '{"aulas":{"mode":"inherit","category_ids":[],"item_ids":[]},"materiais":{"mode":"inherit","category_ids":[],"item_ids":[]},"projetos":{"mode":"inherit","category_ids":[],"item_ids":[]}}'::jsonb
+      ) AS content_permissions,
       created_at, updated_at,
       COALESCE(
         (SELECT ARRAY_AGG(tc.category_id ORDER BY tc.category_id) FROM teacher_categories tc WHERE tc.teacher_id = teachers.id),

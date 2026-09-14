@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { requireTeacherApi } from "@/lib/auth/require"
+import { requireTeacherPermissionApi } from "@/lib/auth/require"
 import {
   ensureGradebookSchema,
   isUuid,
@@ -19,7 +19,7 @@ async function loadOwnedClass(teacherId: string, classId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = await requireTeacherApi()
+  const auth = await requireTeacherPermissionApi("agenda_notas")
   if (!auth.ok) return auth.response
 
   await ensureGradebookSchema()

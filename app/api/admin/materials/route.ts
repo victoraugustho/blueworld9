@@ -6,6 +6,7 @@ import {
   evaluateMaterialAccessPolicy,
   normalizeMaterialAccessPolicy,
 } from "@/lib/material-access"
+import { resolveTeacherContentAccess } from "@/lib/auth/teacher-content-permissions"
 
 export async function GET() {
   const admin = await requireAdminApi()
@@ -36,7 +37,11 @@ export async function GET() {
 
   const teachers = await db`
     SELECT
-      t.id, t.name, t.email, t.country, t.locale,
+      t.id, t.name, t.email, t.country, t.locale, t.role, t.is_admin,
+      COALESCE(
+        to_jsonb(t)->'content_permissions',
+        '{"aulas":{"mode":"inherit","category_ids":[],"item_ids":[]},"materiais":{"mode":"inherit","category_ids":[],"item_ids":[]},"projetos":{"mode":"inherit","category_ids":[],"item_ids":[]}}'::jsonb
+      ) AS content_permissions,
       COALESCE((
         SELECT ARRAY_AGG(tc.category_id ORDER BY tc.category_id)
         FROM teacher_categories tc
@@ -61,11 +66,20 @@ export async function GET() {
 
     const legacyTeacherIds = new Set((material.teacher_ids ?? []).map(String))
     const allowedTeachers = teachers.filter((teacher) => {
-      if (policy) return evaluateMaterialAccessPolicy(policy, teacher as any).allowed
-      if (teacher.locale !== material.language) return false
-      if (material.category_id && !(teacher.category_ids ?? []).includes(material.category_id)) return false
-      if (material.student_year && !(teacher.student_years ?? []).includes(material.student_year)) return false
-      return material.access_scope !== "specific" || legacyTeacherIds.has(String(teacher.id))
+      const allowedByCurrentPolicy = policy
+        ? evaluateMaterialAccessPolicy(policy, teacher as any).allowed
+        : teacher.locale === material.language
+          && (!material.category_id || (teacher.category_ids ?? []).includes(material.category_id))
+          && (!material.student_year || (teacher.student_years ?? []).includes(material.student_year))
+          && (material.access_scope !== "specific" || legacyTeacherIds.has(String(teacher.id)))
+
+      return resolveTeacherContentAccess(
+        teacher,
+        material.file_type === "video" ? "aulas" : "materiais",
+        allowedByCurrentPolicy,
+        material.id,
+        material.category_id,
+      )
     })
 
     return {

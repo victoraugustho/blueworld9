@@ -10,7 +10,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "check:utf8": "node scripts/check-utf8.mjs"
+    "check:utf8": "node scripts/check-utf8.mjs",
+    "test:schools": "node --test tests/schools-*.test.cjs",
+    "test:schools:ui": "node --test tests/schools-ui.browser.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -78,11 +80,14 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",
     "@types/react": "18.3.27",
     "dotenv": "^17.2.3",
     "dotenv-cli": "^11.0.0",
+    "esbuild": "^0.28.2",
     "postcss": "^8.5.26",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",

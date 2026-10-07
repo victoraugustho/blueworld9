@@ -24,6 +24,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         locale={locale}
         systemVersion={systemVersion}
         portalPermissions={teacher.portal_permissions}
+        schoolsEnabled={process.env.SCHOOLS_MODULE_ENABLED === "true"}
         teacher={{
           name: teacher.name,
           avatarUrl: teacher.avatar_url ?? null,

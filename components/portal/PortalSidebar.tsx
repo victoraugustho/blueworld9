@@ -24,6 +24,7 @@ import {
   ChevronsRight,
   Globe2,
   ArrowRightLeft,
+  School,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { TeacherPortalPermissions } from "@/app/types/portal"
@@ -45,6 +46,7 @@ export function PortalSidebar({
   teacher,
   systemVersion,
   portalPermissions,
+  schoolsEnabled = false,
   logoSrc = "/webp/logo-branca-bw9.webp", // garanta que exista em /public ou altere
 }: {
   isAdmin: boolean
@@ -54,6 +56,7 @@ export function PortalSidebar({
   teacher?: TeacherMini
   systemVersion?: string
   portalPermissions?: TeacherPortalPermissions
+  schoolsEnabled?: boolean
   logoSrc?: string
 }) {
   const pathname = usePathname()
@@ -108,13 +111,14 @@ export function PortalSidebar({
       { href: "/portal/dashboard/materiais", label: t.menu.materiais, icon: FileText, permission: "materiais" as const },
       { href: "/portal/dashboard/projetos", label: t.menu.projetos, icon: FolderKanban, permission: "projetos" as const },
       { href: "/portal/dashboard/ia", label: t.menu.ai, icon: Sparkles, permission: "ia" as const },
+      ...(schoolsEnabled ? [{ href: "/portal/dashboard/escolas", label: locale === "es" ? "Escuelas e inventario" : "Escolas e inventário", icon: School, permission: null }] : []),
     ].filter((item) => (
       item.permission === null
       || isAdmin
       || portalPermissions?.[item.permission] !== false
     )),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [locale, isAdmin, portalPermissions]
+    [locale, isAdmin, portalPermissions, schoolsEnabled]
   )
 
   const adminMenu = useMemo(

@@ -200,10 +200,10 @@ export async function PUT(req: NextRequest, context: Ctx) {
     ? db`, can_download = ${can_download}`
     : db``
   const permissionsUpdate = permissionSchema.hasPermissions
-    ? db`, portal_permissions = ${JSON.stringify(portal_permissions)}::jsonb`
+    ? db`, portal_permissions = ${db.json(portal_permissions)}`
     : db``
   const contentPermissionsUpdate = permissionSchema.hasContentPermissions
-    ? db`, content_permissions = ${JSON.stringify(content_permissions)}::jsonb`
+    ? db`, content_permissions = ${db.json(content_permissions)}`
     : db``
 
   const [teacherRow] = await db`

@@ -172,21 +172,25 @@ export default function AdminTeachersPage() {
 
     setApprovalBusy(true)
     setApprovalError("")
-    const res = await fetch(`/api/admin/teachers/${approvalTeacher.id}/approve`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision, ...payload }),
-    })
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      setApprovalError(data?.error ?? "Não foi possível salvar a decisão.")
-      setApprovalBusy(false)
-      return
-    }
+    try {
+      const res = await fetch(`/api/admin/teachers/${approvalTeacher.id}/approve`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, ...payload }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setApprovalError(data?.error ?? "Não foi possível salvar a decisão.")
+        return
+      }
 
-    setApprovalTeacher(null)
-    setApprovalBusy(false)
-    await load()
+      setApprovalTeacher(null)
+      await load()
+    } catch {
+      setApprovalError("Não foi possível concluir a comunicação. Confira sua conexão e tente novamente.")
+    } finally {
+      setApprovalBusy(false)
+    }
   }
 
   async function disable(teacher: Teacher) {

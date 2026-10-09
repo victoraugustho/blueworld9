@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { writeAuditLog } from "@/lib/audit"
@@ -11,12 +12,12 @@ import {
   TEACHER_CONTENT_AREAS,
 } from "@/lib/auth/teacher-content-permissions"
 
-type Ctx = { params: Promise<{ id: string }> } // ✅ params como Promise (Next 16 sync-dynamic-apis)
+type Ctx = { params: Promise<{ id: string }> }
 
-export async function PATCH(req: NextRequest, ctx: Ctx) {
+async function decideRegistration(req: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params
 
-  if (!id) {
+  if (!z.string().uuid().safeParse(id).success) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 })
   }
 
@@ -24,6 +25,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   if (!admin.ok) return admin.response
 
   const body = await req.json().catch(() => ({}))
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Informe os dados da decisão." }, { status: 400 })
+  }
   const hasExplicitPermissions = body.portal_permissions
     && typeof body.portal_permissions === "object"
     && !Array.isArray(body.portal_permissions)
@@ -83,8 +87,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     SET approved = ${approved},
         active = ${active},
         can_download = ${canDownload},
-        portal_permissions = ${JSON.stringify(portalPermissions)}::jsonb,
-        content_permissions = ${JSON.stringify(contentPermissions)}::jsonb,
+        portal_permissions = ${db.json(portalPermissions)},
+        content_permissions = ${db.json(contentPermissions)},
         updated_at = NOW()
     WHERE id = ${id}
     RETURNING
@@ -113,4 +117,22 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   })
 
   return NextResponse.json(result)
+}
+
+export async function PATCH(req: NextRequest, ctx: Ctx) {
+  try {
+    return await decideRegistration(req, ctx)
+  } catch (error) {
+    const failure = error as { code?: string; constraint_name?: string; message?: string }
+    // PostgreSQL details can contain the complete teacher row, including sensitive data.
+    console.error("[admin.teachers.approve]", {
+      code: failure?.code,
+      constraint: failure?.constraint_name,
+      message: failure?.message,
+    })
+    return NextResponse.json(
+      { error: "Não foi possível salvar a decisão. Tente novamente ou contate o suporte.", code: "APPROVAL_FAILED" },
+      { status: 500 },
+    )
+  }
 }

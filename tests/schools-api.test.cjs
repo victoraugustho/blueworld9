@@ -11,10 +11,10 @@ Module._extensions['.ts'] = (module, filename) => module._compile(ts.transpileMo
 }).outputText,filename)
 const contracts = require('../lib/schools/contracts.ts')
 const authorization = require('../lib/auth/authorization.ts')
-let enabled=false, auth, reads=0, writes=0, audits=0, error
+let enabled=false, auth, reads=0, writes=0, audits=0, error, authError
 const originalLoad=Module._load
 Module._load=function(id,...args) {
-  if(id==='@/lib/auth/require') return {requireTeacherApi:async()=>auth}
+  if(id==='@/lib/auth/require') return {requireTeacherApi:async()=>{if(authError)throw authError;return auth}}
   if(id==='@/lib/auth/authorization') return authorization
   if(id==='@/lib/schools/audit') return {writeSchoolAuditMirror:async()=>{audits++}}
   if(id==='@/lib/schools/contracts') return contracts
@@ -50,7 +50,7 @@ test('Escolas: contratos e proteção da API',async t=>{
     assert.equal(result.status,200);assert.equal(result.headers.get('cache-control'),'private, no-store')
   })
   await t.test('paginação, UUID e view inválidos retornam 400',async()=>{
-    for(const query of ['page=0','page=2.5','schoolId=abc','view=secrets']) assert.equal((await GET(new NextRequest(`${url}?${query}`))).status,400)
+    for(const query of ['page=0','page=2.5','schoolId=abc','view=secrets','view=assets&itemId=abc','categoryId=abc','condition=broken']) assert.equal((await GET(new NextRequest(`${url}?${query}`))).status,400)
     assert.equal(reads,1)
   })
   await t.test('origem externa é recusada antes da escrita',async()=>{
@@ -80,5 +80,17 @@ test('Escolas: contratos e proteção da API',async t=>{
   await t.test('sucesso espelha evento na auditoria geral e não usa cache',async()=>{
     const response=await POST(request({action:'request.create'},{origin:'https://portal.example.test'}))
     assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'private, no-store');assert.equal(audits,1)
+  })
+  await t.test('falha da consulta de sessão retorna JSON sem executar leitura ou mutação do módulo',async()=>{
+    const before=[reads,writes,audits],log=console.error
+    console.error=()=>{}
+    authError=new Error('Sessão indisponível')
+    try {
+      for(const response of [await GET(new NextRequest(url)),await POST(request())]) {
+        assert.equal(response.status,500)
+        assert.equal((await response.json()).code,'INTERNAL')
+      }
+      assert.deepEqual([reads,writes,audits],before)
+    } finally {authError=null;console.error=log}
   })
 })

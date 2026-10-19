@@ -12,10 +12,10 @@ export default async function SchoolsPage({ params }: { params: Promise<{ path?:
   if (!['admin','teacher'].includes(role)) notFound()
   const { path = [] } = await params
   const admin = role === 'admin'
-  const globalPage = ['modelos','historico'].includes(path[0])
+  const globalPage = ['modelos','historico','categorias'].includes(path[0])
   if (path.length > 2 || (globalPage && (!admin || path.length > 1))) notFound()
   if (path[0] && !globalPage && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path[0])) notFound()
-  const tab = path[0] === 'historico' ? 'audit' : path[1] ?? 'inventory'
-  if (!['inventory','requests','links','audit'].includes(tab) || (!admin && tab === 'audit')) notFound()
+  const tab = path[0] === 'historico' ? 'audit' : path[0]==='categorias'?'categories':path[1] ?? 'inventory'
+  if (!['inventory','requests','links','audit','categories'].includes(tab) || (!admin && ['audit','categories'].includes(tab))) notFound()
   return <SchoolsClient key={path.join('/')} admin={admin} locale={await getEffectivePortalLocale(teacher)} schoolId={globalPage ? undefined : path[0]} templates={path[0] === 'modelos'} tab={tab} />
 }

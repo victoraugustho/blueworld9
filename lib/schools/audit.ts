@@ -22,7 +22,7 @@ export async function writeSchoolAuditMirror({ req, actor, commandKey, action, t
       ) VALUES (
         ${commandKey}, ${actor.id}, ${actor.email}, ${actor.name}, ${actor.role}, ${actor.sessionId},
         ${action}, 'school', ${targetId}, ${req.method}, ${req.nextUrl.pathname},
-        'success', ${JSON.stringify({ command_id: commandKey })}::jsonb
+        'success', ${db.json({ command_id: commandKey })}::jsonb
       ) ON CONFLICT (id) DO NOTHING
     `
   } catch (error) {

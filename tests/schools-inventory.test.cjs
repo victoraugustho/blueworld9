@@ -40,6 +40,9 @@ test('Escolas e inventário: homologação isolada', async t => {
     await p.query('INSERT INTO legacy_grades VALUES($1,$2,9)',[randomUUID(),classA])
     await t.test('migração aditiva e idempotente', async()=>{
       await p.exec(migration); await p.exec(migration)
+      const unitsMigration=fs.readFileSync(path.join(__dirname,'../scripts/047_inventory_units_and_categories.sql'),'utf8')
+      await p.exec(unitsMigration);await p.exec(unitsMigration)
+      await p.exec(fs.readFileSync(path.join(__dirname,'../scripts/048_inventory_kit_components.sql'),'utf8'))
       assert.equal((await p.query('SELECT score FROM legacy_grades')).rows[0].score,'9')
       assert.equal((await p.query('SELECT COUNT(*)::int AS n FROM teacher_classes')).rows[0].n,2)
     })
@@ -89,7 +92,7 @@ test('Escolas e inventário: homologação isolada', async t => {
       inventoryItem=(await service.read(admin,'inventory',school.id)).rows[0]
       assert.equal(inventoryItem.quantity,10)
       assert.equal((await service.read(teacher,'inventory',school.id)).rows.length,0)
-      inventoryItem=await run(admin,{action:'item.update',schoolId:school.id,id:inventoryItem.id,version:1,data:{...item,quantity:12}})
+      inventoryItem=await run(admin,{action:'item.adjust',schoolId:school.id,id:inventoryItem.id,version:1,direction:'entry',quantity:2,condition:'good',reason:'Recebimento conferido'})
       assert.equal((await service.read(admin,'templates')).rows[0].items[0].quantity,10)
       await rejected(()=>run(admin,{action:'template.apply',schoolId:school.id,version:3,templateId:template.id}),409)
     })
@@ -105,11 +108,11 @@ test('Escolas e inventário: homologação isolada', async t => {
       await rejected(()=>run(admin,{action:'template.apply',schoolId:school.id,version:4,templateId:template.id}),409)
     })
     await t.test('organização permitida não altera quantidade e audita antes/depois',async()=>{
-      const changed=await run(teacher,{action:'item.organize',schoolId:school.id,id:inventoryItem.id,version:2,data:{location:'Sala 2',condition:'maintenance',notes:'Revisar conexões'}})
+      const changed=await run(teacher,{action:'item.organize',schoolId:school.id,id:inventoryItem.id,version:2,data:{location:'Sala 2',notes:'Revisar conexões'}})
       assert.equal(changed.quantity,12);assert.equal(changed.location,'Sala 2')
       await rejected(()=>run(teacher,{action:'item.organize',schoolId:school.id,id:inventoryItem.id,version:3,data:{location:'Sala 2',condition:'good',notes:'',quantity:999}}),400)
       const audit=(await p.query("SELECT * FROM bw_school_audit WHERE action='item.organize'")).rows[0]
-      assert.equal(audit.before_data.location,'Laboratório');assert.equal(audit.after_data.location,'Sala 2')
+      assert.equal(audit.before_data.quantity,12);assert.equal(audit.after_data.location,'Sala 2')
     })
     await t.test('proteção IDOR em item de outra escola',async()=>{
       await rejected(()=>run(admin,{action:'item.update',schoolId:other.id,id:inventoryItem.id,version:3,data:item}),404)
@@ -156,8 +159,8 @@ test('Escolas e inventário: homologação isolada', async t => {
       await assert.rejects(()=>run(admin,{action:'item.create',schoolId:other.id,data:{...item,quantity:1,asset_tag:'pat-1'}}),e=>e.code==='23505')
     })
     await t.test('duas edições com mesma versão: segunda falha sem sobrescrever',async()=>{
-      await run(admin,{action:'item.update',schoolId:school.id,id:inventoryItem.id,version:3,data:{...item,quantity:15}})
-      await rejected(()=>run(admin,{action:'item.update',schoolId:school.id,id:inventoryItem.id,version:3,data:{...item,quantity:999}}),409)
+      await run(admin,{action:'item.adjust',schoolId:school.id,id:inventoryItem.id,version:3,direction:'entry',quantity:3,condition:'good',reason:'Recebimento conferido'})
+      await rejected(()=>run(admin,{action:'item.adjust',schoolId:school.id,id:inventoryItem.id,version:3,direction:'entry',quantity:999,condition:'good',reason:'Recebimento conferido'}),409)
       assert.equal((await p.query('SELECT quantity FROM bw_inventory_items WHERE id=$1',[inventoryItem.id])).rows[0].quantity,15)
     })
     await t.test('falha da auditoria reverte toda a alteração',async()=>{

@@ -26,6 +26,8 @@ test('Escolas: interface responsiva e fluxos em navegador isolado',{timeout:1200
       CREATE TABLE teacher_classes(id uuid PRIMARY KEY,teacher_id uuid,name text,school_year int);
       CREATE TABLE teacher_schedules(id uuid PRIMARY KEY,class_id uuid,weekday int,start_time time,end_time time);`)
     await p.exec(fs.readFileSync(path.join(__dirname,'../scripts/046_schools_inventory.sql'),'utf8'))
+    await p.exec(fs.readFileSync(path.join(__dirname,'../scripts/047_inventory_units_and_categories.sql'),'utf8'))
+    await p.exec(fs.readFileSync(path.join(__dirname,'../scripts/048_inventory_kit_components.sql'),'utf8'))
     const admin={id:randomUUID(),name:'Admin homologação',admin:true},teacher={id:randomUUID(),name:'Professor homologação',admin:false}
     for(const actor of [admin,teacher]) await p.query('INSERT INTO teachers(id,name,email) VALUES($1,$2,$3)',[actor.id,actor.name,'teste@example.test'])
     const service=schoolService({query:async(sql,params)=>(await p.query(sql,params)).rows,transaction:work=>p.transaction(tx=>work({query:async(sql,params)=>(await tx.query(sql,params)).rows}))})
@@ -36,7 +38,7 @@ test('Escolas: interface responsiva e fluxos em navegador isolado',{timeout:1200
     const bundle=await esbuild.build({
       stdin:{contents:`import React from 'react';import {createRoot} from 'react-dom/client';import SchoolsClient from './components/schools/SchoolsClient';
         const query=new URLSearchParams(location.search);const parts=location.pathname.split('/').filter(Boolean).slice(3);
-        createRoot(document.getElementById('root')).render(<SchoolsClient admin={query.get('role')!=='teacher'} locale={query.get('locale')||'pt-BR'} templates={parts[0]==='modelos'} schoolId={['modelos','historico'].includes(parts[0])?undefined:parts[0]} tab={parts[0]==='historico'?'audit':parts[1]||'inventory'}/>);`,resolveDir:cwd,loader:'tsx'},
+        createRoot(document.getElementById('root')).render(<SchoolsClient admin={query.get('role')!=='teacher'} locale={query.get('locale')||'pt-BR'} templates={parts[0]==='modelos'} schoolId={['modelos','historico','categorias'].includes(parts[0])?undefined:parts[0]} tab={parts[0]==='historico'?'audit':parts[0]==='categorias'?'categories':parts[1]||'inventory'}/>);`,resolveDir:cwd,loader:'tsx'},
       bundle:true,write:false,format:'iife',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'},
       plugins:[{name:'isolated-link',setup(build){build.onResolve({filter:/^next\/link$/},()=>({path:'link',namespace:'isolated'}));build.onLoad({filter:/.*/,namespace:'isolated'},()=>({contents:"import React from 'react';export default function Link(props){return React.createElement('a',props)}",loader:'js',resolveDir:cwd}))}}],
     })
@@ -57,7 +59,7 @@ test('Escolas: interface responsiva e fluxos em navegador isolado',{timeout:1200
     page.on('pageerror',error=>browserErrors.push(error.message))
     await page.route('**/api/portal/schools?*',async route=>{
       const query=new URL(route.request().url()).searchParams
-      try {await route.fulfill({json:await service.read(actor,query.get('view'),query.get('schoolId')||undefined,query.get('search')||'',Number(query.get('page')||1))})}
+      try {await route.fulfill({json:await service.read(actor,query.get('view'),query.get('schoolId')||undefined,query.get('search')||'',Number(query.get('page')||1),{itemId:query.get('itemId')||undefined,categoryId:query.get('categoryId')||undefined,condition:query.get('condition')||undefined})})}
       catch(error){await route.fulfill({status:error.status||500,json:{error:error.message,code:error.code}})}
     })
     await page.route('**/api/portal/schools',async route=>{
@@ -71,7 +73,8 @@ test('Escolas: interface responsiva e fluxos em navegador isolado',{timeout:1200
       await go();await expect(page.getByText('Escola Horizonte',{exact:true})).toBeVisible()
       await page.getByRole('button',{name:'Nova escola',exact:true}).click()
       await page.getByLabel('Nome',{exact:true}).fill('Escola Inovação')
-      await page.getByLabel('Código da escola').fill('INOV')
+      await expect(page.getByText('O código da escola será gerado automaticamente.')).toBeVisible()
+      await expect(page.getByLabel('Código da escola')).toHaveCount(0)
       await page.getByRole('button',{name:'Salvar',exact:true}).click();await success()
       await expect(page.getByText('Escola Inovação',{exact:true})).toBeVisible()
     })
@@ -81,9 +84,12 @@ test('Escolas: interface responsiva e fluxos em navegador isolado',{timeout:1200
       await page.getByRole('combobox').selectOption(template.id)
       await page.getByRole('button',{name:'Salvar',exact:true}).click();await success()
       await expect(page.getByText('Arduino Uno',{exact:true})).toBeVisible()
-      await page.getByRole('button',{name:'Editar / organizar'}).click()
-      await page.getByLabel('Quantidade',{exact:true}).fill('12')
-      await page.getByRole('button',{name:'Salvar',exact:true}).click();await success()
+      await page.getByRole('button',{name:/Mais ações/}).click()
+      await page.getByRole('menuitem',{name:'Entrada / baixa',exact:true}).click()
+      await page.getByLabel('Quantidade',{exact:true}).fill('2')
+      await page.getByLabel('Justificativa',{exact:true}).fill('Recebimento conferido')
+      await page.getByRole('button',{name:'Salvar',exact:true}).click()
+      await page.getByRole('button',{name:'Confirmar',exact:true}).click();await success()
       await page.getByRole('button',{name:'Publicar inventário'}).click()
       await expect(page.getByRole('alertdialog')).toBeVisible()
       await page.getByRole('button',{name:'Confirmar',exact:true}).click();await success()
@@ -124,12 +130,131 @@ test('Escolas: interface responsiva e fluxos em navegador isolado',{timeout:1200
       }
       await expect(page.getByText('Incorporado ao inventário',{exact:true})).toBeVisible()
     })
+    await t.test('cadastro individual gera unidades e altera apenas um dos 12 notebooks',async()=>{
+      actor=admin;await go(`/${school.id}`)
+      await page.getByRole('button',{name:'Adicionar item',exact:true}).click()
+      await page.getByLabel('Nome',{exact:true}).fill('Notebooks')
+      await page.getByLabel('Categoria',{exact:true}).selectOption('b9000000-0000-4000-8000-000000000002')
+      await expect(page.getByLabel('Forma de controle',{exact:true})).toHaveValue('individual')
+      await page.getByLabel('Quantidade',{exact:true}).fill('12')
+      await expect(page.getByText(/12 identificadores serão gerados/)).toBeVisible()
+      await page.getByRole('button',{name:'Salvar',exact:true}).click();await success()
+      const row=page.getByRole('article').filter({has:page.getByRole('heading',{name:'Notebooks',exact:true})})
+      await expect(row).toContainText('12 Disponíveis')
+      await row.getByRole('button',{name:'Ver unidades',exact:true}).click()
+      await expect(page.getByRole('article')).toHaveCount(12)
+      await page.getByRole('article').first().getByRole('button',{name:/Atualizar unidade/}).click()
+      await page.getByLabel('Condição',{exact:true}).selectOption('damaged')
+      await page.getByLabel('Observações',{exact:true}).fill('Tela quebrada')
+      await page.getByLabel('Justificativa',{exact:true}).fill('Conferência de equipamentos')
+      await page.getByRole('button',{name:'Salvar',exact:true}).click();await success()
+      await expect(page.getByRole('article')).toHaveCount(12)
+      await expect(page.getByText('Danificados',{exact:true}).last()).toBeVisible()
+      await page.getByRole('button',{name:'Inventário',exact:true}).click()
+      await expect(row).toContainText('11 Disponíveis');await expect(row).toContainText('1 Danificados')
+      await row.getByRole('button',{name:'Editar / organizar'}).click()
+      await expect(page.getByLabel('Quantidade',{exact:true})).not.toBeEditable()
+      await expect(page.getByLabel('Forma de controle',{exact:true})).toBeDisabled()
+      await expect(page.getByLabel('Patrimônio individual',{exact:true})).toHaveCount(0)
+      await page.getByRole('button',{name:'Fechar',exact:true}).click()
+    })
+    await t.test('mudança por quantidade exibe saldo e mantém total',async()=>{
+      const row=page.getByRole('article').filter({has:page.getByRole('heading',{name:'Arduino Uno',exact:true})})
+      await row.getByRole('button',{name:/Alterar condição/}).click()
+      await expect(page.getByText(/Saldo disponível nesta condição: 12/)).toBeVisible()
+      await page.getByLabel('Quantidade',{exact:true}).fill('1')
+      await page.getByLabel('Justificativa',{exact:true}).fill('Uma placa danificada')
+      await page.getByRole('button',{name:'Salvar',exact:true}).click()
+      await page.getByRole('button',{name:'Confirmar',exact:true}).click();await success()
+      await expect(row).toContainText('11 Disponíveis');await expect(row).toContainText('1 Danificados')
+      await row.getByRole('button',{name:'Histórico',exact:true}).click()
+      await expect(page.getByText('Uma placa danificada',{exact:true})).toBeVisible()
+      await page.getByRole('button',{name:'Inventário',exact:true}).click()
+      await expect(row).toContainText('11 Disponíveis')
+      await expect(page.getByText('Carregando…',{exact:true})).toHaveCount(0)
+      if(process.env.SCHOOLS_UI_SCREENSHOTS) {
+        fs.mkdirSync(process.env.SCHOOLS_UI_SCREENSHOTS,{recursive:true})
+        await page.screenshot({path:path.join(process.env.SCHOOLS_UI_SCREENSHOTS,'inventory-desktop.png'),fullPage:true})
+      }
+    })
+    await t.test('kit com composição recolhida, edição confirmada e contagem sem inflação',async()=>{
+      await page.getByRole('button',{name:'Criar kit',exact:true}).click()
+      await page.getByLabel('Nome',{exact:true}).fill('Kit Arduino')
+      await page.getByLabel('Categoria',{exact:true}).selectOption('b9000000-0000-4000-8000-000000000003')
+      await expect(page.getByLabel('Unidade',{exact:true})).toHaveValue('kit')
+      for(const [index,name] of ['Arduino UNO','Cabo USB','Protoboard','Jumpers'].entries()) {
+        if(index) await page.getByRole('button',{name:'Adicionar componente',exact:true}).click()
+        await page.getByLabel(`Nome do componente ${index+1}`,{exact:true}).fill(name)
+        await page.getByLabel(`Quantidade do componente ${index+1}`,{exact:true}).fill(index===3?'10':'1')
+      }
+      await page.getByRole('button',{name:'Salvar',exact:true}).click();await success()
+      const row=page.getByRole('article').filter({has:page.getByRole('heading',{name:'Kit Arduino',exact:true})})
+      await expect(row).toContainText('1 kit')
+      const toggle=row.getByRole('button',{name:/Composição/})
+      await expect(toggle).toHaveAttribute('aria-expanded','false')
+      await expect(row.getByText('Jumpers',{exact:true})).toHaveCount(0)
+      await toggle.click();await expect(toggle).toHaveAttribute('aria-expanded','true')
+      await expect(row.getByText('Jumpers',{exact:true})).toBeVisible()
+      assert.equal((await service.read(admin,'inventory',school.id)).rows.find(r=>r.name==='Kit Arduino').quantity,1)
+      await row.getByRole('button',{name:/Editar \/ organizar/}).click()
+      await page.getByRole('button',{name:'Remover componente 4',exact:true}).click()
+      await expect(page.getByRole('alertdialog')).toContainText('Remover componente?')
+      await page.getByRole('button',{name:'Cancelar',exact:true}).click()
+      await expect(page.getByLabel('Quantidade do componente 4',{exact:true})).toHaveValue('10')
+      await page.getByLabel('Quantidade do componente 4',{exact:true}).fill('20')
+      await page.getByRole('button',{name:'Salvar',exact:true}).click()
+      await expect(page.getByRole('alertdialog')).toBeVisible()
+      await page.getByRole('button',{name:'Confirmar',exact:true}).click();await success()
+      await expect(row).toContainText('20 un')
+      if(process.env.SCHOOLS_UI_SCREENSHOTS) await page.screenshot({path:path.join(process.env.SCHOOLS_UI_SCREENSHOTS,'inventory-kit.png'),fullPage:true})
+      await page.setViewportSize({width:360,height:800});await noOverflow()
+      await row.getByRole('button',{name:/Editar \/ organizar/}).click();await noOverflow()
+      await page.getByRole('button',{name:'Fechar',exact:true}).click()
+      await page.setViewportSize({width:1366,height:900})
+    })
+    await t.test('filtros alteram a lista, mas preservam todos os indicadores gerais',async()=>{
+      const total=page.getByRole('button',{name:/^Total de unidades/})
+      const available=page.getByRole('button',{name:/^Disponíveis/})
+      const maintenance=page.getByRole('button',{name:/^Manutenção/})
+      const damaged=page.getByRole('button',{name:/^Danificados/})
+      await expect(total).toHaveAttribute('aria-pressed','true')
+      const original=await Promise.all([total,available,maintenance,damaged].map(button=>button.textContent()))
+      const checkTotals=async()=>{
+        for(const [index,button] of [total,available,maintenance,damaged].entries()) await expect(button).toHaveText(original[index])
+      }
+      await maintenance.click()
+      await expect(maintenance).toHaveAttribute('aria-pressed','true')
+      await expect(page.getByText('Nenhum registro encontrado.',{exact:true})).toBeVisible()
+      await expect(page.getByRole('article')).toHaveCount(0);await checkTotals()
+      await available.click();await expect(page.getByRole('article')).toHaveCount(4);await checkTotals()
+      await damaged.click();await expect(page.getByRole('article')).toHaveCount(2);await checkTotals()
+      await total.click();await expect(page.getByRole('article')).toHaveCount(4)
+      await page.getByLabel('Filtrar categoria',{exact:true}).selectOption('b9000000-0000-4000-8000-000000000002')
+      await expect(page.getByRole('article')).toHaveCount(1);await checkTotals()
+      await page.getByLabel('Pesquisar inventário',{exact:true}).fill('Não existe')
+      await expect(page.getByText('Nenhum registro encontrado.',{exact:true})).toBeVisible();await checkTotals()
+      await page.getByLabel('Pesquisar inventário',{exact:true}).fill('')
+      await page.getByLabel('Filtrar categoria',{exact:true}).selectOption('')
+      await expect(page.getByRole('article')).toHaveCount(4)
+    })
+    await t.test('admin cadastra categoria com padrões e preserva acentos',async()=>{
+      await go('/categorias')
+      await expect(page.getByText('Computadores e tablets',{exact:true})).toBeVisible()
+      await page.getByRole('button',{name:'Nova categoria',exact:true}).click()
+      await page.getByLabel('Nome',{exact:true}).fill('Sensores e comunicação')
+      await page.getByLabel('Nome em espanhol',{exact:true}).fill('Sensores y comunicación')
+      await page.getByLabel('Controle padrão',{exact:true}).selectOption('individual')
+      await page.getByRole('button',{name:'Salvar',exact:true}).click();await success()
+      await expect(page.getByText('Sensores e comunicação',{exact:true})).toBeVisible()
+    })
     await t.test('telas e modal cabem em 360px e textos seguem em espanhol',async()=>{
       await page.setViewportSize({width:360,height:800})
-      for(const suffix of ['',`/${school.id}`,`/${school.id}/requests`,`/${school.id}/links`,'/historico','/modelos']) {
-        await go(suffix);await expect(page.getByPlaceholder('Pesquisar por nome…').or(page.getByRole('heading',{name:'Equipe e turmas vinculadas'}))).toBeVisible();await noOverflow()
+      for(const suffix of ['',`/${school.id}`,`/${school.id}/requests`,`/${school.id}/links`,'/historico','/modelos','/categorias']) {
+        await go(suffix);await expect(page.getByPlaceholder('Pesquisar por nome…').or(page.getByRole('heading',{name:'Equipe e turmas vinculadas'})).or(page.getByLabel('Pesquisar inventário'))).toBeVisible();await noOverflow()
+        await expect(page.getByText('Carregando…',{exact:true})).toHaveCount(0);await noOverflow()
+        if(process.env.SCHOOLS_UI_SCREENSHOTS&&suffix===`/${school.id}`) await page.screenshot({path:path.join(process.env.SCHOOLS_UI_SCREENSHOTS,'inventory-mobile.png'),fullPage:true})
       }
-      await page.getByRole('button',{name:'Novo modelo'}).click()
+      await go('/modelos');await page.getByRole('button',{name:'Novo modelo'}).click()
       await expect(page.getByRole('dialog')).toBeVisible();await noOverflow()
       const box=await page.getByRole('dialog').boundingBox();assert.ok(box.x>=0&&box.x+box.width<=360)
       await page.getByRole('button',{name:'Fechar',exact:true}).click()

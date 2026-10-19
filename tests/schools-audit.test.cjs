@@ -10,7 +10,7 @@ Module._extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(
 let query,values,fail=false
 const originalLoad=Module._load
 Module._load=function(id,...args){
-  if(id==='@/lib/db')return {db:async(strings,...params)=>{query=strings.join('?');values=params;if(fail)throw new Error('Audit unavailable')}}
+  if(id==='@/lib/db')return {db:Object.assign(async(strings,...params)=>{query=strings.join('?');values=params;if(fail)throw new Error('Audit unavailable')},{json:value=>({jsonValue:value})})}
   return originalLoad.call(this,id,...args)
 }
 const {writeSchoolAuditMirror}=require('../lib/schools/audit.ts')
@@ -22,6 +22,7 @@ test('espelho da auditoria apenas insere e é idempotente por comando',async()=>
   assert.match(query,/ON CONFLICT \(id\) DO NOTHING/)
   assert.doesNotMatch(query,/\b(DELETE|ALTER|CREATE|UPDATE)\b/)
   assert.equal(values[0],input.commandKey)
+  assert.deepEqual(values.at(-1),{jsonValue:{command_id:input.commandKey}})
 })
 test('falha do espelho não transforma comando já confirmado em erro',async()=>{
   fail=true

@@ -26,7 +26,7 @@ test('Gestão da coordenação: visibilidade, confirmação e erros em modal',{t
   let status=200,calls=[]
   await page.route('**/api/admin/teachers/*/role',async route=>{
    const body=route.request().postDataJSON();calls.push(body)
-   if(status!==200){await route.fulfill({status,json:{error:'Sem autorização para alterar a coordenação.'}});return}
+   if(status!==200){await route.fulfill({status,json:{error:'Sem autorização para alterar a coordenação.',code:'ORIGIN',request_id:'referencia-do-teste'}});return}
    const data={role:body.role,is_admin:body.role==='admin'}
    await page.evaluate(data=>{window.savedRole=data},data)
    await route.fulfill({json:{id:teacher.id,...data,changed:true}})
@@ -66,6 +66,8 @@ test('Gestão da coordenação: visibilidade, confirmação e erros em modal',{t
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1))
    await page.getByRole('button',{name:'Tornar coordenador',exact:true}).last().click()
    await expect(page.getByRole('alertdialog')).toContainText('Sem autorização')
+   await expect(page.getByRole('alertdialog')).toContainText('Código: ORIGIN')
+   await expect(page.getByRole('alertdialog')).toContainText('Referência: referencia-do-teste')
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1))
    assert.equal(await page.evaluate(()=>window.changed),2)
    await page.getByRole('button',{name:'Entendi',exact:true}).click()

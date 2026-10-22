@@ -36,7 +36,13 @@ export default function TeacherRoleAction({teacher,canManageRoles,onChanged}:Pro
         body:JSON.stringify({role:coordinator?'teacher':'admin',expected_role:coordinator?'admin':'teacher'}),
       })
       const data = await response.json().catch(()=>null)
-      if (!response.ok) throw new Error(data?.error??'Não foi possível alterar a coordenação. Atualize a lista e tente novamente.')
+      if (!response.ok) {
+        const message = data?.error ?? 'Não foi possível alterar a coordenação. Atualize a lista e tente novamente.'
+        const code = typeof data?.code === 'string' ? `\nCódigo: ${data.code}` : ''
+        const requestId = data?.request_id ?? response.headers.get('x-request-id')
+        const reference = typeof requestId === 'string' ? `\nReferência: ${requestId}` : ''
+        throw new Error(`${message}${code}${reference}`)
+      }
       await onChanged()
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Falha de comunicação. Atualize a lista antes de tentar novamente.')

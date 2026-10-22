@@ -18,6 +18,18 @@ Sem IDs válidos, ninguém recebe a gestão de coordenação. Estar na lista nã
 
 Não existe um novo role `superadmin` no banco. O role de coordenador continua sendo `admin`, e o de professor é `teacher`. A autorização adicional de SuperAdmin é derivada somente do ID no `.env`.
 
+## URL pública e proxy de produção
+
+A validação reutiliza a variável já existente do portal, sem criar outra configuração de URL:
+
+```dotenv
+NEXT_PUBLIC_SITE_URL=https://portal.bw9global.com
+```
+
+Use o domínio real de acesso, com protocolo e porta se não for a padrão. A origem do navegador precisa corresponder à origem dessa URL, mesmo quando o Next.js recebe HTTP por uma URL interna do contêiner. Se a variável já estiver correta, não é necessário alterá-la: basta publicar o código corrigido. Caso o valor seja alterado, faça novo build/deploy, pois variáveis `NEXT_PUBLIC_` podem ser incorporadas ao código durante o build. Sem essa variável, a comparação usa a origem da requisição recebida pelo Next.js, preservando o acesso direto local.
+
+Uma configuração inválida é recusada, sem liberar qualquer origem como fallback. Não informe listas, curingas nem credenciais nessa URL. A rota não confia em `X-Forwarded-Host` ou `X-Forwarded-Proto` para autorizar a origem. Domínios externos, `Origin: null` e requisições identificadas pelo navegador como cross-site continuam bloqueados. Chamadas sem `Origin` e sem indicação de acesso entre sites mantêm compatibilidade com clientes não navegadores, sempre exigindo autenticação e SuperAdmin.
+
 ## Utilização
 
 Em **Gerenciar Professores**, o SuperAdmin verá, nas linhas elegíveis:
@@ -58,6 +70,23 @@ As proteções administrativas se aplicam aos IDs configurados: retirar um ID do
 Para remover: `{ "role": "teacher", "expected_role": "admin" }`.
 
 Respostas: 200 sucesso; 400 entrada inválida; 401 sessão expirada; 403 sem autorização/origem inválida; 404 usuário ausente; 409 conta protegida, papel desatualizado/incompatível ou cadastro não aprovado/ativo; 413 corpo excessivo; 500 falha transacional. Sem mudança efetiva, retorna `changed: false` e não revoga sessões nem gera uma auditoria de mudança.
+
+## Diagnóstico de recusas e falhas
+
+Todas as respostas da rota incluem `X-Request-ID` e `Cache-Control: private, no-store`. Os erros tratados também incluem `code` e `request_id` no JSON. O modal mostra o motivo, o código e a referência para localizar o evento no servidor.
+
+- `SUPER_ADMIN_REQUIRED`: a conta autenticada não é admin autorizado na lista do servidor, ou a autorização foi alterada durante a operação. Verifique o ID da pessoa logada, não o ID da pessoa que receberá a coordenação, e a configuração de todas as instâncias.
+- `ORIGIN`: a origem do navegador não corresponde à URL pública configurada. Confira `NEXT_PUBLIC_SITE_URL`, o domínio usado no navegador e o proxy.
+- `ORIGIN_CONFIG_INVALID`: a URL configurada não é uma URL HTTP/HTTPS válida sem credenciais.
+- `ROLE_CHANGE_FAILED`: a transação foi desfeita; nenhuma mudança de papel ou revogação de sessão foi confirmada.
+
+Recusas e falhas geram logs estruturados com os prefixos `[admin.teachers.role.denied]` ou `[admin.teachers.role.failed]`, contendo código, referência, status HTTP e origens normalizadas, sem corpo da requisição, cookies, tokens, senhas ou lista do `.env`.
+
+Tentativas de admins autenticados também geram uma auditoria `admin.teachers.role.change`, com `status: failed`, código e referência em `metadata`. Na tela de auditoria, filtre por **Falha** e pela ação. Esse registro é feito após o rollback, sem DDL nem limpeza de histórico. Se o banco ou a auditoria estiverem indisponíveis, o registro não poderá ser persistido: o servidor emitirá `[admin.teachers.role.audit.failed]` com a mesma referência e manterá a recusa original. Requisições sem autenticação administrativa validada geram somente log do servidor, evitando escritas anônimas no banco.
+
+Os avisos `[runtime-schema] mutation skipped` não indicam por si só a causa de um `403`; não habilite alterações de esquema para resolver uma recusa de autorização.
+
+Após implantar esta versão, um `403` sem `X-Request-ID` pode indicar uma resposta anterior à rota (proxy/middleware) ou uma instância ainda executando a versão antiga. Confira a resposta no painel Network do navegador e o deploy de todas as instâncias antes de mudar permissões.
 
 ## Banco e homologação
 

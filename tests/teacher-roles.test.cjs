@@ -6,15 +6,16 @@ const {isolatedPostgres}=require('./helpers/isolated-postgres.cjs')
 Module._extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{
  compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true},
 }).outputText,filename)
-const saved={single:process.env.SUPER_ADMIN_ID,multiple:process.env.SUPER_ADMIN_IDS}
+const saved={single:process.env.SUPER_ADMIN_ID,multiple:process.env.SUPER_ADMIN_IDS,site:process.env.NEXT_PUBLIC_SITE_URL}
 const restoreEnv=()=>{
- for(const [key,value] of [['SUPER_ADMIN_ID',saved.single],['SUPER_ADMIN_IDS',saved.multiple]])
+ for(const [key,value] of [['SUPER_ADMIN_ID',saved.single],['SUPER_ADMIN_IDS',saved.multiple],['NEXT_PUBLIC_SITE_URL',saved.site]])
   if(value===undefined)delete process.env[key];else process.env[key]=value
 }
 test('SuperAdmin: gestão de coordenação, proteção de contas e auditoria atômica',{timeout:60000},async t=>{
  const p=new PGlite(),queries=[]
  let isolated
  try {
+  delete process.env.NEXT_PUBLIC_SITE_URL
   await p.exec(`CREATE TABLE teachers(id uuid PRIMARY KEY,name text DEFAULT 'Professor de teste',email text DEFAULT 'teste@example.test',phone text DEFAULT '11999990000',
    country text DEFAULT 'BR',locale text DEFAULT 'pt-BR',document_type text DEFAULT 'CPF',document_number text DEFAULT '12345678900',avatar_url text,
    approved boolean DEFAULT true,active boolean DEFAULT true,role text DEFAULT 'teacher',is_admin boolean DEFAULT false,
@@ -61,7 +62,7 @@ test('SuperAdmin: gestão de coordenação, proteção de contas e auditoria at�
   const request=(id,body,headers={},method='PATCH')=>new NextRequest(`https://portal.example.test/api/admin/teachers/${id}/role`,{
    method,headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body)})
   const call=(body={role:'admin',expected_role:'teacher'},id=teacher,headers={})=>rolePatch(request(id,body,headers),ctx(id))
-  const auditCount=async()=>(await sql`SELECT count(*)::int n FROM audit_logs`)[0].n
+  const auditCount=async()=>(await sql`SELECT count(*)::int n FROM audit_logs WHERE status='success'`)[0].n
   const countSessions=async id=>(await sql`SELECT count(*)::int n FROM teacher_sessions WHERE teacher_id=${id} AND revoked_at IS NULL`)[0].n
   const initial=await row(teacher),other=await row(pending)
   await t.test('allowlist é exclusiva do servidor, aceita singular/lista e falha fechada',async()=>{
@@ -96,7 +97,7 @@ test('SuperAdmin: gestão de coordenação, proteção de contas e auditoria at�
     }
    } finally {auth=previous}
   })
-  await t.test('entrada inválida, origem externa, autoalteração e contas protegidas não gravam',async()=>{
+  await t.test('entrada inválida, origem externa, autoalteração e contas protegidas não alteram cadastros',async()=>{
    const count=await auditCount()
    for(const value of [null,{},[],{role:'superadmin',expected_role:'teacher'},{role:'admin',expected_role:'teacher',is_super_admin:true}])
     assert.equal((await call(value)).status,400)
@@ -123,7 +124,7 @@ test('SuperAdmin: gestão de coordenação, proteção de contas e auditoria at�
    const stored=await row(teacher)
    for(const field of Object.keys(initial).filter(k=>!['role','is_admin','updated_at'].includes(k))) assert.deepEqual(stored[field],initial[field])
    assert.equal(await countSessions(teacher),0);assert.equal(await countSessions(owner),1);assert.equal(await countSessions(admin),1)
-   const [audit]=await sql`SELECT *,jsonb_typeof(metadata) kind FROM audit_logs WHERE target_id=${teacher}`
+   const [audit]=await sql`SELECT *,jsonb_typeof(metadata) kind FROM audit_logs WHERE target_id=${teacher} AND status='success'`
    assert.equal(audit.kind,'object');assert.equal(audit.action,'admin.teachers.role.change');assert.equal(audit.actor_id,owner)
    assert.equal(audit.metadata.before.role,'teacher');assert.equal(audit.metadata.after.is_admin,true);assert.equal(audit.metadata.revoked_sessions,2)
    const auditResponse=await auditGet(new NextRequest('https://portal.example.test/api/admin/audit'))
@@ -193,5 +194,96 @@ test('SuperAdmin: gestão de coordenação, proteção de contas e auditoria at�
    assert.ok(data.approved.every(t=>t.role_management_protected===false))
    assert.ok(queries.every(query=>!/^\s*(CREATE|ALTER|DROP|TRUNCATE)/i.test(query)))
   })
+  await t.test('proxy aceita apenas a origem pública configurada, sem mudar o papel em pedido sem alteração',async()=>{
+   process.env.SUPER_ADMIN_ID=owner
+   const publicOrigin='https://portal.example.test',url=`http://0.0.0.0:80/api/admin/teachers/${teacher}/role`
+   const before=await row(teacher),sessions=await countSessions(teacher),count=await auditCount()
+   const throughProxy=()=>rolePatch(new NextRequest(url,{method:'PATCH',headers:{origin:publicOrigin,'content-type':'application/json'},
+    body:JSON.stringify({role:'teacher',expected_role:'teacher'})}),ctx(teacher))
+   process.env.NEXT_PUBLIC_SITE_URL=`${publicOrigin}/`
+   let response=await throughProxy()
+   assert.equal(response.status,200);assert.equal((await response.json()).changed,false)
+   assert.match(response.headers.get('x-request-id'),/^[0-9a-f-]{36}$/)
+   process.env.NEXT_PUBLIC_SITE_URL=`${publicOrigin}:443/`
+   assert.equal((await throughProxy()).status,200)
+   process.env.NEXT_PUBLIC_SITE_URL=`${publicOrigin}/portal`
+   assert.equal((await throughProxy()).status,200)
+   process.env.NEXT_PUBLIC_SITE_URL='https://outro.example.test'
+   const rejected=await throughProxy()
+   assert.equal(rejected.status,403);assert.equal((await rejected.json()).code,'ORIGIN')
+   assert.deepEqual(await row(teacher),before);assert.equal(await countSessions(teacher),sessions);assert.equal(await auditCount(),count)
+   delete process.env.NEXT_PUBLIC_SITE_URL
+  })
+  await t.test('origens externas, null e cabeçalhos de proxy forjados continuam bloqueados e auditados',async()=>{
+   const before=await row(teacher),sessions=await countSessions(teacher)
+   process.env.NEXT_PUBLIC_SITE_URL='https://portal.example.test'
+   const log=console.warn,warnings=[];console.warn=(...args)=>warnings.push(args)
+   try {
+    for(const headers of [
+     {origin:'https://externo.example.test'},
+     {origin:'null'},
+     {origin:''},
+     {origin:'https://portal.example.test.evil.test'},
+     {origin:'https://portal.example.test@evil.test'},
+     {origin:'https://portal.example.test/path'},
+     {origin:'https://portal.example.test', 'sec-fetch-site':'cross-site'},
+     {'sec-fetch-site':'cross-site'},
+     {'sec-fetch-site':'same-site'},
+     {origin:'https://externo.example.test','x-forwarded-host':'externo.example.test','x-forwarded-proto':'https'},
+    ]) {
+     const response=await call(undefined,teacher,headers),body=await response.json()
+     assert.equal(response.status,403);assert.equal(body.code,'ORIGIN')
+     assert.equal(response.headers.get('cache-control'),'private, no-store')
+     assert.equal(response.headers.get('x-request-id'),body.request_id)
+     const [event]=await sql`SELECT *,jsonb_typeof(metadata) kind FROM audit_logs WHERE metadata->>'request_id'=${body.request_id}`
+     assert.equal(event.status,'failed');assert.equal(event.actor_id,owner);assert.equal(event.target_id,teacher)
+     assert.equal(event.action,'admin.teachers.role.change');assert.equal(event.kind,'object')
+     assert.equal(event.metadata.reason_code,'ORIGIN');assert.equal(event.metadata.http_status,403)
+     assert.equal(event.metadata.expected_origin,'https://portal.example.test')
+     assert.equal(event.metadata.origin_source,'NEXT_PUBLIC_SITE_URL')
+     assert.ok(warnings.some(([label,entry])=>label==='[admin.teachers.role.denied]'&&entry.request_id===body.request_id))
+    }
+    const auditResponse=await auditGet(new NextRequest('https://portal.example.test/api/admin/audit?status=failed'))
+    assert.equal(auditResponse.status,200)
+    assert.ok((await auditResponse.json()).items.some(item=>item.action==='admin.teachers.role.change'&&item.relevance_level==='critical'))
+    assert.deepEqual(await row(teacher),before);assert.equal(await countSessions(teacher),sessions)
+   } finally {console.warn=log;delete process.env.NEXT_PUBLIC_SITE_URL}
+  })
+  await t.test('configuração inválida falha fechada e não usa cabeçalhos ou outra URL como fallback',async()=>{
+   try {
+    for(const value of ['não é uma URL','*','null','ftp://portal.example.test','https://user:senha@portal.example.test']) {
+     process.env.NEXT_PUBLIC_SITE_URL=value
+     const response=await call(undefined,teacher,{origin:'https://portal.example.test'})
+     assert.equal(response.status,403);assert.equal((await response.json()).code,'ORIGIN_CONFIG_INVALID')
+    }
+    delete process.env.NEXT_PUBLIC_SITE_URL
+    assert.equal((await call(undefined,teacher,{origin:'https://externo.example.test','x-forwarded-host':'externo.example.test'})).status,403)
+   } finally {delete process.env.NEXT_PUBLIC_SITE_URL}
+  })
+  await t.test('admin fora da lista recebe razão rastreável sem registrar corpo, cookies ou segredos',async()=>{
+   const previous=auth
+   auth={ok:true,teacherId:admin,sessionId:adminSession,teacher:await row(admin)}
+   try {
+    const response=await call({password:'SEGREDO-NAO-REGISTRAR',token:'TOKEN-NAO-REGISTRAR'},teacher,
+     {cookie:'sessao=COOKIE-NAO-REGISTRAR',authorization:'Bearer AUTH-NAO-REGISTRAR'})
+    assert.equal(response.status,403)
+    const body=await response.json();assert.equal(body.code,'SUPER_ADMIN_REQUIRED')
+    const [event]=await sql`SELECT * FROM audit_logs WHERE metadata->>'request_id'=${body.request_id}`
+    assert.equal(event.actor_id,admin);assert.equal(event.status,'failed');assert.equal(event.metadata.reason_code,'SUPER_ADMIN_REQUIRED')
+    assert.doesNotMatch(JSON.stringify(event),/NAO-REGISTRAR/)
+   } finally {auth=previous}
+  })
+  await t.test('auditoria indisponível não converte recusa em sucesso e deixa log de contingência',async()=>{
+   const before=await row(teacher),sessions=await countSessions(teacher),log=console.error,errors=[]
+   await p.exec('CREATE TRIGGER fail_role_audit BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION fail_role_audit()')
+   console.error=(...args)=>errors.push(args)
+   try {
+    const response=await call(undefined,teacher,{origin:'https://externo.example.test'}),body=await response.json()
+    assert.equal(response.status,403);assert.equal(body.code,'ORIGIN')
+    assert.ok(errors.some(([label,entry])=>label==='[admin.teachers.role.audit.failed]'&&entry.request_id===body.request_id))
+    assert.deepEqual(await row(teacher),before);assert.equal(await countSessions(teacher),sessions)
+   } finally {console.error=log;await p.exec('DROP TRIGGER fail_role_audit ON audit_logs')}
+  })
+  assert.ok(queries.every(query=>!/^\s*(CREATE|ALTER|DROP|TRUNCATE|DELETE FROM public.audit_logs)/i.test(query)))
  } finally {restoreEnv();await isolated?.close();await p.close()}
 })

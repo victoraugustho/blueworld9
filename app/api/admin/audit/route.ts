@@ -98,6 +98,7 @@ const AUDIT_RELEVANCE_SQL = db`
       OR action ILIKE '%revoke%'
       OR action ILIKE '%transfer%'
       OR action ILIKE '%ownership%'
+      OR action = 'admin.teachers.role.change'
       OR action ILIKE '%lock%'
       OR action ILIKE '%close%'
       OR action ILIKE 'auth.password_reset.confirm%'

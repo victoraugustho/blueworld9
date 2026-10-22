@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
+import { canEditProtectedAccount, isConfiguredSuperAdminId } from "@/lib/auth/super-admin"
 import { writeAuditLog } from "@/lib/audit"
 import {
   normalizeTeacherPortalPermissions,
@@ -23,6 +24,9 @@ async function decideRegistration(req: NextRequest, ctx: Ctx) {
 
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
+  if (!canEditProtectedAccount({...admin.teacher,id:admin.teacherId},id)) {
+    return NextResponse.json({error:"Somente o SuperAdmin pode decidir o cadastro de uma conta protegida."},{status:403})
+  }
 
   const body = await req.json().catch(() => ({}))
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -60,6 +64,9 @@ async function decideRegistration(req: NextRequest, ctx: Ctx) {
   }
 
   const decision = body.decision as "approve" | "reject"
+  if (isConfiguredSuperAdminId(id) && decision === "reject") {
+    return NextResponse.json({error:"Uma conta protegida pelo .env não pode ser desaprovada por esta opção."},{status:409})
+  }
   const canDownload = body.can_download
   const portalPermissions = normalizeTeacherPortalPermissions(body.portal_permissions)
   const contentPermissions = normalizeTeacherContentPermissions(body.content_permissions)

@@ -5,6 +5,7 @@ import { writeAuditLog } from "@/lib/audit"
 import { ensureTurmasSchema, normalizeCategoryIds, normalizeStudentYears } from "@/lib/turmas"
 import { normalizeTeacherPortalPermissions } from "@/lib/auth/teacher-permissions"
 import { normalizeTeacherContentPermissions } from "@/lib/auth/teacher-content-permissions"
+import { canEditProtectedAccount, isConfiguredSuperAdminId } from "@/lib/auth/super-admin"
 
 type Country = "BR" | "UY" | "PY"
 type DocType = "CPF" | "CI_UY" | "CI_PY"
@@ -125,10 +126,12 @@ export async function PUT(req: NextRequest, context: Ctx) {
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
 
-  await ensureTurmasSchema()
-
   const resolved = await context.params
   const id = String(resolved?.id ?? "").trim()
+  if (!canEditProtectedAccount({...admin.teacher,id:admin.teacherId},id)) {
+    return NextResponse.json({error:"Somente o SuperAdmin pode editar uma conta protegida."},{status:403})
+  }
+  await ensureTurmasSchema()
   const body = await req.json().catch(() => ({}))
 
   const name = String(body.name ?? "").trim()
@@ -142,6 +145,9 @@ export async function PUT(req: NextRequest, context: Ctx) {
 
   const approved = !!body.approved
   const active = body.active !== undefined ? !!body.active : true
+  if (isConfiguredSuperAdminId(id) && (!approved || !active)) {
+    return NextResponse.json({error:"Uma conta protegida pelo .env não pode ser desativada ou desaprovada por esta opção."},{status:409})
+  }
   const can_download = body.can_download !== undefined ? !!body.can_download : true
   const portal_permissions = normalizeTeacherPortalPermissions(body.portal_permissions)
   const content_permissions = normalizeTeacherContentPermissions(body.content_permissions)
@@ -329,10 +335,12 @@ export async function DELETE(req: NextRequest, context: Ctx) {
   const admin = await requireAdminApi()
   if (!admin.ok) return admin.response
 
-  await ensureTurmasSchema()
-
   const resolved = await context.params
   const id = String(resolved?.id ?? "").trim()
+  if (isConfiguredSuperAdminId(id)) {
+    return NextResponse.json({error:"Uma conta protegida pelo .env não pode ser excluída."},{status:409})
+  }
+  await ensureTurmasSchema()
 
   await db`
     DELETE FROM teachers

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { requireAdminApi } from "@/lib/auth/require"
 import { ensureTurmasSchema } from "@/lib/turmas"
+import { isConfiguredSuperAdminId, isSuperAdmin } from "@/lib/auth/super-admin"
 
 export async function GET() {
   const admin = await requireAdminApi()
@@ -14,7 +15,7 @@ export async function GET() {
       id, name, email, phone,
       avatar_url,
       country, locale, document_type, document_number,
-      approved, active,
+      approved, active, role, is_admin,
       COALESCE(NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean, TRUE) AS can_download,
       COALESCE(
         to_jsonb(teachers)->'portal_permissions',
@@ -51,7 +52,7 @@ export async function GET() {
       id, name, email, phone,
       avatar_url,
       country, locale, document_type, document_number,
-      approved, active,
+      approved, active, role, is_admin,
       COALESCE(NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean, TRUE) AS can_download,
       COALESCE(
         to_jsonb(teachers)->'portal_permissions',
@@ -88,7 +89,7 @@ export async function GET() {
       id, name, email, phone,
       avatar_url,
       country, locale, document_type, document_number,
-      approved, active,
+      approved, active, role, is_admin,
       COALESCE(NULLIF(to_jsonb(teachers)->>'can_download', '')::boolean, TRUE) AS can_download,
       COALESCE(
         to_jsonb(teachers)->'portal_permissions',
@@ -120,5 +121,13 @@ export async function GET() {
     ORDER BY created_at DESC
   `
 
-  return NextResponse.json({ approved, pending, disabled })
+  const describe = (teacher: (typeof approved)[number]) => ({
+    ...teacher,
+    is_super_admin: isSuperAdmin(teacher),
+    role_management_protected: isConfiguredSuperAdminId(teacher.id),
+  })
+  return NextResponse.json({
+    approved:approved.map(describe),pending:pending.map(describe),disabled:disabled.map(describe),
+    can_manage_roles:isSuperAdmin({...admin.teacher,id:admin.teacherId}),
+  }, {headers:{'Cache-Control':'private, no-store'}})
 }

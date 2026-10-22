@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { useConfirmDialog } from "@/components/ui/use-confirm-dialog"
+import TeacherRoleAction from "@/components/admin/TeacherRoleAction"
+import { isAdminUser } from "@/lib/auth/authorization"
 import type { Teacher } from "@/app/types/portal"
 import {
   TeacherApprovalDialog,
@@ -28,6 +30,7 @@ type TeachersGrouped = {
   approved: Teacher[]
   pending: Teacher[]
   disabled: Teacher[]
+  can_manage_roles?: boolean
 }
 
 type Tab = "approved" | "pending" | "disabled"
@@ -131,6 +134,7 @@ export default function AdminTeachersPage() {
   const [data, setData] = useState<TeachersGrouped>({ approved: [], pending: [], disabled: [] })
   const [activeTab, setActiveTab] = useState<Tab>("approved")
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState("")
   const [approvalTeacher, setApprovalTeacher] = useState<Teacher | null>(null)
   const [approvalBusy, setApprovalBusy] = useState(false)
   const [approvalError, setApprovalError] = useState("")
@@ -146,10 +150,14 @@ export default function AdminTeachersPage() {
 
   async function load() {
     setLoading(true)
+    setLoadError("")
     try {
       const res = await fetch("/api/admin/teachers", { cache: "no-store" })
-      const json = await res.json()
+      const json = await res.json().catch(()=>null)
+      if (!res.ok || !json) throw new Error(json?.error??"Não foi possível carregar os professores.")
       setData(json)
+    } catch (failure) {
+      setLoadError(failure instanceof Error ? failure.message : "Não foi possível atualizar a lista. Tente novamente.")
     } finally {
       setLoading(false)
     }
@@ -348,6 +356,7 @@ export default function AdminTeachersPage() {
         </div>
       </div>
 
+      {loadError&&<p role="alert" className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{loadError} Use o botão Atualizar antes de alterar a coordenação.</p>}
       {loading && <p className="text-slate-400">Carregando...</p>}
 
       {!loading && teachers.length === 0 && (
@@ -401,6 +410,7 @@ export default function AdminTeachersPage() {
                               {t.name}
                             </Link>
                             <p className="text-xs text-white/60 truncate">{t.email}</p>
+                            {isAdminUser(t)&&<span className="mt-1 inline-flex rounded-md border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-medium text-cyan-200">{t.is_super_admin?'SuperAdmin':'Coordenador'}</span>}
                           </div>
 
                           <div className="text-xs text-white/80 space-y-2">
@@ -416,6 +426,7 @@ export default function AdminTeachersPage() {
                           </div>
 
                           <div className="flex items-center gap-2 lg:justify-end">
+                            <TeacherRoleAction teacher={t} canManageRoles={data.can_manage_roles===true&&!loadError} onChanged={load}/>
                             <IconButton
                               title="Copiar ID"
                               onClick={async () => {
@@ -462,7 +473,7 @@ export default function AdminTeachersPage() {
                               </IconButton>
                             )}
 
-                            {activeTab !== "disabled" ? (
+                            {!t.role_management_protected&&(activeTab !== "disabled" ? (
                               <IconButton
                                 title="Desativar"
                                 onClick={() => disable(t)}
@@ -478,7 +489,7 @@ export default function AdminTeachersPage() {
                               >
                                 <RotateCcw className="w-4 h-4" />
                               </IconButton>
-                            )}
+                            ))}
                           </div>
                         </div>
                       )

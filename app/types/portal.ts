@@ -87,6 +87,9 @@ export interface Teacher {
   created_at?: string
   updated_at?: string
   role?: string | null
+  is_admin?: boolean | null
+  is_super_admin?: boolean
+  role_management_protected?: boolean
   category_ids?: number[]
   categories?: Category[]
   turma_count?: number
